@@ -43,8 +43,11 @@
   (check-equal? (run '(((lam x (lam x x)) (lam z z)) (lam w w)))
                 '(lam w w)))
 (define (run e)
-  (let loop ([c e] [env empty-env] [k '()])
-    (define-values (c* env* k*) (step c env k))
-    (match* (c* k*)
-      [((? value? v) '()) v]
-      [(_ _) (loop c* env* k*)])))
+  (match e
+    [(? value? v) v]
+    [_
+     (let loop ([c e] [env empty-env] [k '()])
+       (define-values (c* env* k*) (step c env k))
+       (match* (c* k*)
+         [((? value? v) '()) v]
+         [(_ _) (loop c* env* k*)]))]))
