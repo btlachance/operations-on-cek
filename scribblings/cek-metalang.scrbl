@@ -106,4 +106,61 @@ unnecessary boxing/dispatch overheads?  Even pycket boxes a lot of
 values at the metalevel (e.g. no 31-bit signed integers), but they
 don't appear to be subclasses of AST.}
 
+@section{Restrictions}
+
+@subsection{Ambiguities and how we resolve them}
+Imagine you're writing a semantics for the CBV lambda calculus with
+cons.
+
+@codeblock{
+  (define-cek
+    #:expression
+    (e ::= x v (e e) (cons e e))
+    (v ::= (lam x e) (cons v v))
+    ...
+    #:step
+    [((cons (lam x_1 e_1) (lam x_2 e_2)) env k) --> ...])
+}
+
+I don't think we can support steps like the one written above. The
+control string can be interpreted as an expression and as a value, and
+I don't know of a good heuristic to break the tie. What we can allow
+are steps like
+
+@codeblock{
+  (define-cek
+    #:expression
+    (e ::= x v (e e) (cons e e))
+    (v ::= (lam x e) (cons v v))
+    ...
+    #:step
+    [((cons e_1 e_2) env k) --> ...]
+    [((cons v_1 v_2) env k) --> ...])
+}
+
+The first rule is OK because @code{(cons e e)} is only an
+expression. The second rule, even though @code{(cons v v)} can be
+either an expression or a value, is ok because of the following
+heuristic: when a step dispatches on an instance of a form that
+belongs to multiple classes, we pick the class of the production that
+introduced the form. So, for @code{(cons v_1 v_2)} we pick the class
+for @code{v}.
+
+FWIW, we didn't need cons to introduce this heuristic---the same
+problem crops up with plain ol' CBV lambda calculus
+
+@codeblock{
+  (define-cek
+    #:expression
+    (e ::= x v (e e))
+    (v ::= (lam x e))
+    ...)
+}
+
+The two rules that dispatch on @code{v} (the ones that deal with
+evaluating the argument and applying the function) end up being part
+of the interpret method for @code{v}. Although all @code{v} are
+@code{e}, the rule that introduced @code{v} is the @code{v}
+production.
+
 @(TODO-part)
