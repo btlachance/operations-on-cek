@@ -106,24 +106,4 @@ unnecessary boxing/dispatch overheads?  Even pycket boxes a lot of
 values at the metalevel (e.g. no 31-bit signed integers), but they
 don't appear to be subclasses of AST.}
 
-@section{Restrictions}
-
-Currently, we require the expression position of every step to
-syntactically correspond to a single form. Because the example below
-refers to @code{e} in the expression position, we reject it. @TODO{Do we
-have to have this restriction? Right now, it's becuase we want to be
-able to compile each form to a class in RPython. Is that even
-necessary? It's what Pycket does, but what are the alternatives and
-tradeoffs to other compilation styles?}
-
-@codeblock{
- (define-cek
-   #:expression
-   (e ::= n (add1 e))
-   #:env ...
-   #:continuation ...
-   #:step
-   [(e env k) --> (,(println (term e)) env k)])
-}
-
 @(TODO-part)
