@@ -83,6 +83,7 @@ particularly historic.
 
 @section{Compiling}
 
+@subsection{General}
 As the Racket and SML examples above showed, pattern matching makes
 for simple CEK machine-style interpreters. Specifically, it makes it
 easy to dispatch on any combination of the machine's registers.
@@ -105,6 +106,60 @@ values have to be subclasses of our AST in RPython, will this incur
 unnecessary boxing/dispatch overheads?  Even pycket boxes a lot of
 values at the metalevel (e.g. no 31-bit signed integers), but they
 don't appear to be subclasses of AST.}
+
+@subsection{Grouping transitions by their implementing class}
+
+Our general compilation strategy is to turn every expression form into
+a class with an intepret method. For the CBV lambda calculus, for
+example, we would have a class Expr that represents all expressions
+and Expr would have subclasses Var for variables, Val for values, and
+App for applications. As the only value form, Lam (for lambdas) is the
+only subclass of Val.
+
+Given that class hierarchy we then have to assign each machine
+transition with an interpret method for a particular class, sometimes
+combining multiple transitions in one interpret method. Let's dive
+into each of the four transitions below.
+
+@codeblock{
+  (define-cek
+    #:expression
+    (e ::= x v (e e))
+    (x ::= variable)
+    (v ::= (lam x e))
+    #:env ...
+    #:continuation ...
+    #:step
+    [(x env k) --> ((lookup env x) env k)]
+    [((e_1 e_2) env k) --> (e_1 env (arg e_2 env k))]
+    [(v env_0 (arg e env k)) --> (e env (fn v env_0 k))]
+    [(v env_0 (fn (lam x e) env k)) --> (e (extend env x v) k)])
+}
+
+The control string in the first transition corresponds to the Var
+class, and so the transition is implemented in Var's interpret
+method. The next transition, function application, corresponds to the
+App class and so this transition is implemented in App's interpret
+method. The final two transitions corresponds to the Val class, and so
+they are implemneted in Val's interpret method.
+
+(Note: We didn't say that anything gets implemented in Lam's interpret
+method. By default, a subclass just calls its parent's interpret
+method, which means Lam just calls Val's interpet.)
+
+How do we mechanically determine if a transition corresponds to a
+class? Given the expression grammar, we can generate a syntax class
+for each syntactic form that only matches when a a pattern is an
+instance of that form. We can then turn the syntax class into a
+predicate using @racket{syntax-parser}. Each transition is written in
+the pattern language, and the pattern language is what allows us to
+use the underscore suffixnotation (as in @code{e_1} and @code{e_2}) to
+distinguish between different forms.
+
+To find the transitions that correspond to a class, find all of the
+transitions whose left-hand side control string satisfies the class'
+predicate. Repeat this for each class, and now you know which
+transitions must be implemented by each class.
 
 @section{Restrictions}
 
@@ -162,5 +217,7 @@ evaluating the argument and applying the function) end up being part
 of the interpret method for @code{v}. Although all @code{v} are
 @code{e}, the rule that introduced @code{v} is the @code{v}
 production.
+
+
 
 @(TODO-part)
