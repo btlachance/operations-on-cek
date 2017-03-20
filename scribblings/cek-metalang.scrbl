@@ -161,6 +161,49 @@ transitions whose left-hand side control string satisfies the class'
 predicate. Repeat this for each class, and now you know which
 transitions must be implemented by each class.
 
+@subsection{Generating syntax classes for each syntactic form}
+
+We want to compile this BNF
+@codeblock{
+  (e ::= x v (e e))
+  (x ::= variable-not-otherwise-mentioned)
+  (v ::= (lam x e))
+}
+into syntax classes that recognize each of the specified syntactic
+forms. As in Redex, the variable-not-otherwise-mentioned terminal has
+special meaning and matches any symbol that's not a literal in the
+rest of the grammar. The only literal in the grammar above is
+@code{lam}.
+
+To generate the syntax class for
+@code{variable-not-otherwise-mentioned}, we have to do two things
+@itemlist[
+  @item{Give every metavariable and literal a binding@TODO{This is
+        useful even when we don't use
+        @code{variable-not-otherwise-mentioned}. Try to find a way to
+        say this.}.}
+
+  @item{Collect the literals' identifiers into a syntax class
+        containing a pattern that does not match any of the literals.
+        This syntax class is the class for (and the meaning of)
+        @code{variable-not-otherwise-mentioned}.}
+]
+
+
+All remaining syntactic forms are exactly one of metavariable,
+literal, or combination of one or more syntactic forms. We can
+generate a syntax class for each of the remaining forms by considering
+those three cases
+@itemlist[
+  @item{If the form is a metavariable, then its syntax class contains
+        a pattern that matches any of its right-hand side's patterns.}
+  @item{If the form is a literal, then its syntax class contains a
+        pattern that matches the binding given above to this literal.}
+  @item{Otherwise, the form is a combination of syntactic forms, and
+        the form's syntax class contains a pattern that matches a list
+        of the syntactic forms.}
+]
+
 @section{Restrictions}
 
 @subsection{Ambiguities and how we resolve them}
