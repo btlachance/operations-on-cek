@@ -44,6 +44,7 @@
     [(define-cek name
        #:expression
        expr:production ...
+       #:val value-form
        #:env
        env:production
        #:continuation

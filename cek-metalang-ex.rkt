@@ -1,5 +1,21 @@
 #lang racket
-(module+ test-ex.adder
+(module+ test-ex.environment
+  (require
+   rackunit
+   "cek-metalang.rkt")
+  (define-cek environment
+    #:expression
+    (e ::= var)
+    (var ::= x y z)
+    #:val natural
+    #:env
+    (env ::= default-env)
+    #:continuation
+    (k ::= default-mt)
+    #:step
+    [(var env k) --> ((lookup env var) env k)]))
+
+(module+ test-ex.lc
   (require
    rackunit
    "cek-metalang.rkt")
@@ -10,6 +26,7 @@
                     ;; We can remove this limitation later with
                     ;; something like variable-not-otherwise-mentioned
     (v ::= (lam var e))
+    #:val v
     #:env
     (env ::= default-env)
     #:continuation
