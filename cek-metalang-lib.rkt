@@ -39,4 +39,5 @@
     #:literals (-->)
     (pattern [(~and lhs (e-l env-l k-l))
               -->
-              (~and rhs (e-r env-r k-r))]))
+              (~and rhs (e-r env-r k-r))
+              #:implemented-by form]))
