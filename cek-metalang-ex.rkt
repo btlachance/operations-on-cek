@@ -13,7 +13,8 @@
     #:continuation
     (k ::= default-mt)
     #:step
-    [(var env k) --> ((lookup env var) env k)]))
+    [(var env k) --> ((lookup env var) env k)
+     #:implemented-by var]))
 
 (module+ test-ex.lc
   (require

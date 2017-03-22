@@ -4,7 +4,7 @@
  syntax/parse
  (for-template racket/base))
 
-(provide production)
+(provide production step)
 (module+ test
   (require rackunit))
 

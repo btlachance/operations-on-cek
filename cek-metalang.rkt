@@ -50,7 +50,7 @@
        #:continuation
        k:production
        #:step
-       step ...)
+       s:step ...)
      #`(begin
          (define expr.name (void)) ...
          (define env.name (void))
@@ -59,4 +59,4 @@
           #'expr ...
           #'env
           #'k
-          #'step ...))]))
+          #'s ...))]))
