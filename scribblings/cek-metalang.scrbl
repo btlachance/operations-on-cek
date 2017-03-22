@@ -261,6 +261,28 @@ of the interpret method for @code{v}. Although all @code{v} are
 @code{e}, the rule that introduced @code{v} is the @code{v}
 production.
 
+@;; TODO we might be able to reduce the annotation "overhead" and be a
+@;; little more general if we have the specification something like
+@;;     (define-cek lc
+@;;       #:syntax
+@;;       (e ::= ...)
+@;;       (v ::= ...)
+@;;       (env ::= ...)
+@;;       (k ::= ...)
+@;;       (c ::= (e env k))
+@;;       #:configuration c
+@;;       #:val v
+@;;       #:transition [s1 -> s2] ...)
+@;; It might make compilation a little harder (e.g. I'm not sure if we
+@;; can easily tell where in the configuration calls to lookup will
+@;; occur) but we would know that the left-hand side of a transition
+@;; should be compiled as a pattern and the right-hand side of a
+@;; transition should be compiled as a template. Then, we just need
+@;; to generate a compile pattern/compile template function for each
+@;; of the pieces of the configuration.
+@;;
+@;; If we can accomplish that generally, then this might be useful
+@;; for evaluating how different abstract machines compile to RPython
 
 
 @(TODO-part)
