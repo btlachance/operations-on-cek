@@ -24,6 +24,7 @@
              (raise-syntax-error 'cek-metalang "out of context")) ...
              (provide id) ...)]))
   (keywords ::= -->
+            natural
             default-env lookup extend
             default-mt ::))
 (require (for-template 'keywords))

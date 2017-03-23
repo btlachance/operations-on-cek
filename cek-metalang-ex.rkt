@@ -31,7 +31,7 @@
     #:env
     (env ::= default-env)
     #:continuation
-    (k ::= default-mt (arg e env) (fn e env))
+    (k ::= default-mt (arg e env) (fn v env))
     #:step
     [(var env k) --> ((lookup env var) env k)
      #:implemented-by var]
