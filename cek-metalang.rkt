@@ -52,11 +52,10 @@
        #:step
        s:step ...)
      #`(begin
-         (define expr.name (void)) ...
+         #,(compile-grammar (attribute expr.data))
          (define env.name (void))
          (define k.name (void))
          (void
-          #'expr ...
           #'env
           #'k
           #'s ...))]))
