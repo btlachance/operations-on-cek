@@ -52,9 +52,16 @@
        #:step
        s:step ...)
      #`(begin
-         #,(compile-grammar (attribute expr.data))
-         (define env.name (void))
-         (define k.name (void))
+         ;; TODO for expr, env, and k, get the name of each root
+         ;; nonterminal and create a new general syntax-class that
+         ;; represents the root of our AST. Pass the identifier for
+         ;; that general syntax class to compile-grammar so that
+         ;; we can write a function that generates compile-pattern
+         ;; and compile-template functions
+         #,(compile-grammar
+            `(,@(attribute expr.data)
+              ,(attribute env.data)
+              ,(attribute k.data)))
          (void
           #'env
           #'k

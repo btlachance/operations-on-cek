@@ -5,21 +5,28 @@
  syntax/id-set
  (for-template
   racket/base
-  syntax/parse))
+  syntax/parse
+  syntax/id-set))
 
 (provide production step compile-grammar)
 (module+ test
   (require rackunit))
 
 (module keywords racket/base
-  (require (for-syntax racket/base))
+  (require (for-syntax racket/base) syntax/id-set)
   (define-syntax (keywords stx)
     (syntax-case stx ()
       [(_ id ...)
-       #'(begin
-           (define-syntax (id stx)
-             (raise-syntax-error 'cek-metalang "out of context")) ...
-             (provide id) ...)]))
+       (begin
+         #`(begin
+             (define-syntax (id stx)
+               (raise-syntax-error 'cek-metalang "out of context")) ...
+               (provide id) ...
+               (define keywords-set
+                 (immutable-free-id-set (list #'id ...)))
+               (provide keywords-set)))]))
+  ;; TODO Keywords need to be treated specially in patterns. At the
+  ;; very least, the compiler needs to know what their meaning is.
   (keywords ::= -->
             natural
             default-env lookup extend
@@ -43,7 +50,10 @@
   (define-syntax-class (pattern-metavar id)
     (pattern x:id
              #:when (matches-metavar? #'x id))))
-(require (for-template 'keywords 'codegen-util))
+
+(require
+ (for-template 'keywords 'codegen-util)
+ (only-in 'keywords keywords-set))
 
 (struct production (name forms)
   #:name -production
@@ -102,15 +112,15 @@
     ;; TODO bubble up attributes
     #`(pattern (~var f #,form)
                #:attr name (attribute f.name)))
-  (define-values (compiled-combinations patterns)
+  (define-values (compiled-combinations variant-patterns)
     (for/fold ([compiled-combinations '()]
-               [patterns '()])
+               [variant-patterns '()])
               ([form forms])
       (syntax-parse form
         [i:id
          (values
           compiled-combinations
-          (cons (form->pattern #'i) patterns))]
+          (cons (form->pattern #'i) variant-patterns))]
         [(f ...)
          (define name (format-id nonterminal
                                  "~a-~a~a"
@@ -120,13 +130,13 @@
                                  (length compiled-combinations)))
          (values
           (cons (compile-combination name (attribute f)) compiled-combinations)
-          (cons (form->pattern name) patterns))])))
+          (cons (form->pattern name) variant-patterns))])))
   #`(begin
       (define-syntax-class #,nonterminal
         ;; TODO add nonterminal's attributes for associated code/data
         (pattern (~var _ (pattern-metavar #'#,nonterminal))
                  #:attr name #'#,nonterminal)
-        #,@patterns)
+        #,@variant-patterns)
       #,@compiled-combinations))
 
 ;; This mess of ->literals functions could probably be cleaned up
@@ -134,7 +144,8 @@
 ;; more compositional do the same trick.
 
 (define (productions->literals productions literal?)
-  (define (production->literals p) (apply append (map form->literals (production-forms p))))
+  (define (production->literals p)
+    (apply append (map form->literals (production-forms p))))
   (define (form->literals form)
     (syntax-parse form
       [i:id (if (literal? #'i)
@@ -148,17 +159,30 @@
 ;; (listof -production) -> stx
 (define (compile-grammar productions)
   (define nonterminals (immutable-free-id-set (map production-name productions)))
+  ;; see HACK below
+  (define (keyword? form)
+    (and (identifier? form) (identifier-binding form)))
   (define (literal? form)
     (and (identifier? form)
-         (not (free-id-set-member? nonterminals form))))
+         (not (free-id-set-member? nonterminals form))
+         ;; (not (free-id-set-member? keywords-set form))
+         ;; HACK I wanted to use keywords-set like in the line above
+         ;; to make sure that the keywords didn't get interpreted as
+         ;; literals. I couldn't get that to work, so I'm instead
+         ;; relying on them being the only identifiers mentioned on
+         ;; the RHS of a production that are already bound (e.g.
+         ;; literals and other variables aren't yet bound at grammar
+         ;; compilation time)
+         (not (keyword? form))))
   (define literals
     (immutable-free-id-set (productions->literals productions literal?)))
 
   #`(begin
       #,@(for/list ([p productions])
-           (compile-production (production-name p) (production-forms p)))
-      #,@(for/list ([l literals])
-           (compile-literal l))))
+           (compile-production
+            (production-name p)
+            (filter-not keyword? (production-forms p))))
+      #,@(set-map literals compile-literal)))
 
 ;; TODO whatever procedure compiles the transition relation/#:steps to
 ;; IR needs to know what the toplevel syntax classes are for

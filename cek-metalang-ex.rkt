@@ -31,13 +31,13 @@
     #:env
     (env ::= default-env)
     #:continuation
-    (k ::= default-mt (arg e env) (fn v env))
+    (k ::= default-mt (arg e env k) (fn v env k))
     #:step
     [(var env k) --> ((lookup env var) env k)
      #:implemented-by var]
-    [((e_1 e_2) env k) --> (e_1 env (:: (arg e_2 env) k))
+    [((e_1 e_2) env k) --> (e_1 env (arg e_2 env k))
      #:implemented-by (e e)]
-    [(v env_0 (:: (arg e env) k)) --> (e env (:: (fn v env_0) k))
+    [(v env_0 (arg e env k)) --> (e env (fn v env_0 k))
      #:implemented-by v]
-    [(v env_0 (:: (fn (lam var e) env) k)) --> (e (extend env var v) k)
+    [(v env_0 (fn (lam var e) env k)) --> (e (extend env var v) k)
      #:implemented-by v]))
