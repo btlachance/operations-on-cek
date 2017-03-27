@@ -36,8 +36,6 @@
 ;;        [(call-prim (not (call-prim zero? e)))
 ;;         (values (call-prim (add1 e) env k*))])
 
-
-
 ;; TODO start chipping away at this
 (define-syntax (define-cek stx)
   (syntax-parse stx
@@ -51,18 +49,11 @@
        k:production
        #:step
        s:step ...)
+     (define grammar
+       `(,@(attribute expr.data)
+         ,(attribute env.data)
+         ,(attribute k.data)))
      #`(begin
-         ;; TODO for expr, env, and k, get the name of each root
-         ;; nonterminal and create a new general syntax-class that
-         ;; represents the root of our AST. Pass the identifier for
-         ;; that general syntax class to compile-grammar so that
-         ;; we can write a function that generates compile-pattern
-         ;; and compile-template functions
-         #,(compile-grammar
-            `(,@(attribute expr.data)
-              ,(attribute env.data)
-              ,(attribute k.data)))
-         (void
-          #'env
-          #'k
-          #'s ...))]))
+         #,(compile-cek #'name grammar (attribute s.data))
+         ;; (void #'s ...)
+         )]))
