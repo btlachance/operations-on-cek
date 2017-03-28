@@ -40,8 +40,4 @@
     [(v env_0 (arg e env k)) --> (e env (fn v env_0 k))
      #:implemented-by v]
     [(v env_0 (fn (lam var e) env k)) --> (e (extend env var v) k)
-     #:implemented-by v])
-  (require syntax/parse)
-  (syntax-parse #'(e_1 e_2)
-    [:e (syntax->datum ((attribute info) this-syntax #'expr #'e_1))]
-    [_ (error 'example "could not parse")]))
+     #:implemented-by v]))

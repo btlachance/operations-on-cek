@@ -51,6 +51,7 @@
          (bound-identifier=? without-suffix id)))
 
   (define-syntax-class (pattern-metavar id)
+    #:description (format "pattern ~a" (syntax-e id))
     (pattern x:id
              #:when (matches-metavar? #'x id))))
 
@@ -74,7 +75,7 @@
     #`(error 'runtime #,msg)))
 
 (require
- (for-template 'keywords 'compile-util 'codegen-util)
+ (for-template 'keywords 'compile-util 'codegen-util racket/pretty)
  (only-in 'keywords keywords-set make-keywords-delta-introducer))
 
 (struct production (name forms)
@@ -138,6 +139,7 @@
                 #,body))))
 
   #`(define-syntax-class #,comb-name
+      #:description (format "~a" (syntax->datum #'#,subforms))
       (pattern (#,@subform-patterns)
                #:attr name #'#,comb-name
                #:attr info #,info)))
@@ -160,6 +162,7 @@
       ;; if/when we do want number literals via compile-literal, then
       ;; we'll definitely need more than just a fixed pred-id
       (define-syntax-class #,l
+        #:description (format "literal ~a" (syntax-e #'#,l))
         (pattern (~literal #,l)
                  #:attr name #'#,l
                  #:attr info #,info))))
@@ -207,10 +210,10 @@
                   #,rest)))))
   #`(begin
       (define-syntax-class #,nonterminal
+        #:description (format "nonterminal ~a" (syntax-e #'#,nonterminal))
         (pattern (~var _ (pattern-metavar #'#,nonterminal))
                  #:attr name #'#,nonterminal
                  #:attr info #,info)
-
         #,@variant-patterns)
       #,@compiled-combinations))
 
@@ -233,18 +236,32 @@
 ;; pattern that is an instances of at least one of the nonterminals or
 ;; a term in the general pattern language, produces the pattern's
 ;; info object
-(define (compile-getinfo name nonterminals)
+(define (compile-getinfo name nonterminals literals)
+  (define toplevel-id (format-id name "toplevel-~a" name))
   #`(begin
-      (define-syntax-class toplevel
-        #:attributes (info)
-        (pattern (~literal toplevel)
-                 #:attr info #f)
-        #,@(for/list ([nonterminal nonterminals])
-             #`(pattern (~var p #,nonterminal)
-                        #:attr info (attribute p.info))))
+      (define-syntax-class #,toplevel-id
+        #:description (format "a member of the ~a class" (syntax-e #'#,name))
+        #:attributes (info name)
+        (pattern (~literal #,toplevel-id)
+                 #:attr info #f
+                 #:attr name 'toplevel)
+        ;; HACK when we try to match a literal in part of a
+        ;; combination, we try to get the literal's info via
+        ;; getinfo. But, the literals that only appear inside a
+        ;; combination are lifted out like other literals---the two
+        ;; differ though in that "other literals" appear as a RHS of a
+        ;; nonterminal. Thus, there's a path from the toplevel to the
+        ;; literal via the literal's nonterminal. The literals that
+        ;; only appear inside a combination though have no such
+        ;; nonterminal; that's why we have to add them as subpatterns
+        ;; of toplevel.
+        #,@(for/list ([sub (in-sequences nonterminals literals)])
+             #`(pattern (~var p #,sub)
+                        #:attr info (attribute p.info)
+                        #:attr name (attribute p.name))))
       (define (#,name pattern)
         (syntax-parse pattern
-          [(~var p toplevel)
+          [(~var p #,toplevel-id)
            (or (attribute p.info)
                (error
                 'cek-metalang-lib
@@ -275,7 +292,7 @@
     (immutable-free-id-set (productions->literals productions literal?)))
 
   #`(begin
-      #,(compile-getinfo (getinfo) nonterminals)
+      #,(compile-getinfo (getinfo) nonterminals literals)
       ;; this won't do what the user expected if they named a
       ;; production after a keyword---since we filter out keywords
       ;; here, it won't compile the keyword-named production
@@ -286,13 +303,37 @@
       #,@(set-map literals compile-literal)))
 
 (define (compile-transition steps)
-  #'(void))
+  ;; we assume that a step's lhs/rhs is a sequence of
+  ;; patterns/templates that are recognizable by our AST
+  #`(begin
+      (define (compile-step fn-name lhs rhs)
+        ;; TODO we could get the name from each of the subpatterns
+        ;; and use that to generate the names of the arguments
+        (define arg-names (generate-temporaries lhs))
+        (define body
+          (foldr
+           (lambda (pattern source rest)
+             (define compile (#,(getinfo) pattern))
+             (compile pattern source rest))
+           #`(values #,@arg-names)
+           (syntax->list lhs)
+           arg-names))
+        (define result
+          #`(define (#,fn-name #,@arg-names)
+              #,body))
+        (pretty-print (syntax->datum result))
+        result)
+      #,@(for/list ([step steps]
+                    [n (in-naturals)])
+           (define fn-name (format-id (step-lhs step) "step~a" n))
+           #`(compile-step #'#,fn-name #'#,(step-lhs step) #'#,(step-rhs step)))))
 
 (define (compile-cek name productions steps)
-  (parameterize ([getinfo (generate-temporary 'getinfo)])
-  #`(begin
-      #,(compile-grammar productions)
-      #,(compile-transition steps))))
+  (parameterize ([getinfo name])
+    #`(begin
+        #,(compile-grammar productions)
+        ;; for now, I don't want to print out the values produced here
+        (void (let () #,(compile-transition steps))))))
 
 ;; TODO whatever procedure compiles the transition relation/#:steps to
 ;; IR needs to know what the toplevel syntax classes are for
