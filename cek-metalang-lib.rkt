@@ -14,6 +14,7 @@
 
 (module keywords racket/base
   (require (for-syntax racket/base) syntax/id-set)
+  (provide make-keywords-delta-introducer)
   (define-syntax (keywords stx)
     (syntax-case stx ()
       [(_ id ...)
@@ -30,7 +31,9 @@
   (keywords ::= -->
             natural
             default-env lookup extend
-            default-mt ::))
+            default-mt ::)
+  (define (make-keywords-delta-introducer ext-stx)
+    (make-syntax-delta-introducer ext-stx #'::)))
 (module compile-util racket/base
   (require racket/match syntax/parse)
   (provide pattern-metavar)
@@ -72,7 +75,7 @@
 
 (require
  (for-template 'keywords 'compile-util 'codegen-util)
- (only-in 'keywords keywords-set))
+ (only-in 'keywords keywords-set make-keywords-delta-introducer))
 
 (struct production (name forms)
   #:name -production
@@ -250,30 +253,32 @@
                 pattern))]))))
 
 (define getinfo (make-parameter #'getinfo))
-
 ;; (listof -production) -> stx
 (define (compile-grammar productions)
+  ;; assumes that no nonterminal redefines a keyword
   (define nonterminals (immutable-free-id-set (map production-name productions)))
-  ;; see HACK below
+  (define keyword-introducer (make-keywords-delta-introducer (free-id-set-first nonterminals)))
+
+  ;; keyword? : stx -> boolean
   (define (keyword? form)
-    (and (identifier? form) (identifier-binding form)))
+    (and (identifier? form)
+         ;; I'm not confident that this is right; I don't totally
+         ;; understand scopes/delta-introducers yet
+         (free-id-set-member? keywords-set (keyword-introducer form 'remove))))
+
   (define (literal? form)
     (and (identifier? form)
          (not (free-id-set-member? nonterminals form))
-         ;; (not (free-id-set-member? keywords-set form)) HACK I
-         ;; wanted to use keywords-set (like I use nonterminals in the
-         ;; line above) to make sure that the keywords didn't get
-         ;; interpreted as literals. I couldn't get that to work, so
-         ;; I'm instead relying on them being the only identifiers
-         ;; mentioned on the RHS of a production that are already
-         ;; bound (e.g. literals and other variables aren't yet bound
-         ;; at grammar compilation time)
          (not (keyword? form))))
+
   (define literals
     (immutable-free-id-set (productions->literals productions literal?)))
 
   #`(begin
       #,(compile-getinfo (getinfo) nonterminals)
+      ;; this won't do what the user expected if they named a
+      ;; production after a keyword---since we filter out keywords
+      ;; here, it won't compile the keyword-named production
       #,@(for/list ([p productions])
            (compile-production
             (production-name p)
