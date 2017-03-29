@@ -12,8 +12,37 @@
 (module+ test
   (require rackunit))
 
+(module codegen-util racket/base
+  (provide
+   pattern-name
+   err:expected-x-in-y
+   (struct-out info)
+   getinfo-id)
+  ;; pattern-name : identifier -> IR
+  ;; given a pattern that binds a single variable, produces an
+  ;; identifier in IR that can be used to bind that variable
+  (define (pattern-name p)
+    p)
+
+  (struct info (compile-pattern compile-template))
+
+  ;; err:expected-x-in-y pattern id -> IR
+  ;; given a pattern x and an identifier y, produces IR for an error
+  ;; message when the value corresponding to pattern x was not found
+  ;; in y
+  (define (err:expected-x-in-y x y)
+    (define msg
+      (format "expected ~a in ~a but found something else"
+              (syntax->datum x)
+              (syntax->datum y)))
+    #`(error 'runtime #,msg))
+  (define getinfo-id #'getinfo))
+
 (module keywords racket/base
-  (require (for-syntax racket/base) syntax/id-set)
+  (require
+   (for-syntax racket/base)
+   syntax/id-set
+   syntax/parse)
   (provide make-keywords-delta-introducer)
   (define-syntax (keywords stx)
     (syntax-case stx ()
@@ -21,7 +50,7 @@
        (begin
          #`(begin
              (define-syntax (id stx)
-               (raise-syntax-error 'cek-metalang "out of context")) ...
+               (raise-syntax-error 'cek-metalang "out of context" stx)) ...
                (provide id) ...
                (define keywords-set
                  (immutable-free-id-set (list #'id ...)))
@@ -30,10 +59,78 @@
   ;; very least, the compiler needs to know what their meaning is.
   (keywords ::= -->
             natural
-            default-env lookup extend
-            default-mt ::)
+            default-env lookup extend)
   (define (make-keywords-delta-introducer ext-stx)
     (make-syntax-delta-introducer ext-stx #'::)))
+
+(module prims racket/base
+  ;; HACK I don't yet know a better way to do this, but this whole
+  ;; module seems like one big hack
+  (require
+   (submod ".." codegen-util)
+   (for-template
+    (submod ".." keywords)
+    (submod ".." codegen-util)
+    racket/syntax
+    syntax/parse
+    racket/base))
+
+  (provide prim+class-stx)
+  (define prim+class-stx
+    (list
+     (cons
+      #'lookup
+      #`(define-syntax-class lookup-class
+          (pattern ((~literal lookup) e x)
+                   #:attr name #'lookup
+                   #:attr info
+                   (begin
+                     (define (compile-pattern pattern rest)
+                       (raise-syntax-error
+                        #f
+                        "attempted to use lookup as a pattern when it can only be used as a template"
+                        this-syntax))
+                     (define (compile-template template dest rest)
+                       (define (compile-subtemplate subtemplate dest rest)
+                         (define compile-sub (info-compile-template (#,getinfo-id subtemplate)))
+                         (compile-sub subtemplate dest rest))
+                       (define subtemplates (cdr (syntax->list template)))
+                       (define temps (map generate-temporary subtemplates))
+
+                       (foldr
+                        compile-subtemplate
+                        #`(let ([#,dest (prim-lookup #,@temps)])
+                            #,rest)
+                        subtemplates
+                        temps))
+                     (info compile-pattern compile-template)))))
+     (cons
+      #'extend
+      #`(define-syntax-class extend-class
+          (pattern ((~literal extend) e x v)
+                   #:attr name #'extend
+                   #:attr info
+                   (begin
+                     (define (compile-pattern pattern rest)
+                       (raise-syntax-error
+                        #f
+                        "attempted to use lookup as a pattern when it can only be used as a template"
+                        this-syntax))
+                     (define (compile-template template dest rest)
+                       (define (compile-subtemplate subtemplate dest rest)
+                         (define compile-sub (info-compile-template (#,getinfo-id subtemplate)))
+                         (compile-sub subtemplate dest rest))
+                       (define subtemplates (cdr (syntax->list template)))
+                       (define temps (map generate-temporary subtemplates))
+
+                       (foldr
+                        compile-subtemplate
+                        #`(let ([#,dest (prim-extend #,@temps)])
+                            #,rest)
+                        subtemplates
+                        temps))
+                     (info compile-pattern compile-template))))))))
+
 (module compile-util racket/base
   (require racket/match syntax/parse)
   (provide pattern-metavar)
@@ -55,28 +152,11 @@
     (pattern x:id
              #:when (matches-metavar? #'x id))))
 
-(module codegen-util racket/base
-  (provide pattern-name err:expected-x-in-y)
-  ;; pattern-name : identifier -> IR
-  ;; given a pattern that binds a single variable, produces an
-  ;; identifier in IR that can be used to bind that variable
-  (define (pattern-name p)
-    p)
-
-  ;; err:expected-x-in-y pattern id -> IR
-  ;; given a pattern x and an identifier y, produces IR for an error
-  ;; message when the value corresponding to pattern x was not found
-  ;; in y
-  (define (err:expected-x-in-y x y)
-    (define msg
-      (format "expected ~a in ~a but found something else"
-              (syntax->datum x)
-              (syntax->datum y)))
-    #`(error 'runtime #,msg)))
-
 (require
  (for-template 'keywords 'compile-util 'codegen-util racket/pretty)
- (only-in 'keywords keywords-set make-keywords-delta-introducer))
+ (only-in 'keywords keywords-set make-keywords-delta-introducer)
+ (only-in 'prims prim+class-stx)
+ (only-in 'codegen-util getinfo-id))
 
 (struct production (name forms)
   #:name -production
@@ -101,7 +181,7 @@
            #:attr data (-step #'lhs #'rhs (attribute implemented-by))))
 
 ;; compile-combination : stx (listof stx) free-id-set
-;; generates code using the idgetinfo
+;; generates code using the getinfo-id
 (define (compile-combination comb-name subforms)
   (define (subform->pattern form)
     (syntax-parse form
@@ -110,6 +190,9 @@
       [i:id #'(~var _ i)]
       [(f ...) #`(#,(map subform->pattern #'(f ...)))]))
 
+  ;; TODO `names` aren't just names---they're the accessor/projection
+  ;; names. Renaming them to something more meaningful will make the
+  ;; body of compile-subpattern more clear
   (define-values (subform-patterns names)
     (for/lists (subform-patterns names)
                ([subform subforms])
@@ -117,13 +200,13 @@
        (subform->pattern subform)
        (format-id comb-name "~a-sub~a" comb-name (length names)))))
 
-  (define info
+  (define info-stx
     #`(begin
         (define pred-id #'#,(format-id comb-name "~a?" comb-name))
-        (lambda (pattern source rest)
+        (define (compile-pattern pattern source rest)
           (define (compile-subpattern subpattern name body)
-            (define compile (#,(getinfo) subpattern))
-            (compile subpattern #`(#,name #,source) body))
+            (define compile-sub (info-compile-pattern (#,getinfo-id subpattern)))
+            (compile-sub subpattern #`(#,name #,source) body))
           (define body
             (foldr
              compile-subpattern
@@ -136,25 +219,43 @@
           
           #`(if (not (#,pred-id #,source))
                 #,(err:expected-x-in-y #'comb-name source)
-                #,body))))
+                #,body))
+        (define constructor-id #'#,(format-id comb-name "make-~a" comb-name))
+        (define (compile-template template dest rest)
+          (define (compile-subtemplate subtemplate dest rest)
+            (define compile-sub (info-compile-template (#,getinfo-id subtemplate)))
+            (compile-sub subtemplate dest rest))
+          (define subtemplates (syntax->list template))
+          (define temps (generate-temporaries template))
+
+          (foldr
+           compile-subtemplate
+           #`(let ([#,dest (#,constructor-id #,@temps)])
+               #,rest)
+           subtemplates
+           temps))
+        (info compile-pattern compile-template)))
 
   #`(define-syntax-class #,comb-name
       #:description (format "~a" (syntax->datum #'#,subforms))
       (pattern (#,@subform-patterns)
                #:attr name #'#,comb-name
-               #:attr info #,info)))
+               #:attr info #,info-stx)))
 
 (define (compile-literal l)
-  (define info-id (format-id l "~a-info" l))
-  (define info
+  (define info-stx
     #`(begin
         (define pred-id #'#,(format-id l "~a?" l))
-        (lambda (pattern source rest)
+        (define (compile-pattern pattern source rest)
           (define name (pattern-name pattern))
           #`(if (not (#,pred-id #,source))
                 #,(err:expected-x-in-y pattern source)
                 (let ([#,name #,source])
-                  #,rest)))))
+                  #,rest)))
+        (define (compile-template template dest rest)
+          #`(let ([#,dest #,template])
+              #,rest))
+        (info compile-pattern compile-template)))
 
   #`(begin
       ;; we only allow literals in grammars that follow Racket's
@@ -165,7 +266,7 @@
         #:description (format "literal ~a" (syntax-e #'#,l))
         (pattern (~literal #,l)
                  #:attr name #'#,l
-                 #:attr info #,info))))
+                 #:attr info #,info-stx))))
 
 (define (compile-production nonterminal forms)
   (define (form->pattern form)
@@ -196,24 +297,28 @@
           (cons (compile-combination name (attribute f)) compiled-combinations)
           (cons (form->pattern name) variant-patterns))])))
 
-  (define info
+  (define info-stx
     ;; For now, info only contains the compile function
     #`(begin
         (define pred-id #'#,(format-id nonterminal "~a?" nonterminal))
-        (lambda (pattern source rest)
+        (define (compile-pattern pattern source rest)
           (define name (pattern-name pattern))
           ;; here we use syntax objects as IR which already
           ;; seems a bit confusing
           #`(if (not (#,pred-id #,source))
                 #,(err:expected-x-in-y pattern source)
                 (let ([#,name #,source])
-                  #,rest)))))
+                  #,rest)))
+        (define (compile-template template dest rest)
+          #`(let ([#,dest #,template])
+              #,rest))
+        (info compile-pattern compile-template)))
   #`(begin
       (define-syntax-class #,nonterminal
         #:description (format "nonterminal ~a" (syntax-e #'#,nonterminal))
         (pattern (~var _ (pattern-metavar #'#,nonterminal))
                  #:attr name #'#,nonterminal
-                 #:attr info #,info)
+                 #:attr info #,info-stx)
         #,@variant-patterns)
       #,@compiled-combinations))
 
@@ -231,13 +336,19 @@
   (apply append (map production->literals productions)))
 
 
-;; compile-getinfo : id (listof id) -> stx
+;; compile-getinfo : id (listof id) (listof id) (listof id) -> stx
 ;; generates code for a function `name` which, when given an arbitrary
 ;; pattern that is an instances of at least one of the nonterminals or
 ;; a term in the general pattern language, produces the pattern's
 ;; info object
-(define (compile-getinfo name nonterminals literals)
+(define (compile-getinfo name nonterminals literals prims)
   (define toplevel-id (format-id name "toplevel-~a" name))
+
+  (define (prim->prim-class id)
+    ;; must follow what prim+class-stx does
+    (format-id id "~a-class" id))
+  (define keyword-classes (map prim->prim-class prims))
+
   #`(begin
       (define-syntax-class #,toplevel-id
         #:description (format "a member of the ~a class" (syntax-e #'#,name))
@@ -255,23 +366,26 @@
         ;; only appear inside a combination though have no such
         ;; nonterminal; that's why we have to add them as subpatterns
         ;; of toplevel.
-        #,@(for/list ([sub (in-sequences nonterminals literals)])
+        #,@(for/list ([sub (in-sequences nonterminals literals keyword-classes)])
              #`(pattern (~var p #,sub)
                         #:attr info (attribute p.info)
-                        #:attr name (attribute p.name))))
-      (define (#,name pattern)
+                        #:attr name (attribute p.name)))
+        #,@(for/list ([prim prims])
+             #`(pattern (~literal #,prim)
+                        #:attr info #f
+                        #:attr name #'#,prim)))
+      (define (#,getinfo-id pattern)
         (syntax-parse pattern
           [(~var p #,toplevel-id)
            (or (attribute p.info)
                (error
-                'cek-metalang-lib
+                'cek-metalang-internal
                 "attempting to ~a for ~a failed; did toplevel syntax class escape?"
-                (syntax-e #'name)
-                pattern))]))))
+                (syntax-e #'#,getinfo-id)
+                (syntax->datum pattern)))]))))
 
-(define getinfo (make-parameter #'getinfo))
-;; (listof -production) -> stx
-(define (compile-grammar productions)
+;; id (listof -production) -> stx
+(define (compile-grammar name productions)
   ;; assumes that no nonterminal redefines a keyword
   (define nonterminals (immutable-free-id-set (map production-name productions)))
   (define keyword-introducer (make-keywords-delta-introducer (free-id-set-first nonterminals)))
@@ -291,8 +405,11 @@
   (define literals
     (immutable-free-id-set (productions->literals productions literal?)))
 
+  (define prims (map car prim+class-stx))
+
   #`(begin
-      #,(compile-getinfo (getinfo) nonterminals literals)
+      #,(compile-getinfo name nonterminals literals prims)
+      #,@(map cdr prim+class-stx)
       ;; this won't do what the user expected if they named a
       ;; production after a keyword---since we filter out keywords
       ;; here, it won't compile the keyword-named production
@@ -306,34 +423,45 @@
   ;; we assume that a step's lhs/rhs is a sequence of
   ;; patterns/templates that are recognizable by our AST
   #`(begin
+      (define (compile-lhs subpatterns arg-names rest)
+        (foldr
+         (lambda (pattern source r)
+           (define compile-pattern (info-compile-pattern (#,getinfo-id pattern)))
+           (compile-pattern pattern source r))
+         rest
+         subpatterns
+         arg-names))
+      (define (compile-rhs subtemplates dest-names rest)
+        (foldr
+         (lambda (template dest r)
+           (define compile-template (info-compile-template (#,getinfo-id template)))
+           (compile-template template dest r))
+         rest
+         subtemplates
+         dest-names))
+
       (define (compile-step fn-name lhs rhs)
-        ;; TODO we could get the name from each of the subpatterns
-        ;; and use that to generate the names of the arguments
         (define arg-names (generate-temporaries lhs))
+        (define dest-names (generate-temporaries rhs))
         (define body
-          (foldr
-           (lambda (pattern source rest)
-             (define compile (#,(getinfo) pattern))
-             (compile pattern source rest))
-           #`(values #,@arg-names)
-           (syntax->list lhs)
-           arg-names))
+          (compile-lhs (syntax->list lhs) arg-names
+                       (compile-rhs (syntax->list rhs) dest-names #`(values #,@dest-names))))
         (define result
           #`(define (#,fn-name #,@arg-names)
               #,body))
         (pretty-print (syntax->datum result))
         result)
+
       #,@(for/list ([step steps]
                     [n (in-naturals)])
            (define fn-name (format-id (step-lhs step) "step~a" n))
            #`(compile-step #'#,fn-name #'#,(step-lhs step) #'#,(step-rhs step)))))
 
 (define (compile-cek name productions steps)
-  (parameterize ([getinfo name])
-    #`(begin
-        #,(compile-grammar productions)
-        ;; for now, I don't want to print out the values produced here
-        (void (let () #,(compile-transition steps))))))
+  #`(begin
+      #,(compile-grammar name productions)
+      ;; for now, I don't want to print out the values produced here
+      (void (let () #,(compile-transition steps)))))
 
 ;; TODO whatever procedure compiles the transition relation/#:steps to
 ;; IR needs to know what the toplevel syntax classes are for

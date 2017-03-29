@@ -1,5 +1,5 @@
 #lang racket
-(module+ test-ex.environment
+(module test-ex.environment racket
   (require
    rackunit
    "cek-metalang.rkt")
@@ -16,7 +16,7 @@
     [(var env k) --> ((lookup env var) env k)
      #:implemented-by var]))
 
-(module+ test-ex.lc
+(module test-ex.lc racket
   (require
    rackunit
    "cek-metalang.rkt")
@@ -31,7 +31,7 @@
     #:env
     (env ::= default-env)
     #:continuation
-    (k ::= default-mt (arg e env k) (fn v env k))
+    (k ::= mt (arg e env k) (fn v env k))
     #:step
     [(var env k) --> ((lookup env var) env k)
      #:implemented-by var]
