@@ -218,7 +218,7 @@
              (syntax->list #'(#,@names))))
           
           #`(if (not (#,pred-id #,source))
-                #,(err:expected-x-in-y #'comb-name source)
+                #,(err:expected-x-in-y #'#,comb-name source)
                 #,body))
         (define constructor-id #'#,(format-id comb-name "make-~a" comb-name))
         (define (compile-template template dest rest)
