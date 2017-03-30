@@ -40,20 +40,17 @@
 (define-syntax (define-cek stx)
   (syntax-parse stx
     [(define-cek name
-       #:expression
-       expr:production ...
-       #:val value-form
-       #:env
-       env:production
-       #:continuation
-       k:production
+       #:grammar
+       grammar:production ...
+       #:control-string c-nonterminal:id
+       #:environment e-nonterminal:id
+       #:continuation k-nonterminal:id
        #:step
        s:step ...)
-     (define grammar
-       `(,@(attribute expr.data)
-         ,(attribute env.data)
-         ,(attribute k.data)))
-     #`(begin
-         #,(compile-cek #'name grammar (attribute s.data))
-         ;; (void #'s ...)
-         )]))
+     (compile-cek
+      #'name
+      (attribute grammar.data)
+      #'c-nonterminal
+      #'e-nonterminal
+      #'k-nonterminal
+      (attribute s.data))]))
