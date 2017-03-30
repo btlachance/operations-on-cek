@@ -237,7 +237,7 @@
         (info compile-pattern compile-template)))
 
   #`(define-syntax-class #,comb-name
-      #:description (format "~a" (syntax->datum #'#,subforms))
+      #:description #,(format "~a" (map syntax->datum subforms))
       (pattern (#,@subform-patterns)
                #:attr name #'#,comb-name
                #:attr info #,info-stx)))
@@ -263,7 +263,7 @@
       ;; if/when we do want number literals via compile-literal, then
       ;; we'll definitely need more than just a fixed pred-id
       (define-syntax-class #,l
-        #:description (format "literal ~a" (syntax-e #'#,l))
+        #:description #,(format "literal ~a" (syntax-e l))
         (pattern (~literal #,l)
                  #:attr name #'#,l
                  #:attr info #,info-stx))))
@@ -315,7 +315,7 @@
         (info compile-pattern compile-template)))
   #`(begin
       (define-syntax-class #,nonterminal
-        #:description (format "nonterminal ~a" (syntax-e #'#,nonterminal))
+        #:description #,(format "nonterminal ~a" (syntax-e nonterminal))
         (pattern (~var _ (pattern-metavar #'#,nonterminal))
                  #:attr name #'#,nonterminal
                  #:attr info #,info-stx)
@@ -351,7 +351,7 @@
 
   #`(begin
       (define-syntax-class #,toplevel-id
-        #:description (format "a member of the ~a class" (syntax-e #'#,name))
+        #:description #,(format "a member of the ~a class" (syntax-e name))
         #:attributes (info name)
         (pattern (~literal #,toplevel-id)
                  #:attr info #f
@@ -381,7 +381,7 @@
                (error
                 'cek-metalang-internal
                 "attempting to ~a for ~a failed; did toplevel syntax class escape?"
-                (syntax-e #'#,getinfo-id)
+                #,(format "~s" (syntax-e getinfo-id))
                 (syntax->datum pattern)))]))))
 
 ;; id (listof -production) -> stx
