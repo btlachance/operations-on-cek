@@ -138,11 +138,10 @@
         [(regexp #px"([^_]*)(_.+)?" (list _ contents suffix))
          (define symbol-without-suffix (string->symbol contents))
          (datum->syntax pattern symbol-without-suffix pattern)]))
-    (and (identifier-binding id)
-         (bound-identifier=? without-suffix id)))
+    (free-identifier=? without-suffix id))
 
   (define-syntax-class (pattern-metavar id)
-    #:description (format "pattern ~a" (syntax-e id))
+    #:description (format "metavar ~a" (syntax-e id))
     (pattern x:id
              #:when (matches-metavar? #'x id))))
 
