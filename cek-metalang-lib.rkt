@@ -85,7 +85,8 @@
 ;; - (sequence name (listof field) stx)
 ;; - (choice name (U #f (nonemptylistof shape)) id)
 ;;   * a choice's alternatives is only #f while parsing the grammar;
-;;     once it is set to a non-#f value it must not be changed
+;;     once it is set to a non-#f value it is then only changed by
+;;     the prim-creating code
 ;;   * TODO I probably also want a restriction on what's in the list
 ;;   of alternatives. For example, I don't want a choice be able to
 ;;   produce itself without going through a sequence and I don't want
@@ -93,8 +94,10 @@
 ;;   latter couldn't occur during grammar generation, as the name
 ;;   would always be resolved to the choice, but it's an odd
 ;;   possibility in the data structure choice.
+;; - (prim name (sexp -> bool) class)
 (struct sequence (name fields stx))
 (struct choice (name [alternatives #:mutable] nonterminal))
+(struct prim (name matches? class))
 
 ;; a field is a (field name shape)
 (struct field (name shape))
@@ -108,7 +111,8 @@
   (cond
     [(symbol? shape) shape]
     [(sequence? shape) (sequence-name shape)]
-    [else (choice-name shape)]))
+    [(choice? shape) (choice-name shape)]
+    [else (prim-name shape)]))
 
 ;; sequence-of : (listof field)
 ;; recognizes when a syntax matches a sequence of the given fields
@@ -148,7 +152,11 @@
                       (~or (~and (~var s (pattern-metavar (choice-nonterminal shape)))
                                  (~bind [name (choice-name shape)]))
                            (~and (~var ss (one-of (choice-alternatives shape)))
-                                 (~bind [name (attribute ss.name)])))))))
+                                 (~bind [name (attribute ss.name)]))))
+                (~and (~fail #:unless (prim? shape))
+                      _
+                      (~fail #:unless ((prim-matches? shape) (syntax->datum this-syntax)))
+                      (~bind [name (prim-name shape)])))))
 
 (module+ test
   (require rackunit)
@@ -161,6 +169,40 @@
   (check-false (sandwich? #'apple))
   (check-false (sandwich? #'(sandwich)))
   (check-false (sandwich? #'()))
+
+  (define nat-prim (prim 'nat natural-number/c #f))
+  (define nat?
+    (syntax-parser
+      [(~var _ (form-matching nat-prim)) #t]
+      [_ #f]))
+  (check-true (nat? #'5))
+  (check-false (nat? #'-10))
+  (check-false (nat? #'"hello"))
+  (check-equal?
+   (syntax-parse #'5
+     [(~var five (form-matching nat-prim)) (attribute five.name)])
+   'nat)
+
+  (define (matches-lookup? sexp)
+    (match sexp
+      [`(lookup ,_ ,_) #t]
+      [_ #f]))
+  (check-true (matches-lookup? '(lookup x env)))
+  (define lookup-prim (prim 'lookup matches-lookup? #f))
+  (define lookup?
+    (syntax-parser
+      [(~var _ (form-matching lookup-prim)) #t]
+      [_ #f]))
+  (check-true (lookup? #'(lookup x env)))
+
+  (define combination-of-prims?
+    (syntax-parser
+      [(~var _ (one-of (list nat-prim lookup-prim))) #t]
+      [_ #f]))
+  (check-true (combination-of-prims? #'5))
+  (check-true (combination-of-prims? #'(lookup x e)))
+  (check-false (combination-of-prims? #'(lookup)))
+  (check-false (combination-of-prims? #'-10))
 
   (define empty-seq?
     (syntax-parser
@@ -358,59 +400,77 @@
 
 ;; a simple-IR is one of
 ;; - name
-;; - (ir:make name (listof name))
+;; - (ir:make name (U #f (listof name)))
 ;; - (ir:project name name name)
-;; - (ir:prim name (listof name))
+;; - (ir:call-builtin name (listof name))
 (struct ir:make (class-name args) #:transparent)
 (struct ir:project (class-name field-name arg) #:transparent)
-(struct ir:prim (name args) #:transparent)
+(struct ir:call-builtin (name args) #:transparent)
 
 ;; a class is a (class name
-;;                     (listof class-field)
-;;                     (pattern source IR -> IR)
-;;                     (template dest IR -> IR))
-;; where compile-pattern assumes the pattern is an instance of the
-;; class' shape; ditto for compile-template and templates.
+;;                     (U (listof class-field) #f)
+;;                     (pattern name IR -> IR)
+;;                     (template name IR -> IR))
+;; - when fields is #f the class represents a literal, i.e. it does
+;;   not have a constructor
 ;; Invariants:
+;; - compile-pattern assumes the pattern is an instance of the
+;;   class' shape; ditto for compile-template and templates.
 ;; - name must be equal? to the class' shape's name
 (struct class (name fields compile-pattern compile-template) #:transparent)
 
 ;; a class-field is a (class-field name class)
 (struct class-field (name class) #:transparent)
 
-;; literal-class is a really bad name since this is primarily used for
-;; nonterminals
-(define (literal-class name)
+;; nonterminal-class : name (nelistof shape) (map name class) -> class
+(define (nonterminal-class name alternatives class-map)
   (define (compile-pattern pattern source rest)
-    (ir:check-instance
-     source name
-     (ir:let (list (list pattern source))
-             rest)))
+    (syntax-parse pattern
+      [(~var p (one-of alternatives))
+       (define compile-p (class-compile-pattern (hash-ref class-map (attribute p.name))))
+       (compile-p pattern source rest)]
+      [_
+       (ir:check-instance
+        source name
+        (ir:let (list (list pattern source))
+                rest))]))
 
   (define (compile-template template dest rest)
-    (ir:let (list (list dest template))
-            rest))
-
+    (syntax-parse template
+      [(~var t (one-of alternatives))
+       (define compile-t (class-compile-template (hash-ref class-map (attribute t.name))))
+       (compile-t template dest rest)]
+      [_
+       (ir:let (list (list dest template))
+               rest)]))
   (class name '() compile-pattern compile-template))
 
 (module+ test
-  (define literal1 (literal-class 'e))
+  (define nt1 (nonterminal-class 'e '(x y z)))
   (check-equal?
-   ((class-compile-pattern literal1) 'e_1 'self (ir:return '(e_1)))
+   ((class-compile-pattern nt1) 'e_1 'self (ir:return '(e_1)))
    (ir:check-instance
     'self 'e
     (ir:let (list '(e_1 self))
             (ir:return '(e_1)))))
   (check-equal?
-   ((class-compile-template literal1) 'e 'result-e (ir:return '(result-e)))
+   ((class-compile-template nt1) 'e 'result-e (ir:return '(result-e)))
    (ir:let (list '(result-e e))
            (ir:return '(result-e)))))
 
-(define (sequence-class name fields)
+;; sequence-class : name (listof field) (map name class) -> class
+;; INV: class-map must have bindings for each non-symbol field in
+;; fields
+(define (sequence-class name fields class-map)
+  ;; The meaning of a combination in the pattern/template language is
+  ;; more interesting than nonterminals. In a pattern, a combination
+  ;; deconstructs the source and introduces new bindings; in a
+  ;; template, it constructs a new value out of existing bindings and
+  ;; puts that value into dest.
   (define class-fields
     (for/list ([f fields]
                #:unless (symbol? (field-shape f)))
-      (class-field (field-name f) (shape->class (field-shape f)))))
+      (class-field (field-name f) (hash-ref class-map (shape->name (field-shape f))))))
 
   (define (compile-pattern pattern source rest)
     (define field-patterns
@@ -421,7 +481,6 @@
 
     (define (compile-field pat f rest)
       (define compile-pat (class-compile-pattern (class-field-class f)))
-
       (define projection-dest
         (if (symbol? pat)
             pat
@@ -493,10 +552,7 @@
    ((class-compile-template sandwichclass) '(sandwich bread veggies bread)
     'e-result
     (ir:return '(e-result)))
-   ;; TODO Punning the name 'veggies with the datum 'veggies is going
-   ;; to cause problems when we want to remove redundant let bindings.
-   ;; One option may be to compile literals to a choice with 1 variant
-   (ir:let (list (list 'veggies 'veggies))
+   (ir:let (list (list 'veggies (ir:make 'veggies #f)))
            (ir:let (list (list 'e-result (ir:make 'sandwich '(veggies))))
                    (ir:return '(e-result)))))
 
@@ -513,14 +569,14 @@
              'self-bag1 'bag
              (ir:let (list (list 'meat (ir:project 'bag 'contents 'self-bag1)))
                      (ir:check-instance
-                      'meat 'filling
+                      'meat 'meat
                       (ir:let (list (list 'meat 'meat))
                               (ir:let (list (list 'self-bag2 (ir:project 'outerbag 'bag2 'self)))
                                       (ir:check-instance
                                        'self-bag2 'bag
                                        (ir:let (list (list 'veggies (ir:project 'bag 'contents 'self-bag2)))
                                                (ir:check-instance
-                                                'veggies 'filling
+                                                'veggies 'veggies
                                                 (ir:let (list (list 'veggies 'veggies))
                                                         (ir:return '(meat veggies))))))))))))))
 
@@ -529,25 +585,54 @@
     'e-result
     (ir:return '(e-result)))
    (ir:let
-    (list (list 'meat 'meat))
+    (list (list 'meat (ir:make 'meat #f)))
     (ir:let
      (list (list 'e-result-bag1 (ir:make 'bag '(meat))))
      (ir:let
-      (list (list 'meat 'meat))
+      (list (list 'meat (ir:make 'meat #f)))
       (ir:let
        (list (list 'e-result-bag2 (ir:make 'bag '(meat))))
        (ir:let
         (list (list 'e-result (ir:make 'outerbag '(e-result-bag1 e-result-bag2))))
         (ir:return '(e-result)))))))))
 
-(define (shape->class shape)
+;; symbol-class : name -> class
+(define (symbol-class symbol)
+  (define (compile-pattern pattern source rest)
+    (ir:check-instance
+     source symbol
+     (ir:let (list (list pattern source))
+             rest)))
+  (define (compile-template template dest rest)
+    ;; TODO Depending on what variables are bound in surrounding
+    ;; patterns, template could be referring to a bound variable. If
+    ;; it is refering to such a variable, then it seems a little odd
+    ;; that we're constructing an instance of symbol here. Remember,
+    ;; though, that this is the template for a class with no
+    ;; fields. We now have to decide whether two "instances" of a
+    ;; class can be distinguished. If they can, then it's incorrect to
+    ;; use ir:make here universally---if template refers to a bound
+    ;; variable then constructing a new instance of symbol would
+    ;; produce a value that isn't equivalent to what's in the bound
+    ;; variable. On the other hand, if template does not refer to a
+    ;; bound variable, then constructing a new instance would be
+    ;; correct. So, if two instances of a symbol-class can be
+    ;; distinguished, then we have to know whether or not template
+    ;; refers to a bound variable.
+    (ir:let (list (list dest (ir:make symbol #f)))
+            rest))
+  (class symbol #f compile-pattern compile-template))
+
+(define (shape->class shape class-map)
   (cond
-    [(symbol? shape) (literal-class shape)]
-    [(choice? shape) (literal-class (choice-name shape))]
-    [else
-     (define name (sequence-name shape))
-     (define fields (sequence-fields shape))
-     (sequence-class name fields)]))
+    [(symbol? shape) (symbol-class shape)]
+    [(sequence? shape) (sequence-class (sequence-name shape)
+                                       (sequence-fields shape)
+                                       class-map)]
+    [(choice? shape) (nonterminal-class (choice-name shape)
+                                        (choice-alternatives shape)
+                                        class-map)]
+    [else (prim-class shape)]))
 
 ;; a method is a (method class (listof name) IR)
 ;; representing the interpret method of the specified class
@@ -563,7 +648,7 @@
      (define compile-k-temp (class-compile-template (hash-ref class-map (attribute k-temp.name))))
 
      (define-values (c-dest e-dest k-dest)
-       (values 'c* 'e* 'k))
+       (values 'c* 'e* 'k*))
      (compile-c-temp
       (syntax->datum #'c-temp) c-dest
       (compile-e-temp
@@ -587,12 +672,13 @@
        (define compile-k-pat (class-compile-pattern k-class))
 
        (define-values (c-src e-src k-src)
-         (values 'self 'env 'k))
+         (values 'self 'e 'k))
 
        (if (or (equal? (shape->name k-shape) (attribute k-pat.name))
-               ;; TODO we don't yet emit things with this name but we
-               ;; don't want to conflate matching on a shape for a
-               ;; variant of k with a shape for a primitive.
+               ;; There are three cases: either the pattern is the k
+               ;; metavariable, a primitive pattern, or a pattern for
+               ;; some other part of the grammar. We only know we're
+               ;; in the first case if we rule out the other two.
                (equal? 'prim (attribute k-pat.name)))
            (list
             (method
@@ -613,10 +699,7 @@
               (syntax->datum #'c-pat) c-src
               (compile-e-pat
                (syntax->datum #'e-pat) e-src
-               ;; TODO can we do better than a gensym? I would like
-               ;; something testable without resorting to alpha
-               ;; equivalence
-               (let ([k (gensym 'k)])
+               (let ([k 'dispatch-k])
                  ;; here we just check that our third argument is
                  ;; actually a k and then send the control string and
                  ;; environment to it
@@ -628,7 +711,7 @@
                   (ir:send k (list (syntax->datum #'c-pat) (syntax->datum #'e-pat))))))))
             (let ()
               (define-values (k-src-cont c-src-cont e-src-cont)
-                (values 'self 'e-arg 'env-arg))
+                (values 'self 'c-arg 'e-arg))
               (method
                k-class
                (list k-src-cont c-src-cont e-src-cont)
@@ -641,22 +724,140 @@
                   (compile-rhs c-shape e-shape k-shape class-map (step-rhs step)))))))))]))
   (apply append (map step->methods steps)))
 
+;; add-prims! : class shape shape -> (listof shape)
+;; given
+;;  - a class that can compile any pattern/template that the user wrote
+;;  - choice shapes for the control string and the environment
+;; this function mutates the alternatives in c-shape and e-shape with
+;; prim shapes that produce control strings and environments and
+;; returns the added prims
+(define (add-prims! toplevel-class c-shape e-shape)
+  (define (compile-subtemplate t f dest rest)
+    (define compile-t (class-compile-template (class-field-class f)))
+    (compile-t t dest rest))
+  (define prim-lookup
+    (let ()
+      (define lookup-fields (list (class-field 'var toplevel-class)
+                                  (class-field 'env toplevel-class)))
+      (define (compile-lookup-template template dest rest)
+        (define subtemplates (cdr template))
+        (define dests
+          (for/list ([f lookup-fields])
+            (format-symbol "~a-~a" dest (class-field-name f))))
+        (foldr
+         compile-subtemplate
+         (ir:let (list (list dest (ir:call-builtin 'lookup dests)))
+                 rest)
+         subtemplates
+         lookup-fields
+         dests))
+      (prim
+       'lookup
+       (match-lambda [`(lookup ,_ ,_) #t] [_ #f])
+       (class
+         'lookup
+         lookup-fields
+         (lambda (pattern source rest)
+           (error 'compile-pattern "Cannot compile lookup to a pattern"))
+         compile-lookup-template))))
+  (define prim-extend
+    (let ()
+      (define extend-fields (list (class-field 'env toplevel-class)
+                                  (class-field 'var toplevel-class)
+                                  (class-field 'val toplevel-class)))
+      (define (compile-extend-template template dest rest)
+        (define subtemplates (cdr template))
+        (define dests
+          (for/list ([f extend-fields])
+            (format-symbol "~a-~a" dest (class-field-name f))))
+        (foldr
+         compile-subtemplate
+         (ir:let (list (list dest (ir:call-builtin 'extend dests)))
+                 rest)
+         subtemplates
+         extend-fields
+         dests))
+      (prim
+       'extend
+       (match-lambda [`(extend ,_ ,_ ,_) #t] [_ #f])
+       (class
+         'extend
+         extend-fields
+         (lambda (pattern source rest)
+           (error 'compile-pattern "Cannot compile extend to a pattern"))
+         compile-extend-template))))
+
+  (set-choice-alternatives!
+   c-shape
+   (cons
+    prim-lookup
+    (choice-alternatives c-shape)))
+  (set-choice-alternatives!
+   e-shape
+   (cons
+    prim-extend
+    (choice-alternatives e-shape)))
+  (list prim-lookup prim-extend))
+
+;; build-classes! : (map name class) (map name shape) -> void
+(define (build-classes! class-map shape-map)
+  (define choice-shapes (filter choice? (hash-values shape-map)))
+  ;; Unless we make the classes mutable, we need to use a mutable hash
+  ;; map to build the class-map (in a similar way to how we build up
+  ;; shape-map). Assuming we go with the latter, create a class for
+  ;; each choice shape and add it to the map---it's OK that we don't
+  ;; yet have classes for each of the choice's alternatives, since the
+  ;; choice only uses those when its compile-pattern/template is
+  ;; called, which only happens after the class map is fully
+  ;; constructed. Then, for each remaining shape, create its
+  ;; class---if it needs to look something up in the class-map, we
+  ;; know that that something must be choice and all choice shapes
+  ;; have a class in class-map
+  (for ([c choice-shapes])
+    (hash-set! class-map (choice-name c) (shape->class c class-map)))
+
+  (define remaining-shapes (filter-not choice? (hash-values shape-map)))
+  (for ([s remaining-shapes])
+    (hash-set! class-map (shape->name s) (shape->class s class-map))))
+
+;; toplevel-class : (listof shape) (map name class) -> class
+;; makes a class like nonterminal-class but errors if the
+;; pattern/template does not match any of choice-shapes
+(define (toplevel-class choice-shapes class-map)
+  (define (compile-pattern pattern source rest)
+    (syntax-parse pattern
+      [(~var p (one-of choice-shapes))
+       (define compile-p (class-compile-pattern (hash-ref class-map (attribute p.name))))
+       (compile-p pattern source rest)]))
+  (define (compile-template template dest rest)
+    (syntax-parse template
+      [(~var t (one-of choice-shapes))
+       (define compile-t (class-compile-template (hash-ref class-map (attribute t.name))))
+       (compile-t template dest rest)]))
+
+  (class 'toplevel '() compile-pattern compile-template))
+
 (define (compile-cek name productions c-id e-id k-id steps)
-  ;; For each of c, e, and k, we need to generate the appropriate
-  ;; class hierarchy.
   (define shape-map (compile-grammar2 productions))
   (define-values (c-shape e-shape k-shape)
     (values
      (hash-ref shape-map (syntax-e c-id))
      (hash-ref shape-map (syntax-e e-id))
      (hash-ref shape-map (syntax-e k-id))))
-  (define class-map (for/hash ([(name shape) (in-dict shape-map)])
-                      (values name (shape->class shape))))
+
+  ;; Tying the knot for prims has felt like a really big hack... all
+  ;; of this mutation wasn't thought through, which makes it feel like
+  ;; more of a hack
+  (define class-map (make-hash))
+  (define toplevel (toplevel-class (filter choice? (hash-values shape-map)) class-map))
+  (define prims (add-prims! toplevel c-shape e-shape))
+  (build-classes! class-map shape-map)
+  (for ([p prims])
+    (hash-set! class-map (prim-name p) (shape->class p class-map)))
 
   (define methods (steps->methods steps class-map c-shape e-shape k-shape))
   (pretty-print methods)
 
-  ;; TODO primitives
   ;; TODO collecting classes
   ;; TODO translating IR to RPython
   ;; TODO error messages (syntax-parse and runtime)
