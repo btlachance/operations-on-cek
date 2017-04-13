@@ -442,7 +442,6 @@
         (define result
           #`(define (#,fn-name #,@arg-names)
               #,body))
-        (pretty-print (syntax->datum result))
         result)
 
       #,@(for/list ([step steps]
@@ -721,9 +720,11 @@
 ;; a IR is one of
 ;; - (ir:check-instance name name IR)
 ;; - (ir:let (listof (list name simple-IR)) IR)
+;; - (ir:send name (listof name))
 ;; - (ir:return (listof name))
 (struct ir:check-instance (arg class-name rest) #:transparent)
 (struct ir:let (bindings rest) #:transparent)
+(struct ir:send (receiver args) #:transparent)
 (struct ir:return (results)  #:transparent)
 
 ;; a simple-IR is one of
@@ -743,10 +744,10 @@
 ;; class' shape; ditto for compile-template and templates.
 ;; Invariants:
 ;; - name must be equal? to the class' shape's name
-(struct class (name fields compile-pattern compile-template))
+(struct class (name fields compile-pattern compile-template) #:transparent)
 
 ;; a class-field is a (class-field name class)
-(struct class-field (name class))
+(struct class-field (name class) #:transparent)
 
 ;; literal-class is a really bad name since this is primarily used for
 ;; nonterminals
@@ -919,8 +920,28 @@
      (define fields (sequence-fields shape))
      (sequence-class name fields)]))
 
-;; a method is a (method name class IR)
-(struct method (name class body))
+;; a method is a (method class (listof name) IR)
+;; representing the interpret method of the specified class
+(struct method (class args body) #:transparent)
+
+(define (compile-rhs c-shape e-shape k-shape class-map rhs)
+  (syntax-parse rhs
+    [((~var c-temp (form-matching c-shape))
+      (~var e-temp (form-matching e-shape))
+      (~var k-temp (form-matching k-shape)))
+     (define compile-c-temp (class-compile-template (hash-ref class-map (attribute c-temp.name))))
+     (define compile-e-temp (class-compile-template (hash-ref class-map (attribute e-temp.name))))
+     (define compile-k-temp (class-compile-template (hash-ref class-map (attribute k-temp.name))))
+
+     (define-values (c-dest e-dest k-dest)
+       (values 'c* 'e* 'k))
+     (compile-c-temp
+      (syntax->datum #'c-temp) c-dest
+      (compile-e-temp
+       (syntax->datum #'e-temp) e-dest
+       (compile-k-temp
+        (syntax->datum #'k-temp) k-dest
+        (ir:return (list c-dest e-dest k-dest)))))]))
 
 (define (steps->methods steps class-map c-shape e-shape k-shape)
   (define (step->methods step)
@@ -932,18 +953,64 @@
        (define e-class (hash-ref class-map (attribute e-pat.name)))
        (define k-class (hash-ref class-map (attribute k-pat.name)))
 
-       (define compile-c (class-compile-pattern c-class))
-       (define compile-e (class-compile-pattern e-class))
-       (define compile-k (class-compile-pattern k-class))
+       (define compile-c-pat (class-compile-pattern c-class))
+       (define compile-e-pat (class-compile-pattern e-class))
+       (define compile-k-pat (class-compile-pattern k-class))
+
+       (define-values (c-src e-src k-src)
+         (values 'self 'env 'k))
 
        (if (or (equal? (shape->name k-shape) (attribute k-pat.name))
                ;; TODO we don't yet emit things with this name but we
                ;; don't want to conflate matching on a shape for a
                ;; variant of k with a shape for a primitive.
                (equal? 'prim (attribute k-pat.name)))
-           (error 'implement-typical-compile)
-           (error 'implement-message-send-compile))]))
-  (error 'implement-step-compilation))
+           (list
+            (method
+             c-class
+             (list c-src e-src k-src)
+             (compile-c-pat
+              (syntax->datum #'c-pat) c-src
+              (compile-e-pat
+               (syntax->datum #'e-pat) e-src
+               (compile-k-pat
+                (syntax->datum #'k-pat) k-src
+                (compile-rhs c-shape e-shape k-shape class-map (step-rhs step)))))))
+           (list
+            (method
+             c-class
+             (list c-src e-src k-src)
+             (compile-c-pat
+              (syntax->datum #'c-pat) c-src
+              (compile-e-pat
+               (syntax->datum #'e-pat) e-src
+               ;; TODO can we do better than a gensym? I would like
+               ;; something testable without resorting to alpha
+               ;; equivalence
+               (let ([k (gensym 'k)])
+                 ;; here we just check that our third argument is
+                 ;; actually a k and then send the control string and
+                 ;; environment to it
+                 ((class-compile-pattern (hash-ref class-map (shape->name k-shape)))
+                  k k-src
+                  ;; the order of these arguments is important and
+                  ;; must match the order of the args in the method on
+                  ;; k-class below
+                  (ir:send k (list (syntax->datum #'c-pat) (syntax->datum #'e-pat))))))))
+            (let ()
+              (define-values (k-src-cont c-src-cont e-src-cont)
+                (values 'self 'e-arg 'env-arg))
+              (method
+               k-class
+               (list k-src-cont c-src-cont e-src-cont)
+               (compile-k-pat
+                (syntax->datum #'k-pat) k-src-cont
+                (compile-c-pat
+                 (syntax->datum #'c-pat) c-src-cont
+                 (compile-e-pat
+                  (syntax->datum #'e-pat) e-src-cont
+                  (compile-rhs c-shape e-shape k-shape class-map (step-rhs step)))))))))]))
+  (apply append (map step->methods steps)))
 
 (define (compile-cek name productions c-id e-id k-id steps)
   ;; For each of c, e, and k, we need to generate the appropriate
@@ -958,9 +1025,10 @@
                       (values name (shape->class shape))))
 
   (define methods (steps->methods steps class-map c-shape e-shape k-shape))
+  (pretty-print methods)
 
   ;; TODO primitives
-  ;; TODO compiling steps into method bodies; collecting classes
+  ;; TODO collecting classes
   ;; TODO translating IR to RPython
   ;; TODO error messages (syntax-parse and runtime)
 
