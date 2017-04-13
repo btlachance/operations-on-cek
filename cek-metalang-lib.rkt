@@ -738,16 +738,12 @@
 
 ;; a class is a (class name
 ;;                     (listof class-field)
-;;                     (pattern source (listof name) IR -> (list IR (listof name)))
-;;                     (template dest (listof name) IR -> IR))
+;;                     (pattern source IR -> IR)
+;;                     (template dest IR -> IR))
 ;; where compile-pattern assumes the pattern is an instance of the
 ;; class' shape; ditto for compile-template and templates.
 ;; Invariants:
 ;; - name must be equal? to the class' shape's name
-;; - Callers of compile-pattern must thread the resulting (listof
-;;   name) through to subsequent calls of compile-pattern; this is
-;;   because compiling a pattern needs to return a list of the names
-;;   it introduces.
 (struct class (name fields compile-pattern compile-template))
 
 ;; a class-field is a (class-field name class)
@@ -756,15 +752,13 @@
 ;; literal-class is a really bad name since this is primarily used for
 ;; nonterminals
 (define (literal-class name)
-  (define (compile-pattern pattern source names rest)
-    (define IR
-      (ir:check-instance
-       source name
-       (ir:let (list (list pattern source))
-               rest)))
-    (list IR (cons pattern names)))
+  (define (compile-pattern pattern source rest)
+    (ir:check-instance
+     source name
+     (ir:let (list (list pattern source))
+             rest)))
 
-  (define (compile-template template dest names rest)
+  (define (compile-template template dest rest)
     (ir:let (list (list dest template))
             rest))
 
@@ -773,14 +767,13 @@
 (module+ test
   (define literal1 (literal-class 'e))
   (check-equal?
-   ((class-compile-pattern literal1) 'e_1 'self '() (ir:return '(e_1)))
-   (list (ir:check-instance
-          'self 'e
-          (ir:let (list '(e_1 self))
-                  (ir:return '(e_1))))
-         '(e_1)))
+   ((class-compile-pattern literal1) 'e_1 'self (ir:return '(e_1)))
+   (ir:check-instance
+    'self 'e
+    (ir:let (list '(e_1 self))
+            (ir:return '(e_1)))))
   (check-equal?
-   ((class-compile-template literal1) 'e 'result-e '(e) (ir:return '(result-e)))
+   ((class-compile-template literal1) 'e 'result-e (ir:return '(result-e)))
    (ir:let (list '(result-e e))
            (ir:return '(result-e)))))
 
@@ -790,49 +783,32 @@
                #:unless (symbol? (field-shape f)))
       (class-field (field-name f) (shape->class (field-shape f)))))
 
-  ;; TODO do something about the flip-flopping order when pairing a
-  ;; listof names with IR---make a struct or stick to one order
-  ;; throughout the project
-  (define (compile-pattern pattern source names rest)
+  (define (compile-pattern pattern source rest)
     (define field-patterns
       (for/list ([p pattern]
                  [f fields]
                  #:unless (symbol? (field-shape f)))
         p))
 
-    (define (compile-field pat f idx names+rest)
+    (define (compile-field pat f rest)
       (define compile-pat (class-compile-pattern (class-field-class f)))
-      (define names (first names+rest))
-      (define rest (second names+rest))
 
       (define projection-dest
         (if (symbol? pat)
             pat
             (format-symbol "~a-~a" source (class-field-name f))))
+      (ir:let (list (list projection-dest (ir:project name (class-field-name f) source)))
+              (compile-pat pat projection-dest rest)))
 
-      (define fieldbody+names
-        (compile-pat pat projection-dest (cons projection-dest names) rest))
+    (ir:check-instance
+     source name
+     (foldr
+      compile-field
+      rest
+      field-patterns
+      class-fields)))
 
-      (list
-       (second fieldbody+names)
-       (ir:let (list (list projection-dest (ir:project name (class-field-name f) source)))
-               (first fieldbody+names))))
-
-    (define names+body
-      (foldr
-       compile-field
-       (list names rest)
-       field-patterns
-       class-fields
-       (build-list (length class-fields) identity)))
-
-    (list
-     (ir:check-instance
-      source name
-      (second names+body))
-     (first names+body)))
-
-  (define (compile-template template dest names rest)
+  (define (compile-template template dest rest)
     (define field-templates
       (for/list ([t template]
                  [f fields]
@@ -847,7 +823,7 @@
 
     (define (compile-subtemplate t f dest rest)
       (define compile-t (class-compile-template (class-field-class f)))
-      (compile-t t dest names rest))
+      (compile-t t dest rest))
     (foldr
      compile-subtemplate
      (ir:let (list (list dest (ir:make name subtemplate-dests)))
@@ -872,13 +848,10 @@
   ;; the end, but it's an easier thing for now that works. It does
   ;; make me wonder what literals in their current state are useful
   ;; for other than for tags...
-  (define sandwichpatcompiled+names
-    ((class-compile-pattern sandwichclass) '(sandwich bread filling_1 bread)
-    'self
-    '()
-    (ir:return '(filling_1))))
   (check-equal?
-   (first sandwichpatcompiled+names)
+   ((class-compile-pattern sandwichclass) '(sandwich bread filling_1 bread)
+    'self
+    (ir:return '(filling_1)))
    (ir:check-instance
     'self 'sandwich
     (ir:let (list (list 'filling_1 (ir:project 'sandwich 'filling 'self)))
@@ -886,14 +859,10 @@
              'filling_1 'filling
              (ir:let (list (list 'filling_1 'filling_1))
                      (ir:return '(filling_1)))))))
-  (check-equal?
-   (list->set (second sandwichpatcompiled+names))
-   (list->set '(filling_1)))
 
   (check-equal?
    ((class-compile-template sandwichclass) '(sandwich bread veggies bread)
     'e-result
-    '()
     (ir:return '(e-result)))
    ;; TODO Punning the name 'veggies with the datum 'veggies is going
    ;; to cause problems when we want to remove redundant let bindings.
@@ -904,13 +873,10 @@
 
   (define bag (sequence 'bag (list (field 'contents filling-shape)) #'here))
   (define bagofbags (sequence 'outerbag (list (field 'bag1 bag) (field 'bag2 bag)) #'here))
-  (define bagofbagspatcompiled+names
-    ((class-compile-pattern (shape->class bagofbags)) '((meat) (veggies))
-     'self
-     '()
-     (ir:return '(meat veggies))))
   (check-equal?
-   (first bagofbagspatcompiled+names)
+   ((class-compile-pattern (shape->class bagofbags)) '((meat) (veggies))
+    'self
+    (ir:return '(meat veggies)))
    (ir:check-instance
     'self 'outerbag
     (ir:let (list (list 'self-bag1 (ir:project 'outerbag 'bag1 'self)))
@@ -928,14 +894,10 @@
                                                 'veggies 'filling
                                                 (ir:let (list (list 'veggies 'veggies))
                                                         (ir:return '(meat veggies))))))))))))))
-  (check-equal?
-   (list->set (second bagofbagspatcompiled+names))
-   (list->set '(self-bag1 self-bag2 meat veggies)))
 
   (check-equal?
    ((class-compile-template (shape->class bagofbags)) '((meat) (meat))
     'e-result
-    '()
     (ir:return '(e-result)))
    (ir:let
     (list (list 'meat 'meat))
@@ -962,7 +924,6 @@
 (struct method (name class body))
 
 (define (steps->methods steps class-map c-shape e-shape k-shape)
-  ;; step->methods : step -> (nonemptylistof method)
   (define (step->methods step)
     (syntax-parse (step-lhs step)
       [((~var c-pat (form-matching c-shape))
@@ -998,30 +959,6 @@
                       (values name (shape->class shape))))
 
   (define methods (steps->methods steps class-map c-shape e-shape k-shape))
-
-  ;; Although each shape will know its class, which itself will know
-  ;; how to compile patterns that correspond to its shape, the shape
-  ;; and class aren't in charge of when to compile k patterns as a
-  ;; message send or not; that decision is made before we even hand a
-  ;; pattern to the k class's compile-pattern function. The "driver"
-  ;; that walks the c, e, and k registers and gets the classes/compile
-  ;; functions looks at the k pattern and determines if it should be a
-  ;; message send or not.
-  ;; - If not, then it simply passes the pattern to the corresponding
-  ;;   class' compile-pattern and adds the IR to the body of the
-  ;;   control string's interpret method.
-  ;; - If the k pattern should be compiled to a message send, the
-  ;;   driver emits the IR for the message send---it knows what
-  ;;   variables compiling the c and e patterns introduced, so it puts
-  ;;   those in the right argument positions---and places the message
-  ;;   send in the control string's interpret method. It then starts
-  ;;   to emit IR for the k class' interpret method and, since it
-  ;;   knows where it put the arguments for the message send, it can
-  ;;   finish compiling the template for the body of the k class'
-  ;;   interpret method.
-  ;; This way, each class' compile function is treated uniformly. The
-  ;; only non-uniform decisions are made exactly where we know how to
-  ;; make that decision.
 
   ;; TODO primitives
   ;; TODO compiling steps into method bodies; collecting classes
