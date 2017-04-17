@@ -39,7 +39,7 @@
 ;; TODO start chipping away at this
 (define-syntax (define-cek stx)
   (syntax-parse stx
-    [(define-cek name
+    [(define-cek name:id
        #:grammar
        grammar:production ...
        #:control-string c-nonterminal:id
