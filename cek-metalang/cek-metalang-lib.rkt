@@ -429,7 +429,7 @@
   (class name '() compile-pattern compile-template))
 
 (module+ test
-  (define nt1 (nonterminal-class 'e '(x y z)))
+  (define nt1 (nonterminal-class 'e '(x y z) (make-hash)))
   (check-equal?
    ((class-compile-pattern nt1) 'e_1 'self (ir:return '(e_1)))
    (ir:check-instance
@@ -507,12 +507,17 @@
 
 (module+ test
   (define filling-shape (choice 'filling '(veggies meat) #'here))
+  (define sandwiches-shape-map (hash 'filling filling-shape
+                                     'veggies 'veggies
+                                     'meat 'meat))
+  (define sandwiches-class-map (make-hash))
+  (build-classes! sandwiches-class-map (make-hash) sandwiches-shape-map)
   (define sandwich-shape (sequence 'sandwich (list (field 'tag 'sandwich)
                                                    (field 'topslice 'bread)
                                                    (field 'filling filling-shape)
                                                    (field 'bottomslice 'bread))
                                    #'here))
-  (define sandwichclass (shape->class sandwich-shape))
+  (define sandwichclass (shape->class sandwich-shape sandwiches-class-map))
 
   ;; This test assumes we don't want to check literals that appear
   ;; inside of a sequence. I don't know if this is what we'll want in
@@ -539,10 +544,17 @@
            (ir:let (list (list 'e-result (ir:make 'sandwich '(veggies))))
                    (ir:return '(e-result)))))
 
+
   (define bag (sequence 'bag (list (field 'contents filling-shape)) #'here))
   (define bagofbags (sequence 'outerbag (list (field 'bag1 bag) (field 'bag2 bag)) #'here))
+  (define bags-shape-map (hash-set* sandwiches-shape-map
+                                    'bag bag
+                                    'outerbag bagofbags))
+  (define bags-class-map (hash-copy sandwiches-class-map))
+  (build-classes! bags-class-map (make-hash) bags-shape-map)
+
   (check-equal?
-   ((class-compile-pattern (shape->class bagofbags)) '((meat) (veggies))
+   ((class-compile-pattern (shape->class bagofbags bags-class-map)) '((meat) (veggies))
     'self
     (ir:return '(meat veggies)))
    (ir:check-instance
@@ -564,7 +576,7 @@
                                                         (ir:return '(meat veggies))))))))))))))
 
   (check-equal?
-   ((class-compile-template (shape->class bagofbags)) '((meat) (meat))
+   ((class-compile-template (shape->class bagofbags bags-class-map)) '((meat) (meat))
     'e-result
     (ir:return '(e-result)))
    (ir:let
@@ -606,6 +618,9 @@
             rest))
   (class symbol #f compile-pattern compile-template))
 
+;; shape->class : shape (map name class) -> class
+;; INV: when shape is a sequence, class-map must have bindings for
+;; each of its non-symbol fields
 (define (shape->class shape class-map)
   (cond
     [(symbol? shape) (symbol-class shape)]

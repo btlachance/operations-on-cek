@@ -1,24 +1,6 @@
 #lang racket
-(module test-ex.environment racket
-  (require
-   rackunit
-   "cek-metalang.rkt")
-  (define-cek environment
-    #:grammar
-    (e ::= var)
-    (var ::= x y z)
-    (env ::= default-env)
-    (k ::= mt)
-    #:control-string e
-    #:environment env
-    #:continuation k
-    #:step
-    [(var env k) --> ((lookup env var) env k)]))
-
 (module test-ex.lc racket
-  (require
-   rackunit
-   "cek-metalang.rkt")
+  (require "../cek-metalang/cek-metalang.rkt")
   (define-cek lc
     #:grammar
     (e ::= var v (e e))
