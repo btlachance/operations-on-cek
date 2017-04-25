@@ -3,6 +3,7 @@
  racket/syntax
  syntax/parse
  syntax/id-set
+ "ir.rkt"
  (for-template
   racket/base
   syntax/parse
@@ -35,29 +36,7 @@
   (define (make-keywords-delta-introducer ext-stx)
     (make-syntax-delta-introducer ext-stx #'::)))
 
-(module compile-util racket/base
-  (require racket/match syntax/parse)
-  (provide pattern-metavar)
-  (define (matches-metavar? pattern id)
-    (define without-suffix
-      (match (symbol->string (syntax-e pattern))
-        [(regexp #px"([^_]*)(_.+)?" (list _ contents suffix))
-         (define symbol-without-suffix (string->symbol contents))
-         (datum->syntax pattern symbol-without-suffix pattern)]))
-    (free-identifier=? without-suffix id))
-
-  (define-syntax-class (pattern-metavar id)
-    #:description (format "metavar ~a" (syntax-e id))
-    (pattern x:id
-             #:when (matches-metavar? #'x id))))
-
-(require
- (for-template 'keywords 'compile-util racket/pretty)
- (only-in 'keywords keywords-set make-keywords-delta-introducer)
- ;; for new representations
- 'compile-util)
-
-
+(require (for-template 'keywords))
 (struct production (name forms)
   #:name -production
   #:constructor-name -production)
@@ -113,6 +92,23 @@
     [(sequence? shape) (sequence-name shape)]
     [(choice? shape) (choice-name shape)]
     [else (prim-name shape)]))
+
+(module compile-util racket/base
+  (require racket/match syntax/parse)
+  (provide pattern-metavar)
+  (define (matches-metavar? pattern id)
+    (define without-suffix
+      (match (symbol->string (syntax-e pattern))
+        [(regexp #px"([^_]*)(_.+)?" (list _ contents suffix))
+         (define symbol-without-suffix (string->symbol contents))
+         (datum->syntax pattern symbol-without-suffix pattern)]))
+    (free-identifier=? without-suffix id))
+
+  (define-syntax-class (pattern-metavar id)
+    #:description (format "metavar ~a" (syntax-e id))
+    (pattern x:id
+             #:when (matches-metavar? #'x id))))
+(require 'compile-util)
 
 ;; sequence-of : (listof field)
 ;; recognizes when a syntax matches a sequence of the given fields
@@ -351,6 +347,9 @@
 
 ;; compile-grammar2 : productions -> (map name shape)
 ;; produces a map from names to shapes for the given grammar
+;; INV: productions are sorted s.t. the production defining a
+;; nonterminal that is an alternative for some other nonterminal comes
+;; after that other nonterminal's production
 (define (compile-grammar2 productions)
   (define init-choice-shapes
     (for/hash ([p productions])
@@ -388,24 +387,6 @@
   (check-true (hash-has-key? snacks-shape-map 'chips))
   (check-equal? (length (hash-keys snacks-shape-map)) 7))
 
-;; a IR is one of
-;; - (ir:check-instance name name IR)
-;; - (ir:let (listof (list name simple-IR)) IR)
-;; - (ir:send name (listof name))
-;; - (ir:return (listof name))
-(struct ir:check-instance (arg class-name rest) #:transparent)
-(struct ir:let (bindings rest) #:transparent)
-(struct ir:send (receiver args) #:transparent)
-(struct ir:return (results)  #:transparent)
-
-;; a simple-IR is one of
-;; - name
-;; - (ir:make name (U #f (listof name)))
-;; - (ir:project name name name)
-;; - (ir:call-builtin name (listof name))
-(struct ir:make (class-name args) #:transparent)
-(struct ir:project (class-name field-name arg) #:transparent)
-(struct ir:call-builtin (name args) #:transparent)
 
 ;; a class is a (class name
 ;;                     (U (listof class-field) #f)
@@ -413,6 +394,8 @@
 ;;                     (template name IR -> IR))
 ;; - when fields is #f the class represents a literal, i.e. it does
 ;;   not have a constructor
+;; - when super-name is #f the class is only relevant for compile-time
+;;   and should not have a residual in the generated code
 ;; Invariants:
 ;; - compile-pattern assumes the pattern is an instance of the
 ;;   class' shape; ditto for compile-template and templates.
@@ -799,8 +782,17 @@
     (choice-alternatives e-shape)))
   (list prim-lookup prim-extend))
 
-;; build-classes! : (map name class) (map name shape) -> void
-(define (build-classes! class-map shape-map)
+;; a super-class is one of
+;; - #f
+;; - 'top
+;; - name, where name != 'top
+;; A class whose super-class is #f is only relevant for compile time
+;; and should have no residual in the generated code
+
+;; build-classes! : (map name class) (map name super-class) (map name shape) -> void
+;; mutates class-map and super-class-map so that every shape in
+;; shape-map has a class/super-class entry
+(define (build-classes! class-map super-class-map shape-map)
   (define choice-shapes (filter choice? (hash-values shape-map)))
   ;; Unless we make the classes mutable, we need to use a mutable hash
   ;; map to build the class-map (in a similar way to how we build up
@@ -814,7 +806,13 @@
   ;; know that that something must be choice and all choice shapes
   ;; have a class in class-map
   (for ([c choice-shapes])
-    (hash-set! class-map (choice-name c) (shape->class c class-map)))
+    (hash-set! class-map (choice-name c) (shape->class c class-map))
+    (for ([alt (choice-alternatives c)])
+      (hash-set! super-class-map (shape->name alt) (choice-name c))))
+
+  (for ([c choice-shapes]
+        #:unless (hash-has-key? super-class-map (choice-name c)))
+    (hash-set! super-class-map (choice-name c) 'top))
 
   (define remaining-shapes (filter-not choice? (hash-values shape-map)))
   (for ([s remaining-shapes])
@@ -849,17 +847,60 @@
   ;; of this mutation wasn't thought through, which makes it feel like
   ;; more of a hack
   (define class-map (make-hash))
+  (define super-class-map (make-hash))
   (define toplevel (toplevel-class (filter choice? (hash-values shape-map)) class-map))
+  ;; because shape-map is immutable we don't add prims to it; thus, to
+  ;; get their super class entries into super-class-map, we have to do
+  ;; that outside of build-classes
   (define prims (add-prims! toplevel c-shape e-shape))
-  (build-classes! class-map shape-map)
+  (build-classes! class-map super-class-map shape-map)
   (for ([p prims])
+    (hash-set! super-class-map (prim-name p) #f)
     (hash-set! class-map (prim-name p) (shape->class p class-map)))
 
   (define methods (steps->methods steps class-map c-shape e-shape k-shape))
-  (pretty-print methods)
+  (define method-map
+    (for/fold ([method-map (hash)])
+              ([m methods])
+      (define c (method-class m))
+      (define existing-method (hash-ref method-map (class-name c) #f))
+      (when (and existing-method
+                 (not (equal? (method-body existing-method) (method-body m)))
+                 (not (equal? (method-args existing-method) (method-args m))))
+        (error 'compile-cek "class ~a has two methods that are not equivalent; method 1: ~a\n method 2: ~a"
+               (method-body existing-method)
+               (method-body m)))
+      (hash-set method-map (class-name c) m)))
 
-  ;; TODO collecting classes
+  (define (class-field->field-def c-f)
+    (ir:field-def (class-field-name c-f) (class-name (class-field-class c-f))))
+  (define (method->method-def m)
+    (ir:method-def
+     (method-args m)
+     (method-body m)))
+  
+  (define class-definitions
+    (for/hash ([class-name (in-hash-keys class-map)]
+               #:when (hash-ref super-class-map class-name))
+      (define def
+        (ir:class-def
+         class-name
+         (hash-ref super-class-map class-name)
+         ;; Not sure what to do about #f fields (literals)---should
+         ;; their class-def also have #f? Do we need to distinguish
+         ;; literals anywhere else (do we even distinguish it
+         ;; upstream?)?
+         (map class-field->field-def (or (class-fields (hash-ref class-map class-name)) '()))
+         (if (hash-has-key? method-map class-name)
+             (method->method-def (hash-ref method-map class-name))
+             (ir:method-def
+              '()
+              (ir:error (format "class ~a does not implement a method" class-name))))))
+      (values class-name def)))
+
+  (for ([class-def (in-hash-values class-definitions)])
+    (pretty-print class-def #:newline? #t))
+
   ;; TODO translating IR to RPython
   ;; TODO error messages (syntax-parse and runtime)
-
   #'(begin))
