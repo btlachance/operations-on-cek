@@ -6,8 +6,8 @@
   racket/sequence
   "cek-metalang-lib.rkt"))
 
-(require (submod "cek-metalang-lib.rkt" keywords))
-(provide (all-from-out (submod "cek-metalang-lib.rkt" keywords)))
+(require "keywords.rkt")
+(provide (all-from-out "keywords.rkt"))
 (provide define-cek)
 
 ;; For each right r, we need to generate a collection of the

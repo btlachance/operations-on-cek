@@ -4,39 +4,18 @@
  syntax/parse
  syntax/id-set
  "ir.rkt"
+ "py-from-ir.rkt"
+ "compile-util.rkt"
  (for-template
   racket/base
   syntax/parse
-  syntax/id-set))
+  syntax/id-set
+  "keywords.rkt"))
 
 (provide production step compile-cek)
 (module+ test
   (require rackunit))
 
-(module keywords racket/base
-  (require
-   (for-syntax racket/base)
-   syntax/id-set
-   syntax/parse)
-  (provide make-keywords-delta-introducer)
-  (define-syntax (keywords stx)
-    (syntax-case stx ()
-      [(_ id ...)
-       (begin
-         #`(begin
-             (define-syntax (id stx)
-               (raise-syntax-error 'cek-metalang "out of context" stx)) ...
-               (provide id) ...
-               (define keywords-set
-                 (immutable-free-id-set (list #'id ...)))
-               (provide keywords-set)))]))
-  (keywords ::= -->
-            natural
-            default-env lookup extend)
-  (define (make-keywords-delta-introducer ext-stx)
-    (make-syntax-delta-introducer ext-stx #'::)))
-
-(require (for-template 'keywords))
 (struct production (name forms)
   #:name -production
   #:constructor-name -production)
@@ -93,22 +72,7 @@
     [(choice? shape) (choice-name shape)]
     [else (prim-name shape)]))
 
-(module compile-util racket/base
-  (require racket/match syntax/parse)
-  (provide pattern-metavar)
-  (define (matches-metavar? pattern id)
-    (define without-suffix
-      (match (symbol->string (syntax-e pattern))
-        [(regexp #px"([^_]*)(_.+)?" (list _ contents suffix))
-         (define symbol-without-suffix (string->symbol contents))
-         (datum->syntax pattern symbol-without-suffix pattern)]))
-    (free-identifier=? without-suffix id))
-
-  (define-syntax-class (pattern-metavar id)
-    #:description (format "metavar ~a" (syntax-e id))
-    (pattern x:id
-             #:when (matches-metavar? #'x id))))
-(require 'compile-util)
+(require "compile-util.rkt")
 
 ;; sequence-of : (listof field)
 ;; recognizes when a syntax matches a sequence of the given fields
