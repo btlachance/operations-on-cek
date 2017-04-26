@@ -22,7 +22,7 @@
 (struct ir:project (class-name field-name arg) #:transparent)
 (struct ir:call-builtin (name args) #:transparent)
 
-;; an ir:class-def is (ir:class-def name super-name (listof field-def) method-def)
+;; an ir:class-def is (ir:class-def name super-name (U #f (listof field-def)) method-def)
 (struct ir:class-def (name super-name fields method) #:transparent)
 
 ;; an ir:field-def is (ir:field-def name name)

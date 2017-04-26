@@ -865,11 +865,9 @@
         (ir:class-def
          class-name
          (hash-ref super-class-map class-name)
-         ;; Not sure what to do about #f fields (literals)---should
-         ;; their class-def also have #f? Do we need to distinguish
-         ;; literals anywhere else (do we even distinguish it
-         ;; upstream?)?
-         (map class-field->field-def (or (class-fields (hash-ref class-map class-name)) '()))
+         (match (class-fields (hash-ref class-map class-name))
+           [(list fields ...) (map class-field->field-def fields)]
+           [_ #f])
          (if (hash-has-key? method-map class-name)
              (method->method-def (hash-ref method-map class-name))
              (ir:method-def
