@@ -8,7 +8,7 @@
                     ;; We can remove this limitation later with some
                     ;; kind of variable or symbol primitive
     (v ::= (lam var e))
-    (env ::= default-env)
+    (env ::= dummy)
     (k ::= mt (arg e env k) (fn v env k))
     #:control-string e
     #:environment env
