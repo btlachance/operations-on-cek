@@ -18,7 +18,9 @@
 (define (class-def->py cdef)
   (match cdef
     [(ir:class-def name super-name fdefs mdef)
-     (define header (format "class ~a(~a):" name (or super-name "object")))
+     (define header (format "class ~a(~a):" name (if (equal? 'top super-name)
+                                                     "object"
+                                                     super-name)))
      (define constructor (field-defs->constructor-py name fdefs #:indent "  "))
      (define method (method-def->py mdef #:indent "  "))
      (~a header constructor method #:separator "\n")]))
@@ -91,14 +93,19 @@
                  "\n")))
 
 
-;; method-def->py : ir:method-def -> string
+;; method-def->py : (U 'super ir:method-def) -> string
 (define (method-def->py mdef #:indent [prefix ""])
   (match mdef
+    ['super
+     (format "~a# method inherited from super class" prefix)]
     [(ir:method-def args body)
      (define header (format "~adef interpret(~a):" prefix (apply ~a #:separator ", " args)))
      (string-join (list header (ir->py body #:indent (string-append prefix "  "))) "\n")]))
 
 (module+ test
+  (check-equal? (method-def->py 'super) ;; low-value test...
+                "# method inherited from super class")
+
   ;; TODO currently, upstream code puts the self argument explicitly
   ;; in the IR. I'm not sure if that's what we necessarily want; these
   ;; tests assume that it is what we want.

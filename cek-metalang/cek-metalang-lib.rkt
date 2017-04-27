@@ -699,8 +699,8 @@
     (compile-t t dest rest))
   (define prim-lookup
     (let ()
-      (define lookup-fields (list (class-field 'var toplevel-class)
-                                  (class-field 'env toplevel-class)))
+      (define lookup-fields (list (class-field 'env toplevel-class)
+                                  (class-field 'var toplevel-class)))
       (define (compile-lookup-template template dest rest)
         (define subtemplates (cdr template))
         (define dests
@@ -858,6 +858,21 @@
     (ir:method-def
      (method-args m)
      (method-body m)))
+
+  ;; check-for-super-method: name super-class -> (U ir:method-def 'super)
+  ;; assumes that super-name is non-#f and that either it is 'top or
+  ;; it has a non-#f super-class according to super-class-map
+  (define (check-for-super-method class-name super-name)
+    (let loop ([defining-class super-name])
+      (match defining-class
+        ['top
+         (ir:method-def
+          '()
+          (ir:error (format "class ~a does not implement a method" class-name)))]
+        [_
+         (if (hash-has-key? method-map defining-class)
+             'super
+             (loop (hash-ref super-class-map defining-class)))])))
   
   (define class-definitions
     (for/hash ([class-name (in-hash-keys class-map)]
@@ -871,14 +886,11 @@
            [_ #f])
          (if (hash-has-key? method-map class-name)
              (method->method-def (hash-ref method-map class-name))
-             (ir:method-def
-              '()
-              (ir:error (format "class ~a does not implement a method" class-name))))))
+             (check-for-super-method class-name (hash-ref super-class-map class-name)))))
       (values class-name def)))
 
   (for ([class-def (in-hash-values class-definitions)])
     (pretty-display (class-def->py class-def) #:newline? #t))
 
-  ;; TODO translating IR to RPython
   ;; TODO error messages (syntax-parse and runtime)
   #'(begin))
