@@ -889,8 +889,15 @@
              (check-for-super-method class-name (hash-ref super-class-map class-name)))))
       (values class-name def)))
 
-  (for ([class-def (in-hash-values class-definitions)])
-    (pretty-display (class-def->py class-def) #:newline? #t))
+  ;; in python, super class declarations must come before a subclass'
+  ;; declaration... given that all of the nonterminals are the only
+  ;; superclasses, it's sufficient to print those out first (and thus
+  ;; I can put off implementing a topological sort even longer)
+  (define root-names (map (compose syntax-e production-name) productions))
+  (for ([root root-names])
+    (pretty-display (class-def->py (hash-ref class-definitions root))))
+  (for ([remaining (remove* root-names (hash-keys class-definitions))])
+    (pretty-display (class-def->py (hash-ref class-definitions remaining)) #:newline? #t))
 
   ;; TODO error messages (syntax-parse and runtime)
   #'(begin))
