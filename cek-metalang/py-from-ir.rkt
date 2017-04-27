@@ -125,19 +125,19 @@
   (match ir
     [(ir:check-instance n class-name rest)
      (define guard (format "~aif not(isinstance(~a, ~a)):" prefix n class-name))
-     (define failure-message (format "~aExpected ~a to be an ~a" prefix n class-name))
+     (define failure-message (format "Expected ~a to be an ~a" n class-name))
      (define failure (format "~araise Exception(~s)" prefix failure-message))
 
      (format "~a\n  ~a\n~a"
              guard
              failure
-             (ir->py rest))]
+             (ir->py rest #:indent prefix))]
     [(ir:let (list (list lhss rhss) ...) rest)
      (define (binding-pair->py name simple-ir)
        (format "~a~a = ~a" prefix name (simple-ir->py simple-ir)))
      (define py-assignments (map binding-pair->py lhss rhss))
 
-     (apply ~a #:separator "\n" (append py-assignments (list (ir->py rest))))]
+     (apply ~a #:separator "\n" (append py-assignments (list (ir->py rest #:indent prefix))))]
     [(ir:send receiver args)
      (format "~a~a.interpret(~a)"
              prefix
@@ -166,6 +166,13 @@
                   "  raise Exception(\"Expected e1 to be an e\")"
                   "return e1")
                  "\n"))
+  (check-equal? (ir->py (ir:check-instance 'e1 'e (ir:return '(e1))) #:indent "  ")
+                (string-join
+                 (list
+                  "  if not(isinstance(e1, e)):"
+                  "    raise Exception(\"Expected e1 to be an e\")"
+                  "  return e1")
+                 "\n"))
   (check-equal? (ir->py (ir:let '() (ir:return '(e1))))
                 "return e1")
   (check-equal? (ir->py (ir:let '((e2 e1)
@@ -176,6 +183,16 @@
                   "e2 = e1"
                   "k2 = k1"
                   "return e2, k2")
+                 "\n"))
+  (check-equal? (ir->py (ir:let '((e2 e1))
+                                (ir:let '((e3 e2))
+                                        (ir:return '(e3 e2 e1))))
+                        #:indent "  ")
+                (string-join
+                 (list
+                  "  e2 = e1"
+                  "  e3 = e2"
+                  "  return e3, e2, e1")
                  "\n"))
 
   (check-equal? (ir->py (ir:send 'x '()))
