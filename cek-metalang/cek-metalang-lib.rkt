@@ -296,7 +296,7 @@
           'compile-grammar2
           "cannot nest a combination in a combination"
           form))
-       (define comb-name (format-symbol "~a-comb~a" p-name i))
+       (define comb-name (format-symbol "~a_comb~a" p-name i))
        (comb->shape comb-name shape-map subforms)])))
 
 (module+ test
@@ -431,7 +431,7 @@
       (define projection-dest
         (if (symbol? pat)
             pat
-            (format-symbol "~a-~a" source (class-field-name f))))
+            (format-symbol "~a_~a" source (class-field-name f))))
       (ir:let (list (list projection-dest (ir:project name (class-field-name f) source)))
               (compile-pat pat projection-dest rest)))
 
@@ -454,7 +454,7 @@
                  [f class-fields])
         (if (symbol? t)
             t
-            (format-symbol "~a-~a" dest (class-field-name f)))))
+            (format-symbol "~a_~a" dest (class-field-name f)))))
 
     (define (compile-subtemplate t f dest rest)
       (define compile-t (class-compile-template (class-field-class f)))
@@ -523,17 +523,17 @@
     (ir:return '(meat veggies)))
    (ir:check-instance
     'self 'outerbag
-    (ir:let (list (list 'self-bag1 (ir:project 'outerbag 'bag1 'self)))
+    (ir:let (list (list 'self_bag1 (ir:project 'outerbag 'bag1 'self)))
             (ir:check-instance
-             'self-bag1 'bag
-             (ir:let (list (list 'meat (ir:project 'bag 'contents 'self-bag1)))
+             'self_bag1 'bag
+             (ir:let (list (list 'meat (ir:project 'bag 'contents 'self_bag1)))
                      (ir:check-instance
                       'meat 'meat
                       (ir:let (list (list 'meat 'meat))
-                              (ir:let (list (list 'self-bag2 (ir:project 'outerbag 'bag2 'self)))
+                              (ir:let (list (list 'self_bag2 (ir:project 'outerbag 'bag2 'self)))
                                       (ir:check-instance
-                                       'self-bag2 'bag
-                                       (ir:let (list (list 'veggies (ir:project 'bag 'contents 'self-bag2)))
+                                       'self_bag2 'bag
+                                       (ir:let (list (list 'veggies (ir:project 'bag 'contents 'self_bag2)))
                                                (ir:check-instance
                                                 'veggies 'veggies
                                                 (ir:let (list (list 'veggies 'veggies))
@@ -546,13 +546,13 @@
    (ir:let
     (list (list 'meat (ir:make 'meat #f)))
     (ir:let
-     (list (list 'e-result-bag1 (ir:make 'bag '(meat))))
+     (list (list 'e-result_bag1 (ir:make 'bag '(meat))))
      (ir:let
       (list (list 'meat (ir:make 'meat #f)))
       (ir:let
-       (list (list 'e-result-bag2 (ir:make 'bag '(meat))))
+       (list (list 'e-result_bag2 (ir:make 'bag '(meat))))
        (ir:let
-        (list (list 'e-result (ir:make 'outerbag '(e-result-bag1 e-result-bag2))))
+        (list (list 'e-result (ir:make 'outerbag '(e-result_bag1 e-result_bag2))))
         (ir:return '(e-result)))))))))
 
 ;; symbol-class : name -> class
@@ -610,7 +610,7 @@
      (define compile-k-temp (class-compile-template (hash-ref class-map (attribute k-temp.name))))
 
      (define-values (c-dest e-dest k-dest)
-       (values 'c* 'e* 'k*))
+       (values 'c_result 'e_result 'k_result))
      (compile-c-temp
       (syntax->datum #'c-temp) c-dest
       (compile-e-temp
@@ -661,7 +661,7 @@
               (syntax->datum #'c-pat) c-src
               (compile-e-pat
                (syntax->datum #'e-pat) e-src
-               (let ([k 'dispatch-k])
+               (let ([k 'dispatch_k])
                  ;; here we just check that our third argument is
                  ;; actually a k and then send the control string and
                  ;; environment to it
@@ -673,7 +673,7 @@
                   (ir:send k (list (syntax->datum #'c-pat) (syntax->datum #'e-pat))))))))
             (let ()
               (define-values (k-src-cont c-src-cont e-src-cont)
-                (values 'self 'c-arg 'e-arg))
+                (values 'self 'c_arg 'e_arg))
               (method
                k-class
                (list k-src-cont c-src-cont e-src-cont)
@@ -705,7 +705,7 @@
         (define subtemplates (cdr template))
         (define dests
           (for/list ([f lookup-fields])
-            (format-symbol "~a-~a" dest (class-field-name f))))
+            (format-symbol "~a_~a" dest (class-field-name f))))
         (foldr
          compile-subtemplate
          (ir:let (list (list dest (ir:call-builtin 'lookup dests)))
@@ -731,7 +731,7 @@
         (define subtemplates (cdr template))
         (define dests
           (for/list ([f extend-fields])
-            (format-symbol "~a-~a" dest (class-field-name f))))
+            (format-symbol "~a_~a" dest (class-field-name f))))
         (foldr
          compile-subtemplate
          (ir:let (list (list dest (ir:call-builtin 'extend dests)))
@@ -836,6 +836,7 @@
   (for ([p prims])
     (hash-set! super-class-map (prim-name p) #f)
     (hash-set! class-map (prim-name p) (shape->class p class-map)))
+  (hash-set! super-class-map 'toplevel #f)
 
   (define methods (steps->methods steps class-map c-shape e-shape k-shape))
   (define method-map
@@ -876,7 +877,7 @@
       (values class-name def)))
 
   (for ([class-def (in-hash-values class-definitions)])
-    (pretty-print class-def #:newline? #t))
+    (pretty-display (class-def->py class-def) #:newline? #t))
 
   ;; TODO translating IR to RPython
   ;; TODO error messages (syntax-parse and runtime)
