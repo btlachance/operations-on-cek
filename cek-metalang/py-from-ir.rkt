@@ -13,14 +13,23 @@
 ;; TODO since Python doesn't have let, we'll also need to ensure any
 ;; conflicting identifiers in a method name get renamed appropriately
 
+(define (class-name->py name)
+  ;; Since metavariables overlap with class names, we need a way to
+  ;; disambiguate the two in Python. I'm opting for mangling class
+  ;; names---it isn't the most principled approach but it's simple
+  ;; enough to work for my examples.
+  (format "cl_~a" name))
+
 ;; class-def->py : ir:class-def -> string
 ;; where cdef's super-name is not #f
 (define (class-def->py cdef)
   (match cdef
     [(ir:class-def name super-name fdefs mdef)
-     (define header (format "class ~a(~a):" name (if (equal? 'top super-name)
-                                                     "object"
-                                                     super-name)))
+     (define header (format "class ~a(~a):"
+                            (class-name->py name)
+                            (if (equal? 'top super-name)
+                                "object"
+                                (class-name->py super-name))))
      (define constructor (field-defs->constructor-py name fdefs #:indent "  "))
      (define method (method-def->py mdef #:indent "  "))
      (~a header constructor method #:separator "\n")]))
@@ -35,7 +44,7 @@
   (check-equal? (class-def->py app-def)
                 (string-join
                  (list
-                  "class app(e):"
+                  "class cl_app(cl_e):"
                   "  def __init__(self, app_fn, app_arg):"
                   "    self.app_fn = app_fn"
                   "    self.app_arg = app_arg"
@@ -131,7 +140,10 @@
 (define (ir->py ir #:indent [prefix ""])
   (match ir
     [(ir:check-instance n class-name rest)
-     (define guard (format "~aif not(isinstance(~a, ~a)):" prefix n class-name))
+     (define guard (format "~aif not(isinstance(~a, ~a)):"
+                           prefix
+                           n
+                           (class-name->py class-name)))
      (define failure-message (format "Expected ~a to be an ~a" n class-name))
      (define failure (format "~araise Exception(~s)" prefix failure-message))
 
@@ -169,14 +181,14 @@
   (check-equal? (ir->py (ir:check-instance 'e1 'e (ir:return '(e1))))
                 (string-join
                  (list
-                  "if not(isinstance(e1, e)):"
+                  "if not(isinstance(e1, cl_e)):"
                   "  raise Exception(\"Expected e1 to be an e\")"
                   "return e1")
                  "\n"))
   (check-equal? (ir->py (ir:check-instance 'e1 'e (ir:return '(e1))) #:indent "  ")
                 (string-join
                  (list
-                  "  if not(isinstance(e1, e)):"
+                  "  if not(isinstance(e1, cl_e)):"
                   "    raise Exception(\"Expected e1 to be an e\")"
                   "  return e1")
                  "\n"))
@@ -216,10 +228,10 @@
 (define (simple-ir->py simple-ir)
   (match simple-ir
     [(ir:make name #f)
-     (format "~a()" name)]
+     (format "~a()" (class-name->py name))]
     [(ir:make name args)
      (format "~a(~a)"
-             name
+             (class-name->py name)
              (apply ~a #:separator ", " args))]
     [(ir:project _ field-name arg)
      (format "~a.~a" arg field-name)]
@@ -233,11 +245,11 @@
   (require rackunit)
 
   (check-equal? (simple-ir->py (ir:make 'mt #f))
-                "mt()")
+                "cl_mt()")
   (check-equal? (simple-ir->py (ir:make 'nil '()))
-                "nil()")
+                "cl_nil()")
   (check-equal? (simple-ir->py (ir:make 'app '(e_1 e_2)))
-                "app(e_1, e_2)")
+                "cl_app(e_1, e_2)")
 
   (check-equal? (simple-ir->py (ir:project 'mumble 'appfirst 'e))
                 "e.appfirst")
