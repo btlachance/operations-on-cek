@@ -107,6 +107,16 @@
   (match mdef
     ['super
      (format "~a# method inherited from super class" prefix)]
+    ;; I'm not happy with this special-case, but we need the
+    ;; unimplemented "implementations" to accept an arbitrary # of
+    ;; arguments. We only know the number of arguments when we emit
+    ;; code for implemented methods, and we can't leave the
+    ;; unimplemented ones at zero arguments: we don't want Python
+    ;; errors that say e.g.  "interpret() takes no arguments (3
+    ;; given)"
+    [(ir:method-def (list) (and err (ir:error message)))
+     (define header (format "~adef interpret(*args):" prefix))
+     (string-join (list header (ir->py err #:indent (string-append prefix "  "))) "\n")]
     [(ir:method-def args body)
      (define header (format "~adef interpret(~a):" prefix (apply ~a #:separator ", " args)))
      (string-join (list header (ir->py body #:indent (string-append prefix "  "))) "\n")]))
