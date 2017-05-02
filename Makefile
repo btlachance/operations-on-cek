@@ -8,4 +8,7 @@ $(DEST)/%.html: scribblings/%.scrbl
 .PHONY: test
 test:
 	raco test cek-metalang/
-	raco test -q --submodule test-ex.lc examples/cek-metalang-ex.rkt | python
+	{ raco test -q --submodule test-ex.lc examples/cek-metalang-ex.rkt;\
+	    cat cek-metalang/runtime.py\
+	        lam-example-tests.py;\
+	    echo 'tests()'; } | python

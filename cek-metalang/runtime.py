@@ -39,6 +39,4 @@ def run(p):
     try:
       c, e, k = c.interpret(e, k)
     except CEKError as err:
-      print "CEKError: ", err.__str__()
       return c
-
