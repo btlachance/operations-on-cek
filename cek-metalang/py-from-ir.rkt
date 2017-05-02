@@ -158,7 +158,7 @@
 
      (apply ~a #:separator "\n" (append py-assignments (list (ir->py rest #:indent prefix))))]
     [(ir:send receiver args)
-     (format "~a~a.interpret(~a)"
+     (format "~areturn ~a.interpret(~a)"
              prefix
              receiver
              (apply ~a #:separator ", " args))]
@@ -215,9 +215,9 @@
                  "\n"))
 
   (check-equal? (ir->py (ir:send 'x '()))
-                "x.interpret()")
+                "return x.interpret()")
   (check-equal? (ir->py (ir:send 'k '(v env)))
-                "k.interpret(v, env)")
+                "return k.interpret(v, env)")
   (check-equal? (ir->py (ir:return '(c e k)))
                 "return c, e, k")
   (check-equal? (ir->py (ir:error "Expected c but got e"))
