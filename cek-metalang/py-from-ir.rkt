@@ -145,7 +145,7 @@
                            n
                            (class-name->py class-name)))
      (define failure-message (format "Expected ~a to be an ~a" n class-name))
-     (define failure (format "~araise Exception(~s)" prefix failure-message))
+     (define failure (format "~araise CEKError(~s)" prefix failure-message))
 
      (format "~a\n  ~a\n~a"
              guard
@@ -173,7 +173,7 @@
     [(ir:return results)
      (format "~areturn ~a" prefix (apply ~a results #:separator ", "))]
     [(ir:error message)
-     (format "~araise Exception(~s)" prefix message)]))
+     (format "~araise CEKError(~s)" prefix message)]))
 
 (module+ test
   (check-equal? (ir->py (ir:return '()))
@@ -182,14 +182,14 @@
                 (string-join
                  (list
                   "if not(isinstance(e1, cl_e)):"
-                  "  raise Exception(\"Expected e1 to be an e\")"
+                  "  raise CEKError(\"Expected e1 to be an e\")"
                   "return e1")
                  "\n"))
   (check-equal? (ir->py (ir:check-instance 'e1 'e (ir:return '(e1))) #:indent "  ")
                 (string-join
                  (list
                   "  if not(isinstance(e1, cl_e)):"
-                  "    raise Exception(\"Expected e1 to be an e\")"
+                  "    raise CEKError(\"Expected e1 to be an e\")"
                   "  return e1")
                  "\n"))
   (check-equal? (ir->py (ir:let '() (ir:return '(e1))))
@@ -221,7 +221,7 @@
   (check-equal? (ir->py (ir:return '(c e k)))
                 "return c, e, k")
   (check-equal? (ir->py (ir:error "Expected c but got e"))
-                "raise Exception(\"Expected c but got e\")"))
+                "raise CEKError(\"Expected c but got e\")"))
   
 
 ;; simple-ir->py : simple-ir -> string
