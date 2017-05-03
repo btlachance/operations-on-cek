@@ -5,8 +5,8 @@ all: $(DEST)/cek-metalang.html test
 $(DEST)/%.html: scribblings/%.scrbl
 	scribble --dest $(@D) --dest-name $(@F) $<
 
-$(DEST)/lam-example-tests-linked.py: cek-metalang/runtime.py lam-example-tests.py\
-	                                     examples/cek-metalang-ex.rkt
+$(DEST)/lam-example-tests-linked.py: cek-metalang/runtime.py $(wildcard cek-metalang/*.rkt)\
+	                                     examples/cek-metalang-ex.rkt lam-example-tests.py
 	{ raco test -q --submodule test-ex.lc examples/cek-metalang-ex.rkt;\
 	    cat cek-metalang/runtime.py\
 	        lam-example-tests.py;\

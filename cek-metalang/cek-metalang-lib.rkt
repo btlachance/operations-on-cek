@@ -25,16 +25,22 @@
   (pattern (name:id ::= form ...+)
            #:attr data (-production #'name (attribute form))))
 
-(struct step (lhs rhs)
+;; a step is a (-step syntax syntax (listof (list syntax syntax)))
+(struct step (lhs rhs wheres)
   #:name -step
   #:constructor-name -step)
+(define-splicing-syntax-class where-clause
+  #:attributes (body)
+  (pattern (~seq #:where pattern template)
+           #:attr body (list #'pattern #'template)))
 (define-syntax-class step
-  #:attributes (lhs rhs data)
+  #:attributes (lhs rhs (wheres 1) data)
   #:literals (-->)
   (pattern [(~and lhs (e-l env-l k-l))
             -->
-            (~and rhs (e-r env-r k-r))]
-           #:attr data (-step #'lhs #'rhs)))
+            (~and rhs (e-r env-r k-r))
+            wheres:where-clause ...]
+           #:attr data (-step #'lhs #'rhs (attribute wheres.body))))
 
 ;; a name is a symbol
 
@@ -619,7 +625,7 @@
         (syntax->datum #'k-temp) k-dest
         (ir:return (list c-dest e-dest k-dest)))))]))
 
-(define (steps->methods steps class-map c-shape e-shape k-shape)
+(define (steps->methods steps class-map toplevel-shape c-shape e-shape k-shape)
   (define (step->methods step)
     (syntax-parse (step-lhs step)
       [((~var c-pat (form-matching c-shape))
@@ -632,6 +638,35 @@
        (define compile-c-pat (class-compile-pattern c-class))
        (define compile-e-pat (class-compile-pattern e-class))
        (define compile-k-pat (class-compile-pattern k-class))
+
+       (define-syntax-class top
+         #:attributes (name)
+         (pattern (~var p (form-matching toplevel-shape))
+                  #:attr name (attribute p.name)))
+       (define (compile-wheres wheres rest)
+         ;; Compiling a where clause requires compiling the template
+         ;; and then compiling the pattern: the template produces
+         ;; things that the pattern consumes, and so they must be
+         ;; compiled in that order. (The reason the rest of the system
+         ;; is setup for compiling patterns before templates is
+         ;; because those patterns consume function arguments, which
+         ;; are already produced, and those templates produce things
+         ;; that get consumed by the function's return)
+         (define (compile-where w idx r)
+           (syntax-parse w
+             [(pat:top templ:top)
+              (define compile-pat (class-compile-pattern (hash-ref class-map (attribute pat.name))))
+              (define compile-templ (class-compile-template (hash-ref class-map (attribute templ.name))))
+              (compile-templ
+               (syntax->datum #'templ) (format-symbol "w_tmp~a" idx)
+               (compile-pat
+                (syntax->datum #'pat) (format-symbol "w_tmp~a" idx)
+                r))]))
+         (foldr
+          compile-where
+          rest
+          (or wheres '())
+          (build-list (length (or wheres '())) values)))
 
        (define-values (c-src e-src k-src)
          (values 'self 'e 'k))
@@ -652,7 +687,9 @@
                (syntax->datum #'e-pat) e-src
                (compile-k-pat
                 (syntax->datum #'k-pat) k-src
-                (compile-rhs c-shape e-shape k-shape class-map (step-rhs step)))))))
+                (compile-wheres
+                 (step-wheres step)
+                 (compile-rhs c-shape e-shape k-shape class-map (step-rhs step))))))))
            (list
             (method
              c-class
@@ -683,7 +720,9 @@
                  (syntax->datum #'c-pat) c-src-cont
                  (compile-e-pat
                   (syntax->datum #'e-pat) e-src-cont
-                  (compile-rhs c-shape e-shape k-shape class-map (step-rhs step)))))))))]))
+                  (compile-wheres
+                   (step-wheres step)
+                   (compile-rhs c-shape e-shape k-shape class-map (step-rhs step))))))))))]))
   (apply append (map step->methods steps)))
 
 ;; add-prims! : class shape shape -> (listof shape)
@@ -827,18 +866,21 @@
   ;; more of a hack
   (define class-map (make-hash))
   (define super-class-map (make-hash))
-  (define toplevel (toplevel-class (filter choice? (hash-values shape-map)) class-map))
+
+  (define choice-shapes (filter choice? (hash-values shape-map)))
+  (define toplevel-s (choice 'toplevel choice-shapes #'here))
   ;; because shape-map is immutable we don't add prims to it; thus, to
   ;; get their super class entries into super-class-map, we have to do
   ;; that outside of build-classes
-  (define prims (add-prims! toplevel c-shape e-shape))
+  (define toplevel-c (toplevel-class choice-shapes class-map))
+  (define prims (add-prims! toplevel-c c-shape e-shape))
   (build-classes! class-map super-class-map shape-map)
   (for ([p prims])
     (hash-set! super-class-map (prim-name p) #f)
     (hash-set! class-map (prim-name p) (shape->class p class-map)))
   (hash-set! super-class-map 'toplevel #f)
 
-  (define methods (steps->methods steps class-map c-shape e-shape k-shape))
+  (define methods (steps->methods steps class-map toplevel-s c-shape e-shape k-shape))
   (define method-map
     (for/fold ([method-map (hash)])
               ([m methods])
