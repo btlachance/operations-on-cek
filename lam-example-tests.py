@@ -1,3 +1,10 @@
+def lamvar(v):
+  varkey = [k for k in v.__dict__.keys() if 'var' in k][0]
+  return v.__dict__[varkey]
+def lambody(v):
+  bodykey = [k for k in v.__dict__.keys() if 'e' in k][0]
+  return v.__dict__[bodykey]
+
 def tests():
   test1()
   test2()
@@ -14,8 +21,8 @@ def test1():
 
   if not isinstance(result, cl_v_comb0):
     print "error! result was not a lambda"
-  if not (result.var4684.literal == "z" and
-          result.e4685.literal == "z"):
+  if not (lamvar(result).literal == "z" and
+          lambody(result).literal == "z"):
     print "error! result should be lam z. z"
 
 def test2():
@@ -29,8 +36,8 @@ def test2():
 
   if not isinstance(result, cl_v_comb0):
     print "error! result was not a lambda"
-  if not (result.var4684.literal == "x" and
-          result.e4685.literal == "x"):
+  if not (lamvar(result).literal == "x" and
+          lambody(result).literal == "x"):
     print "error! results should be lam x. x"
 
 def test3():
@@ -54,8 +61,8 @@ def test3():
 
   if not isinstance(result, cl_v_comb0):
     print "error! result was not a lambda"
-  if not (result.var4684.literal == "y" and
-          result.e4685.literal == "y"):
+  if not (lamvar(result).literal == "y" and
+          lambody(result).literal == "y"):
     print ("error! result should be lam y. y "
-           "got lam {}. {}".format(result.var4684.literal,
-                                   result.e4685.literal))
+           "got lam {}. {}".format(lamvar(result).literal,
+                                   lambody(result).literal))
