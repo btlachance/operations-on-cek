@@ -15,7 +15,7 @@
   ;; A type is an id with a transformer binding. The value for that
   ;; binding must be a form
 
-  ;;  binding is a (binding id type) where the first id is the
+  ;; A binding is a (binding id type) where the first id is the
   ;; identifier being bound and the second id represents the
   ;; identifier's type
   (struct binding (id type))
@@ -35,12 +35,14 @@
 
   ;; A pattern-presult is one of
   ;; - #f
-  ;; - (pattern-presult (listof binding)) representing the result of
-  ;; succesfully parsing a pattern's syntax
-  (struct pattern-presult (bindings))
+  ;; - (pattern-presult type (listof binding)) representing the result
+  ;;   of succesfully parsing a pattern's syntax
+  (struct pattern-presult (type bindings))
 
-
-  (struct form (parse-pattern ;; syntax -> pattern-presult
+  (struct form (type ;; type -- I'm not certain we'll want this but it
+                     ;; seems like we will for things like lookup and
+                     ;; extend metafunctions
+                parse-pattern ;; syntax -> pattern-presult
                 parse-template
                 compile-pattern
                 compile-template
@@ -48,14 +50,14 @@
 
 (module prims-impl racket
   (require (submod ".." rep) syntax/parse "compile-util.rkt")
-  (provide mk-variable mk-number mk-numbers)
+  (provide mk-variable mk-number mk-numbers mk-cons)
   (define (mk-variable ty)
     (define (parse-variable-pattern stx)
       (syntax-parse stx
         [(~var v (pattern-metavar ty))
-         (pattern-presult (list (binding this-syntax ty)))]
+         (pattern-presult ty (list (binding this-syntax ty)))]
         [_ #f]))
-    (form parse-variable-pattern #f #f #f #t))
+    (form ty parse-variable-pattern #f #f #f #t))
   (module+ test
     (require rackunit)
     ;; These tests don't really live up to the contract on mk-variable
@@ -74,9 +76,9 @@
     (define (parse-number-pattern stx)
       (syntax-parse stx
         [(~var n (pattern-metavar ty))
-         (pattern-presult (list (binding this-syntax ty)))]
+         (pattern-presult ty (list (binding this-syntax ty)))]
         [_ #f]))
-    (form parse-number-pattern #f #f #f #t))
+    (form ty parse-number-pattern #f #f #f #t))
   (module+ test
     (define test-num (mk-number #'number))
     (define parse-number-pattern (form-parse-pattern test-num))
@@ -89,29 +91,56 @@
     (define (parse-numbers-pattern stx)
       (syntax-parse stx
         [(~var n (pattern-metavar ty))
-         (pattern-presult (list (binding this-syntax ty)))]
+         (pattern-presult ty (list (binding this-syntax ty)))]
         [(t0 t ...)
          #:when (free-identifier=? ty #'t0)
          (define number-f (syntax-local-value number-ty))
          (define parse-number-pattern (form-parse-pattern number-f))
-         (andmap parse-number-pattern (attribute t))]
+         (pattern-presult
+          ty
+          (for/fold ([bindings '()])
+                    ([pattern (attribute t)])
+            (define result (parse-number-pattern pattern))
+            (append (pattern-presult-bindings result) bindings)))]
         [_ #f]))
-    (form parse-numbers-pattern #f #f #f #t)))
+    (form ty parse-numbers-pattern #f #f #f #t))
+
+  (define (parse-alts-pattern alts pattern)
+    (for/or ([f (map syntax-local-value alts)])
+      ((form-parse-pattern f) pattern)))
+
+  (define (mk-cons ty alts)
+    (define alts* (cons ty alts))
+    (define (parse-cons-pattern stx)
+      (syntax-parse stx
+        [(cons t1 t2)
+         ;; because I insisted on using Racket's cons identifier as
+         ;; the identifier for cons patterns... I can't write cons in
+         ;; the template
+         (define t1-presult (parse-alts-pattern alts* #'t1))
+         (define t2-presult (parse-alts-pattern alts* #'t2))
+         (pattern-presult
+          ty
+          (append (pattern-presult-bindings t1-presult)
+                  (pattern-presult-bindings t2-presult)))]
+        [_ #f]))
+    (form ty parse-cons-pattern #f #f #f #f)))
 
 (module+ test
   (require (submod ".." prims-impl test)))
 
 (module prims racket
   (require (for-syntax (submod ".." prims-impl)))
-  (provide variable number numbers)
+  (provide variable number numbers cons)
   (define-syntax variable (mk-variable #'variable))
   (define-syntax number (mk-number #'number))
-  (define-syntax numbers (mk-numbers #'numbers #'number)))
+  (define-syntax numbers (mk-numbers #'numbers #'number))
+  (define-syntax cons (mk-cons #'cons (list #'variable #'number #'numbers))))
 
 (require 'prims (for-syntax 'rep racket/bool))
 (begin-for-syntax
-  (define numbers-form (syntax-local-value #'numbers))
-  (define parse-numbers-pattern (form-parse-pattern numbers-form))
-  (if (false? (parse-numbers-pattern #'(numbers numbers number_1)))
+  (define cons-form (syntax-local-value #'cons))
+  (define parse-cons-pattern (form-parse-pattern cons-form))
+  (if (false? (parse-cons-pattern #'(cons (cons number_1 number_2) number_3)))
       (println "failed")
       (println "success!")))
