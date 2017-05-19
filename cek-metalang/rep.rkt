@@ -1,15 +1,34 @@
 #lang racket
 (require rackunit)
 (provide (struct-out language)
+         mk-language
          (struct-out binding)
          binding-equal?
          check-binds?
          check-not-binds?
          (struct-out pattern-presult)
+         (struct-out template-presult)
          (struct-out form))
 
-;; A language is a (language (listof form))
-(struct language (forms))
+;; A language is a (language (listof form)
+;;                           (syntax -> pattern presult)
+;;                           (syntax (listof binding) -> boolean))
+(struct language (forms parse-pattern parse-template))
+
+;; mk-language : (listof form) -> language
+(define (mk-language forms)
+  (define (parse-pattern stx)
+    (for/or ([f forms])
+      ((form-parse-pattern f) stx)))
+
+  (define (parse-template stx bindings)
+    (define (default? f) ((form-is-default? f))) ;; yes, ((parens))
+    (define-values (plain-forms default?-forms)
+      (partition (compose not default?) forms))
+    (for/or ([f (in-sequences plain-forms default?-forms)])
+      ((form-parse-template f) stx bindings)))
+
+  (language forms parse-pattern parse-template))
 
 ;; A type is an id with a transformer binding. The value for that
 ;; binding must be a form
@@ -34,10 +53,15 @@
 
 ;; A pattern-presult is one of
 ;; - #f
-;; - (pattern-presult type (listof binding)) representing the result
-;;   of succesfully parsing a pattern's syntax
+;; - (pattern-presult type (listof binding)) representing the type
+;;   of a succesfully parsed pattern and the variables it binds
 (struct pattern-presult (type bindings))
 
+;; A template-presult is one of
+;; - #f
+;; - (template-presult type) representing the type of a succesfully
+;;   parsed template
+(struct template-presult (type))
 
 ;; A form is a
 (struct form (type ;; type

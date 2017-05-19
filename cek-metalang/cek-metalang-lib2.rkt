@@ -1,11 +1,13 @@
 #lang racket
 (module prims racket
-  (require (for-syntax "prims-impl.rkt"))
+  (require (for-syntax "rep.rkt" "prims-impl.rkt" syntax/parse))
   (provide variable number numbers cons)
+
   (define-syntax variable (mk-variable #'variable))
   (define-syntax number (mk-number #'number))
-  (define-syntax numbers (mk-numbers #'numbers #'number))
-  (define-syntax cons (mk-cons #'cons (list #'variable #'number #'numbers))))
+  (define-syntax numbers (mk-numbers #'lang #'numbers #'number))
+  (define-syntax cons (mk-cons #'lang #'cons))
+  (define-syntax lang (mk-language (map syntax-local-value (list #'variable #'number #'numbers #'cons)))))
 
 (require 'prims (for-syntax "rep.rkt" racket/bool))
 (begin-for-syntax

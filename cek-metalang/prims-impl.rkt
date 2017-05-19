@@ -20,14 +20,14 @@
              ~!
              (~fail #:unless (bound-as-variable? #'v bindings)
                     (format "Expected a bound variable of type '~a'" (syntax-e ty))))
-       #t]
+       (template-presult ty)]
       ;; For now this simple form for variable templates will do. If
       ;; all nonterminals have a transformer binding, then we can
       ;; prevent some likely-buggy forms of overlap by seeing if the
       ;; identifier has a form in its transformer binding and
       ;; rejecting if it does
       [id:identifier
-       #t]
+       (template-presult ty)]
       [_ #f]))
   (form ty parse-variable-pattern parse-variable-template #f #f (lambda () #t)))
 (module+ test
@@ -45,7 +45,7 @@
                     (binding #'number #'variable))
 
   (define p-var-template (form-parse-template test-var))
-  (check-true (p-var-template #'variable_3 (list (binding #'variable_3 #'variable))))
+  (check-not-false (p-var-template #'variable_3 (list (binding #'variable_3 #'variable))))
   (check-exn exn:fail:syntax? (thunk (p-var-template #'variable_4 (list (binding #'variable #'variable))))))
 
 (define (mk-number ty)
@@ -62,8 +62,9 @@
              ~!
              (~fail #:unless (bound-as-number? #'n bindings)
                     (format "Expected a bound variable of type '~a'" (syntax-e ty))))
-       #t]
-      [:number #t]
+       (template-presult ty)]
+      [:number
+       (template-presult ty)]
       [_ #f]))
   (form ty parse-number-pattern parse-number-template #f #f (lambda () #f)))
 (module+ test
@@ -76,15 +77,16 @@
                     (binding #'variable_1 #'number))
 
   (define p-num-template (form-parse-template test-num))
-  (check-true (p-num-template #'number_2
+  (check-not-false (p-num-template #'number_2
                               (list (binding #'number_2 #'number))))
-  (check-true (p-num-template #'10 (list)))
+  (check-not-false (p-num-template #'10 (list)))
   (check-false (p-num-template #'"hello" (list)))
   (check-false (p-num-template #'variable (list)))
   (check-exn exn:fail:syntax? (thunk (p-num-template #'number (list)))))
 
-(define (mk-numbers ty number-ty)
+(define (mk-numbers lang ty number-ty)
   (define (parse-numbers-pattern stx)
+    (define parse-pattern (language-parse-pattern (syntax-local-value lang)))
     (syntax-parse stx
       [(~var n (pattern-metavar ty))
        (pattern-presult ty (list (binding this-syntax ty)))]
@@ -100,52 +102,46 @@
           (append (pattern-presult-bindings result) bindings)))]
       [_ #f]))
   (define (parse-numbers-template stx bindings)
+    (define (parse-template stx)
+      ((language-parse-template (syntax-local-value lang)) stx bindings))
     (syntax-parse stx
       [(t0 t ...)
        #:when (free-identifier=? ty #'t0)
-       (define number-f (syntax-local-value number-ty))
-       (define parse-number-template (form-parse-template number-f))
-       (for/and ([template (attribute t)])
-         (parse-number-template template bindings))]
+       ;; TODO return the type of a parsed template
+       (for/and ([t (attribute t)])
+         (match (parse-template t)
+           [(template-presult t-ty)
+            (free-identifier=? t-ty number-ty)]
+           [_ #f]))]
       ;; TODO run the cons example without this default case. You get
       ;; an error message that I was not expecting...
       [_ #f]))
   (form ty parse-numbers-pattern parse-numbers-template
         #f #f (lambda () #f)))
 
-(define (parse-alts-pattern alts pattern)
-  (for/or ([f (map syntax-local-value alts)])
-    ((form-parse-pattern f) pattern)))
-
-(define (parse-alts-template alts template bindings)
-  (define forms* (map syntax-local-value alts))
-  (define (default-form? f) ((form-is-default? f))) ;; yes, ((parens))
-  (define-values (forms default-forms)
-    (partition (compose not default-form?) forms*))
-
-  (for/or ([f (in-sequences forms default-forms)])
-    ((form-parse-template f) template bindings)))
-
-(define (mk-cons ty alts)
-  (define alts* (cons ty alts))
+(define (mk-cons lang ty)
   (define (parse-cons-pattern stx)
+    (define parse-pattern (language-parse-pattern (syntax-local-value lang)))
     (syntax-parse stx
       [(cons t1 t2)
        ;; because I insisted on using Racket's cons identifier as
        ;; the identifier for cons patterns... I can't write cons in
        ;; the template
-       (define t1-presult (parse-alts-pattern alts* #'t1))
-       (define t2-presult (parse-alts-pattern alts* #'t2))
+       (define t1-presult (parse-pattern #'t1))
+       (define t2-presult (parse-pattern #'t2))
        (pattern-presult
         ty
         (append (pattern-presult-bindings t1-presult)
                 (pattern-presult-bindings t2-presult)))]
       [_ #f]))
   (define (parse-cons-template stx bindings)
+    (define (parse-template stx)
+      ((language-parse-template (syntax-local-value lang)) stx bindings))
     (syntax-parse stx
       [(cons t1 t2)
-       #:with #t (parse-alts-template alts* #'t1 bindings)
-       #:with #t (parse-alts-template alts* #'t2 bindings)
-       #t]
+       (match* ((parse-template #'t1) (parse-template #'t2))
+         [((template-presult t1-ty) (template-presult t2-ty))
+          (template-presult ty)]
+         [(_ _) #f])]
       [_ #f]))
   (form ty parse-cons-pattern parse-cons-template #f #f (lambda () #f)))
