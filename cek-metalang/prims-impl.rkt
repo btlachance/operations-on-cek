@@ -107,11 +107,11 @@
     (syntax-parse stx
       [(t0 t ...)
        #:when (free-identifier=? ty #'t0)
-       ;; TODO return the type of a parsed template
-       (for/and ([t (attribute t)])
-         (match (parse-template t)
-           [(template-presult t-ty)
-            (free-identifier=? t-ty number-ty)]
+       (for/fold ([result (template-presult ty)])
+                 ([sub (attribute t)])
+         (match (and result (parse-template sub))
+           [(template-presult ty1)
+            (free-identifier=? ty1 number-ty)]
            [_ #f]))]
       ;; TODO run the cons example without this default case. You get
       ;; an error message that I was not expecting...
