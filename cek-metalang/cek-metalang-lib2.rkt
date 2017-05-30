@@ -28,24 +28,6 @@
 (struct prim (data id) #:transparent)
 (struct compound (asts sort) #:transparent)
 
-;; TODO I think typechecking will be easier if we only allow
-;; standalone terminals to be an ast. Otherwise, we have to give a
-;; type to interior terminals, and I don't think we want to give them
-;; a type (what type do we give? and why?). In that case, either we
-;; keep the interior terminals in the AST representation but sure we
-;; don't accidentally typecheck one or we be eliminate that
-;; possibility by making interior terminals not valid ast's. This does
-;; shifts some of the burden onto constructing a compound ast's, but I
-;; don't think that's so bad. The code that constructs those has the
-;; sort handy and knows where the interior terminals and the
-;; nonterminals are. If we do end up needing the interior terminals,
-;; say for printing, we can always reconstruct them from the sort. And
-;; when we need to compare the types of the compound's asts to the
-;; types of the nonterminals in the sort, that's pretty easy
-;; too. Since I can't think of a useful type to give interior symbols,
-;; we will change our AST representation (which means "being careful")
-;; so that we can't possibly typecheck them.
-
 ;; a binding is a (binding metavar type)
 (struct binding (metavar type))
 
