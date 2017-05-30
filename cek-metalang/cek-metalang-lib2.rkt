@@ -238,7 +238,7 @@
        (prim (syntax-e this-syntax) #'var)]
       [_ #f]))
   (define var-parser (parser var-parse-fun var-parse-fun))
-  (define t1-parser (lang-parser (list 'lambda 'mt 'fn 'arg)
+  (define t1-parser (lang-parser (list 'mt)
                                  (list (nt 'e) (nt 'x))
                                  (list (list 'lambda (nt 'x) (nt 'e))
                                        (list (nt 'e) (nt 'e)))
