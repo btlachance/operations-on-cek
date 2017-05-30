@@ -28,23 +28,48 @@
 (struct prim (data id) #:transparent)
 (struct compound (asts sort) #:transparent)
 
+;; TODO I think typechecking will be easier if we only allow
+;; standalone terminals to be an ast. Otherwise, we have to give a
+;; type to interior terminals, and I don't think we want to give them
+;; a type (what type do we give? and why?). In that case, either we
+;; keep the interior terminals in the AST representation but sure we
+;; don't accidentally typecheck one or we be eliminate that
+;; possibility by making interior terminals not valid ast's. This does
+;; shifts some of the burden onto constructing a compound ast's, but I
+;; don't think that's so bad. The code that constructs those has the
+;; sort handy and knows where the interior terminals and the
+;; nonterminals are. If we do end up needing the interior terminals,
+;; say for printing, we can always reconstruct them from the sort. And
+;; when we need to compare the types of the compound's asts to the
+;; types of the nonterminals in the sort, that's pretty easy
+;; too. Since I can't think of a useful type to give interior symbols,
+;; we will change our AST representation (which means "being careful")
+;; so that we can't possibly typecheck them.
+
 ;; a binding is a (binding metavar type)
 (struct binding (metavar type))
 
-;; tc-prim-pattern : any/c id -> (listof binding)
+;; Typechecking a pattern must produce a type. I had this in the model
+;; but I don't know why I didn't translate it in the implementation
+
+;; tc-prim-pattern : any/c id -> (values type (listof binding))
 (define (tc-prim-pattern pattern id)
   (define info (syntax-local-value id))
   (define tc-pattern (prim-info-tc-pattern info))
   (tc-pattern pattern))
 
-;; tc-pattern : lang ast -> (listof binding)
+;; tc-pattern : lang ast -> (values type (listof binding))
 (define (tc-pattern lang ast)
   (match ast
-    [(? symbol? l) '()]
-    [(metavar nt suffix) (binding ast (lang-nt->type nt))]
+    [(? symbol? l)
+     (values ((lang-nt->type lang) l) '())]
+     [(metavar nt suffix)
+      (define ty ((lang-nt->type lang) nt))
+      (values ty (binding ast ty))]
     [(metafunction _ _) (error "metafunctions can't be used as patterns")]
     [(prim p id) (tc-prim-pattern p id)]
-    [(compound (list asts ...) sort) ((lang-tc-compound-pattern lang) sort asts)]))
+    [(compound (list asts ...) sort)
+     ((lang-tc-compound-pattern lang) sort asts)]))
 
 ;; TODO instances of the lang struct are generated from the grammar
 ;; Somewhere (possibly in the lang) we also need to know which forms
@@ -52,7 +77,7 @@
 
 ;; a lang is a (lang (symbol -> type)
 ;;                   (symbol -> type)
-;;                   (sort (listof ast) -> (listof binding))
+;;                   (sort (listof ast) -> (values type (listof binding)))
 ;;                   (sort (listof ast) (listof binding) -> type)
 ;;                   (pattern source rest -> IR)
 ;;                   (template dest rest -> IR))
@@ -63,7 +88,7 @@
               compile-pattern
               compile-template))
 
-;; a prim-info is a (prim-info (any/c -> (listof binding))
+;; a prim-info is a (prim-info (any/c -> (values type (listof binding)))
 ;;                             (any/c (listof binding) -> type)
 ;;                             (pattern source rest -> IR)
 ;;                             (template dest rest -> IR))
@@ -227,6 +252,16 @@
   (t1-parse-p #'(lambda x e))
   (t1-parse-t #'(pick e e))
   (t1-parse-t #'(lambda (car z) (car z))))
+
+;; lang-typechecker : ??? -> (values ??? ???)
+(define (lang-typechecker ...)
+  (define (tc-temp ast)
+    (match ast
+      [(? symbol? s)
+       (error 'tc-temp)]))
+  (define (tc-pat ast)
+    (error 'tc-pat))
+  (values tc-temp tc-pat))
 
 ;; compile-cek : id (listof production) id id id (listof step) -> stx
 (define (compile-cek lang-id productions c-id e-id k-id steps)
