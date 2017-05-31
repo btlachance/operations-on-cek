@@ -1,6 +1,8 @@
 #lang racket
 (require syntax/parse "rep.rkt")
-(provide lang-parser)
+(provide
+ lang-parser
+ (struct-out parser))
 
 ;; a parse-fun is a (syntax -> (U ast #f))
 ;; a parser is a (parser parse-fun parse-fun)
