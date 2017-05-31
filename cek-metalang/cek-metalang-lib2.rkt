@@ -30,6 +30,22 @@
 ;; a binding is a (binding metavar type)
 (struct binding (metavar type))
 
+;; lookup-ty : metavar (listof binding) -> (U type #f)
+(define (lookup-ty metavar bindings)
+  (define (find-metavar bs)
+    (match bs
+      [(list b bs* ...)
+       (if (equal? (binding-metavar b) metavar)
+           (binding-type b)
+           (find-metavar bs*))]
+      [_ #f]))
+  (find-metavar bindings))
+
+;; a tc-template-result is one of
+;; - #f
+;; - (tc-template-result type)
+(struct tc-template-result (type))
+
 (struct tc-pattern-result (type bindings))
 
 ;; Typechecking a pattern must produce a type. I had this in the model
@@ -231,9 +247,11 @@
                (compound (list (prim 'z _) (prim 'z _))
                          (list 'lambda (nt 'x) (nt 'e)))))
 
-;; lang-typechecker : (sort -> type) (symbol -> type) (type type -> boolean) -> (values ??? ???)
+;; lang-typechecker : (sort -> type) (symbol -> type) (type type -> boolean)
+;;                      -> (values (ast (listof binding) -> tc-template-result)
+;;                                 (ast -> tc-pattern-result))
 (define (lang-typechecker sort->type metafunction->type subtype?)
-  (define (tc-temp ast)
+  (define (tc-temp ast bindings)
     ;; tc-temps : (listof ast) (listof type) -> void
     ;; given a list of asts and a list of expected types, both of the
     ;; same length, tc-temps checks pairwise for each ast, type pair
@@ -241,26 +259,40 @@
     (define (tc-temps asts expected-tys)
       (for ([ast asts]
             [expected-ty expected-tys])
-        (define actual-ty (tc-temp ast))
-        (unless (subtype? actual-ty expected-ty)
-          (raise-arguments-error
-           'tc-temp
-           "expected a template with a different type"
-           "expected" expected-ty
-           "got" actual-ty))))
+        (match (tc-temp ast bindings)
+          [(tc-template-result actual-ty)
+           (unless (subtype? actual-ty expected-ty)
+             (raise-arguments-error
+              'tc-temp
+              "expected a template with a different type"
+              "expected" expected-ty
+              "got" actual-ty))]
+          [#f
+           (raise-arguments-error
+            'tc-temp
+            "template did not typecheck"
+            "template" ast)])))
+
     (match ast
-      [(? symbol? s) (sort->type s)]
-      [(metavar nt suffix) nt]
+      [(? symbol? s)
+       (tc-template-result (sort->type s))]
+      [(metavar nt suffix)
+       (match (lookup-ty ast bindings)
+         [#f (raise-arguments-error
+              'tc-temp
+              "could not typecheck an unbound variable"
+              "variable" ast)]
+         [ty (tc-template-result ty)])]
       [(metafunction name args sort)
        (define expected-tys (map nt-symbol (filter nt? (cdr sort))))
        (tc-temps args expected-tys)
-       (metafunction->type name)]
+       (tc-template-result (metafunction->type name))]
       [(prim p id)
        (error 'tc-temp)]
       [(compound asts sort)
        (define expected-tys (map nt-symbol (filter nt? sort)))
        (tc-temps asts expected-tys)
-       (sort->type sort)]))
+       (tc-template-result (sort->type sort))]))
   (define (tc-pat ast)
     (define (tc-pats asts expected-tys)
       (append*
@@ -311,22 +343,36 @@
       [(_ _) #f]))
   (define-values (t1-tc-t t1-tc-p)
     (lang-typechecker t1-sort->type t1-metafunction->type t1-subtype?))
-  (check-equal? (t1-tc-t (metavar 'x #f))
-                'x)
-  (check-equal? (t1-tc-t (compound (list (metavar 'x 1) (metavar 'x 1))
-                                   (list 'lambda (nt 'x) (nt 'e))))
-                'e)
-  (check-equal? (t1-tc-t (metafunction 'lookup (list (metavar 'x #f) (metavar 'env #f))
-                                       (list 'lookup (nt 'x) (nt 'env))))
-                'e)
-  (check-equal? (t1-tc-t (compound (list (metavar 'x #f)
-                                         (compound (list (metavar 'x #f) (metavar 'x #f))
-                                                   (list (nt 'e) (nt 'e))))
-                                   (list 'lambda (nt 'x) (nt 'e))))
-                'e)
+
+  (check-match (t1-tc-t (metavar 'x #f) (list (binding (metavar 'x #f) 'x)))
+               (tc-template-result 'x))
+
+  (check-match (t1-tc-t (compound (list (metavar 'x 1) (metavar 'x 1))
+                                  (list 'lambda (nt 'x) (nt 'e)))
+                        (list (binding (metavar 'x 1) 'x)))
+               (tc-template-result 'e))
+
+  (check-match (t1-tc-t (metafunction 'lookup (list (metavar 'x #f) (metavar 'env #f))
+                                      (list 'lookup (nt 'x) (nt 'env)))
+                        (list (binding (metavar 'x #f) 'x)
+                              (binding (metavar 'env #f) 'env)))
+               (tc-template-result 'e))
+
+  (check-match (t1-tc-t (compound (list (metavar 'x #f)
+                                        (compound (list (metavar 'x #f) (metavar 'x #f))
+                                                  (list (nt 'e) (nt 'e))))
+                                  (list 'lambda (nt 'x) (nt 'e)))
+                        (list (binding (metavar 'x #f) 'x)))
+               (tc-template-result 'e))
+
+  (define (unbound-variable) (t1-tc-t (metavar 'x #f) '()))
+  (check-exn exn:fail:contract? unbound-variable)
+
+
   (check-match (t1-tc-p (compound (list (metavar 'x 1) (metavar 'x 2))
                                   (list 'lambda (nt 'x) (nt 'e))))
                (tc-pattern-result 'e _))
+
   (check-match (t1-tc-p (compound (list (metavar 'x 1)
                                         (compound (list (metavar 'x 2) (metavar 'e #f))
                                                   (list 'lambda (nt 'x) (nt 'e))))
