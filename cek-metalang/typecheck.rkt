@@ -5,7 +5,7 @@
 ;; a type is a symbol representing the name of a nonterminal from some
 ;; production
 
-;; lang-typechecker : (sort -> type) (symbol -> type) (type type -> boolean)
+;; lang-typechecker : (hash sort type) (symbol -> type) (type type -> boolean)
 ;;                      -> (values (ast (listof binding) -> tc-template-result)
 ;;                                 (ast -> tc-pattern-result))
 (define (lang-typechecker sort->type metafunction->type subtype?)
@@ -33,7 +33,7 @@
 
     (match ast
       [(? symbol? s)
-       (tc-template-result (sort->type s))]
+       (tc-template-result (hash-ref sort->type s))]
       [(metavar nt suffix)
        (match (lookup-ty ast bindings)
          [#f (raise-arguments-error
@@ -50,7 +50,7 @@
       [(compound asts sort)
        (define expected-tys (map nt-symbol (filter nt? sort)))
        (tc-temps asts expected-tys)
-       (tc-template-result (sort->type sort))]))
+       (tc-template-result (hash-ref sort->type sort))]))
   (define (tc-pat ast)
     (define (tc-pats asts expected-tys)
       (append*
@@ -66,7 +66,7 @@
               "got" actual-ty)))))
     (match ast
       [(? symbol? s)
-       (tc-pattern-result (sort->type s) '())]
+       (tc-pattern-result (hash-ref sort->type s) '())]
       [(metavar nt suffix)
        (tc-pattern-result nt (list (binding ast nt)))]
       [(metafunction name args sort)
@@ -79,16 +79,15 @@
       [(compound asts sort)
        (define expected-tys (map nt-symbol (filter nt? sort)))
        (define bindings (tc-pats asts expected-tys))
-       (tc-pattern-result (sort->type sort) bindings)]))
+       (tc-pattern-result (hash-ref sort->type sort) bindings)]))
   (values tc-temp tc-pat))
 
 (module+ test
   (require rackunit)
-  (define (t1-sort->type sort)
-    (match sort
-      ['mt 'k]
-      [(list 'lambda (nt 'x) (nt 'e)) 'e]
-      [(list (nt 'e) (nt 'e)) 'e]))
+  (define t1-sort->type
+    (hash 'mt 'k
+          (list 'lambda (nt 'x) (nt 'e)) 'e
+          (list (nt 'e) (nt 'e)) 'e))
   (define (t1-metafunction->type name)
     (match name
       ['lookup 'e]

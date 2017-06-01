@@ -20,7 +20,7 @@
 ;; - symbol
 
 ;; a binding is a (binding metavar type)
-(struct binding (metavar type))
+(struct binding (metavar type) #:transparent)
 
 ;; lookup-ty : metavar (listof binding) -> (U type #f)
 (define (lookup-ty metavar bindings)
@@ -36,6 +36,6 @@
 ;; a tc-template-result is one of
 ;; - #f
 ;; - (tc-template-result type)
-(struct tc-template-result (type))
+(struct tc-template-result (type) #:transparent)
 
-(struct tc-pattern-result (type bindings))
+(struct tc-pattern-result (type bindings) #:transparent)

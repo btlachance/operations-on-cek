@@ -1,5 +1,6 @@
 #lang racket
 (require
+ racket/hash
  syntax/parse
  "rep.rkt"
  "parse.rkt"
@@ -32,33 +33,35 @@
 (define ((form-in-nonterminals? nonterminals) f)
   (memf (lambda (nt) (equal? (nt-symbol nt) f)) nonterminals))
 
-(struct grammar-components (terminals nonterminals compounds metafunctions prim-parsers))
+(struct grammar-components (nonterminals sort->type metafunctions prim-parsers))
 (define (productions->components productions)
   (define nonterminals (map (compose nt syntax-e production-name) productions))
   (define nonterminal-form? (form-in-nonterminals? nonterminals))
 
-  (define-values (terminals compounds)
-    (for/fold ([terminals '()]
-               [compounds '()])
-              ([form-stx (apply in-sequences (map production-forms productions))])
-      (define form (syntax->datum form-stx))
-      (cond
-        [(nt? form)
-         (values terminals compounds)]
-        [(symbol? form)
-         (values (cons form terminals) compounds)]
-        [(list? form)
-         (define (compound-form->sort f)
-           (for/list ([subform f])
-             (if (nonterminal-form? subform)
-                 (nt subform)
-                 subform)))
-         (values terminals (cons (compound-form->sort form) compounds))]
-        [else (raise-arguments-error
-               'compile-cek
-               "unexpected form"
-               "form" form)])))
-  (grammar-components terminals nonterminals compounds '() '()))
+  (define sort->type
+    (for/fold ([sort->type (hash)])
+              ([production-name (map syntax-e (map production-name productions))]
+               [form-stxs (map production-forms productions)])
+      (hash-union
+       sort->type
+       (for/hash ([form (map syntax->datum form-stxs)]
+                  #:unless (nonterminal-form? form))
+         (cond
+           [(symbol? form)
+            (values form production-name)]
+           [(list? form)
+            (define (compound-form->sort f)
+              (for/list ([subform f])
+                (if (nonterminal-form? subform)
+                    (nt subform)
+                    subform)))
+            (values (compound-form->sort form) production-name)]
+           [else (raise-arguments-error
+                  'compile-cek
+                  "unexpected form"
+                  "form" form)])))))
+  (println sort->type)
+  (grammar-components nonterminals sort->type '() '()))
 
 ;; mk/subtype? : (setof nonterminal) (listof production) -> (type type -> boolean)
 ;; INV:
@@ -112,15 +115,23 @@
   (check-true (subtype?-t1 'z 'v))
   (check-true (subtype?-t1 'z 'e)))
 
-
 ;; compile-cek : id (listof production) id id id (listof step) -> stx
 (define (compile-cek lang-id productions c-id e-id k-id steps)
-  (match-define (grammar-components terminals nonterminals compounds _ _)
+  (match-define (grammar-components nonterminals sort->type _ _)
     (productions->components productions))
+  (define-values (terminals compounds) (partition symbol? (hash-keys sort->type)))
+
   (match-define (parser parse-template parse-pattern)
     (lang-parser terminals nonterminals compounds '() '()))
+  (define-values (tc-temp tc-pat)
+    (lang-typechecker
+     sort->type
+     (thunk (error 'metafunction->type))
+     (mk/subtype? nonterminals productions)))
 
-  
-  (pretty-print (parse-pattern #'(clo v_0 e_hello)))
+  (define pat-ast (parse-pattern #'(clo v_0 env_hello)))
+  (pretty-print pat-ast)
+  (pretty-print (tc-pat pat-ast))
+  (pretty-print (tc-pat (parse-pattern #'(lam x e))))
 
   #'(void))
