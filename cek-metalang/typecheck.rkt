@@ -2,6 +2,9 @@
 (require "rep.rkt")
 (provide lang-typechecker)
 
+;; a type is a symbol representing the name of a nonterminal from some
+;; production
+
 ;; lang-typechecker : (sort -> type) (symbol -> type) (type type -> boolean)
 ;;                      -> (values (ast (listof binding) -> tc-template-result)
 ;;                                 (ast -> tc-pattern-result))
