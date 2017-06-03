@@ -79,6 +79,11 @@
            #:attr data atomic-sort)
   (pattern _
            #:when (nt? atomic-sort)
+           ;; TODO we have to make sure we only call parse-fun here
+           ;; when it can actually be parsed. If we call it on an
+           ;; "interior" terminal e.g. lambda then parsing will fail
+           ;; too early.
+           ;; #:when (not (interior-terminal? (syntax-e this-syntax)))
            #:attr data (parse-fun this-syntax)
            #:when (attribute data)))
 (define-syntax-class (-compound-of list-sort parse-fun)

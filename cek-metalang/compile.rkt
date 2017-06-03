@@ -1,16 +1,8 @@
 #lang racket
-(require "rep.rkt" "ir.rkt" racket/syntax)
+(require "rep.rkt" "ir.rkt" "util.rkt" racket/syntax)
 (provide lang-compiler)
 
-;; The IR currently expects symbols for variable names. Later, though,
-;; it might be worth making it use metavar's
-(define (metavar->symbol mv)
-  (match mv
-    [(metavar nt #f) nt]
-    [(metavar nt suffix)
-     (format-symbol "~a_~a" nt suffix)]))
-
-;; lang-compiler : (sort -> (listof symbol)) (sort -> symbol)
+;; lang-compiler : (hash sort (listof symbol)) (hash sort symbol)
 ;;                                      -> (values (ast dest IR -> IR)
 ;;                                                 (ast source IR -> IR))
 (define (lang-compiler sort->field-names sort->name [... #f])
@@ -37,11 +29,11 @@
        ...]
       [(compound asts sort)
        (define subtemp-dests
-         (for/list ([name (sort->field-names sort)])
+         (for/list ([name (hash-ref sort->field-names sort)])
            (format-symbol "~a_~a" dest name)))
        (foldr
         compile-temp
-        (ir:let (list (list dest (ir:make (sort->name sort) subtemp-dests)))
+        (ir:let (list (list dest (ir:make (hash-ref sort->name sort) subtemp-dests)))
                 rest)
         asts
         subtemp-dests)]))
@@ -61,14 +53,14 @@
        ...]
       [(compound asts sort)
        (define projection-dests
-         (for/list ([field-name (sort->field-names sort)])
+         (for/list ([field-name (hash-ref sort->field-names sort)])
            (format-symbol "~a_~a" source field-name)))
 
        (ir:check-instance
-        source (sort->name sort)
+        source (hash-ref sort->name sort)
         (ir:let (for/list ([dest projection-dests]
-                           [field-name (sort->field-names sort)])
-                  (list dest (ir:project (sort->name sort) field-name source)))
+                           [field-name (hash-ref sort->field-names sort)])
+                  (list dest (ir:project (hash-ref sort->name sort) field-name source)))
                 (foldr
                  compile-pat
                  rest
