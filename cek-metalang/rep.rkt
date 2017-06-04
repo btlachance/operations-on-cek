@@ -2,11 +2,19 @@
 (require "ast.rkt")
 (provide
  (all-from-out "ast.rkt")
+ (struct-out prim-data)
  (struct-out nt)
  (struct-out binding)
  lookup-ty
  (struct-out tc-template-result)
  (struct-out tc-pattern-result))
+
+(struct prim-data (tc-temp
+                   tc-pat
+                   compile-temp
+                   compile-pat
+                   name
+                   type))
 
 ;; a sort is one of
 ;; - symbol, representing a terminal

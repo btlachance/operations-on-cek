@@ -19,7 +19,7 @@
 ;; - name
 ;; - (ir:make name (U #f (listof name)))
 ;; - (ir:project name name name)
-;; - (ir:call-builtin name (listof name))
+;; - (ir:call-builtin name (listof (U name string)))
 (struct ir:make (class-name args) #:transparent)
 (struct ir:project (class-name field-name arg) #:transparent)
 (struct ir:call-builtin (name args) #:transparent)

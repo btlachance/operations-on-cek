@@ -4,9 +4,7 @@
   (define-cek lc
     #:grammar
     (e ::= var v (e e))
-    (var ::= x y z) ;; For now, our language only has three variables
-                    ;; We can remove this limitation later with some
-                    ;; kind of variable or symbol primitive
+    (var ::= variable)
     (v ::= (lam var e))
     (w ::= (clo v env))
     (env ::= dummy)

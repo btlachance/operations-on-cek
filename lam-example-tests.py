@@ -5,6 +5,13 @@ def lambody(v):
   bodykey = [k for k in v.__dict__.keys() if 'e' in k][0]
   return v.__dict__[bodykey]
 
+def cl_x():
+  return mkvariable("x")
+def cl_y():
+  return mkvariable("y")
+def cl_z():
+  return mkvariable("z")
+
 def tests():
   test1()
   test2()

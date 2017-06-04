@@ -25,8 +25,8 @@
                 rest)
         args
         subtemp-dests)]
-      [(prim _ _)
-       ...]
+      [(prim p data)
+       ((prim-data-compile-temp p dest rest))]
       [(compound asts sort)
        (define subtemp-dests
          (for/list ([name (hash-ref sort->field-names sort)])
@@ -49,8 +49,8 @@
         source nt
         (ir:let (list (list (metavar->symbol ast) source))
                 rest))]
-      [(prim _ _)
-       ...]
+      [(prim p data)
+       ((prim-data-compile-pat p source rest))]
       [(compound asts sort)
        (define projection-dests
          (for/list ([field-name (hash-ref sort->field-names sort)])

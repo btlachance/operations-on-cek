@@ -45,8 +45,8 @@
        (define expected-tys (map nt-symbol (filter nt? (cdr sort))))
        (tc-temps args expected-tys)
        (tc-template-result (hash-ref metafunction->type name))]
-      [(prim p id)
-       (error 'tc-temp)]
+      [(prim p data)
+       ((prim-data-tc-temp data) p)]
       [(compound asts sort)
        (define expected-tys (map nt-symbol (filter nt? sort)))
        (tc-temps asts expected-tys)
@@ -74,8 +74,8 @@
         'tc-pat
         "metafunctions cannot be used as a pattern"
         "given metafunction" name)]
-      [(prim p id)
-       (error 'tc-pat)]
+      [(prim p data)
+       ((prim-data-tc-pat data) p)]
       [(compound asts sort)
        (define expected-tys (map nt-symbol (filter nt? sort)))
        (define bindings (tc-pats asts expected-tys))

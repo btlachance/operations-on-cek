@@ -10,7 +10,7 @@
  "compile.rkt"
  "ir.rkt"
  "py-from-ir.rkt"
- (for-template racket/base))
+ (for-template racket/base "prims.rkt"))
 (provide -production -step compile-cek)
 
 (struct production (name forms))
@@ -55,7 +55,16 @@
                    parent-of))
 
 (define (productions->lang-info productions)
-  (define nonterminals (map (compose nt syntax-e production-name) productions))
+  ;; Looking up the prims in this function was tricky for me: because
+  ;; it's required for-syntax by cek-metalang, we have to make sure
+  ;; that the prims have for-template bindings.
+  (define variable-prim (syntax-local-value #'variable))
+  (define nonterminals
+    ;; HACK Need to detect whether the grammar actually uses the
+    ;; variable and actually insert the nonterminal into this list
+    ;; like we do for other nonterminals
+    (append (map (compose nt syntax-e production-name) productions)
+            (list (nt (prim-data-name variable-prim)))))
   (define nonterminal-form? (form-in-nonterminals? nonterminals))
 
   (define-values (sort->name sort->field-names sort->type)
@@ -65,9 +74,14 @@
               ([production-name (map syntax-e (map production-name productions))]
                [form-stxs (map production-forms productions)]
                #:when #t
+               [form-stx form-stxs]
                [form (map syntax->datum form-stxs)]
                [idx (in-naturals)]
-               #:unless (nonterminal-form? form))
+               #:when (not (nonterminal-form? form))
+               ;; HACK And we need to make sure that primitives /in
+               ;; general/ aren't treated like literals
+               #:when (not (and (identifier? form-stx)
+                                (free-identifier=? form-stx #'variable))))
       (cond
         [(symbol? form)
          (values
@@ -97,12 +111,17 @@
                "unexpected form"
                "form" form)])))
 
+  (define variable-parse-fun
+    (syntax-parser
+      [:id
+       (prim (syntax-e this-syntax) variable-prim)]
+      [_ #f]))
   (lang-info nonterminals
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
                    (list 'extend (nt 'env) (nt 'var) (nt 'w)))
-             ;; TODO hard-code the variable and environment prims
-             '()
+             ;; TODO hard-code the environment prim
+             (list (parser variable-parse-fun variable-parse-fun))
              sort->name sort->field-names sort->type
              (hash 'lookup 'w
                    'extend 'env)

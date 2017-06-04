@@ -4,6 +4,12 @@ class CEKError(Exception):
   def __str__(self):
     return repr(self.message)
 
+def mkvariable(name):
+  return PrimVariable(name)
+class PrimVariable(cl_variable):
+  def __init__(self, name):
+    self.literal = name
+
 class Env(cl_env):
   def __init__(self):
     pass
