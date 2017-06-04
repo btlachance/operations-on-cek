@@ -5,7 +5,7 @@
 ;; a type is a symbol representing the name of a nonterminal from some
 ;; production
 
-;; lang-typechecker : (hash sort type) (symbol -> type) (type type -> boolean)
+;; lang-typechecker : (hash sort type) (hash symbol type) (type type -> boolean)
 ;;                      -> (values (ast (listof binding) -> tc-template-result)
 ;;                                 (ast -> tc-pattern-result))
 (define (lang-typechecker sort->type metafunction->type subtype?)
@@ -44,7 +44,7 @@
       [(metafunction name args sort)
        (define expected-tys (map nt-symbol (filter nt? (cdr sort))))
        (tc-temps args expected-tys)
-       (tc-template-result (metafunction->type name))]
+       (tc-template-result (hash-ref metafunction->type name))]
       [(prim p id)
        (error 'tc-temp)]
       [(compound asts sort)
@@ -88,10 +88,10 @@
     (hash 'mt 'k
           (list 'lambda (nt 'x) (nt 'e)) 'e
           (list (nt 'e) (nt 'e)) 'e))
-  (define (t1-metafunction->type name)
-    (match name
-      ['lookup 'e]
-      ['extend 'env]))
+  (define t1-metafunction->type
+    (hash
+     'lookup 'e
+     'extend 'env))
   (define (t1-subtype? ty1 ty2)
     (match* (ty1 ty2)
       [('x 'x) #t]

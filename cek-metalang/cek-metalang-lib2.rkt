@@ -9,6 +9,7 @@
  "typecheck.rkt"
  "compile.rkt"
  "ir.rkt"
+ "py-from-ir.rkt"
  (for-template racket/base))
 (provide -production -step compile-cek)
 
@@ -48,6 +49,8 @@
                    sort->field-names
                    ;; (hash sort type)
                    sort->type
+                   ;; (hash name type)
+                   metafunction->type
                    ;; (hash type (U type #f))
                    parent-of))
 
@@ -94,11 +97,18 @@
                "unexpected form"
                "form" form)])))
 
-  (lang-info nonterminals '() '()
+  (lang-info nonterminals
+             ;; hard-coded metafunctions for now...
+             (list (list 'lookup (nt 'env) (nt 'var))
+                   (list 'extend (nt 'env) (nt 'var) (nt 'w)))
+             ;; TODO hard-code the variable and environment prims
+             '()
              sort->name sort->field-names sort->type
+             (hash 'lookup 'w
+                   'extend 'env)
              (mk/parent-of nonterminals productions)))
 
-;; mk/parent-of : (setof nonterminal) (listof production) -> (hash type (U type #f))
+;; mk/parent-of : (setof nonterminal) (listof production) -> (hash type (U type 'top))
 ;; INV:
 ;; - only the production-name in productions have a corresponding
 ;;   nonterminal in nonterminals
@@ -109,7 +119,7 @@
   (define nonterminal-form? (form-in-nonterminals? nonterminals))
   
   (define (nt->no-parent nt)
-    (cons (nt-symbol nt) #f))
+    (cons (nt-symbol nt) 'top))
   (for/fold ([parent-of (make-immutable-hash (map nt->no-parent nonterminals))])
             ([p productions]
              #:when #t
@@ -123,7 +133,7 @@
     (cond
       [(equal? t1 t2) #t]
       [else
-       (and (hash-ref parent-of t1)
+       (and (not (equal? 'top (hash-ref parent-of t1)))
             (subtype? (hash-ref parent-of t1) t2))]))
   subtype?)
 (module+ test
@@ -144,10 +154,14 @@
 (define (compile-cek lang-id productions c-id e-id k-id steps)
   (match-define (lang-info nonterminals metafunctions prim-parsers
                            sort->name sort->field-names sort->type
-                           parent-of)
+                           metafunction->type parent-of)
     (productions->lang-info productions))
-  ;; TODO prim's have a class but metafunctions don't, handle those
-  ;; cases carefully
+
+  ;; ast->name : ast -> name
+  ;; Given an ast produce its corresponding class' name. I think it
+  ;; should only be called on pattern ast's but I'm not certain yet;
+  ;; that rules out calling it on metafunctions, which is a good
+  ;; thing: those don't have a class.
   (define (ast->name ast)
     (cond
       [(symbol? ast) (hash-ref sort->name ast)]
@@ -161,7 +175,7 @@
   (define-values (tc-temp tc-pat)
     (lang-typechecker
      sort->type
-     (thunk (error 'metafunction->type))
+     metafunction->type
      subtype?))
   (define-values (compile-temp compile-pat)
     (lang-compiler sort->field-names sort->name))
@@ -201,17 +215,55 @@
        (define-values (c0-ast e0-ast k0-ast)
          (values (parse-pattern #'c0) (parse-pattern #'e0) (parse-pattern #'k0)))
 
+       (define (parse-where w)
+         (match w
+           [(list pattern template)
+            (list (parse-pattern pattern) (parse-template template))]))
+       (define wheres-asts (map parse-where (step-wheres step)))
+
        (syntax-parse (step-rhs step)
          [(c* e* k*)
           (define-values (c*-ast e*-ast k*-ast)
             (values (parse-template #'c*) (parse-template #'e*) (parse-template #'k*)))
 
-          (define lhs-bindings
-            (tc-pats/expecteds (list c0-ast e0-ast k0-ast)
-                               (map syntax-e (list c-id e-id k-id))))
+          (define bindings
+            (let loop ([bindings (tc-pats/expecteds
+                                  (list c0-ast e0-ast k0-ast)
+                                  (map syntax-e (list c-id e-id k-id)))]
+                       [asts wheres-asts])
+              (match asts
+                [(cons (list pat-ast temp-ast) asts-rest)
+                 (define ty
+                   (match (tc-temp temp-ast bindings)
+                     [(tc-template-result ty)
+                      ty]
+                     [_ (raise-user-error
+                         'compile-cek
+                         "could not typecheck template ~a" temp-ast)]))
+                 (loop (append (tc-pats/expecteds (list pat-ast) (list ty)) bindings)
+                       asts-rest)]
+                [_
+                 bindings])))
+
           (tc-temps/expecteds (list c*-ast e*-ast k*-ast)
                               (map syntax-e (list c-id e-id k-id))
-                              lhs-bindings)
+                              bindings)
+
+          (define (compile-wheres asts rest)
+            (define (compile-where w idx r)
+              (match w
+                [(list pat-ast temp-ast)
+                 (define tmp (format-symbol "w_tmp~a" idx))
+                 (compile-temp
+                  temp-ast tmp
+                  (compile-pat
+                   pat-ast tmp
+                   rest))]))
+            (foldr
+             compile-where
+             rest
+             asts
+             (build-list (length asts) values)))
 
           (if (or (metavar? k0-ast)
                   (prim? k0-ast))
@@ -221,11 +273,13 @@
                 (list 'self 'e 'k)
                 (foldr
                  compile-pat
-                 (foldr
-                  compile-temp
-                  (ir:return (list 'c_result 'e_result 'k_result))
-                  (list c*-ast e*-ast k*-ast)
-                  (list 'c_result 'e_result 'k_result))
+                 (compile-wheres
+                  wheres-asts
+                  (foldr
+                   compile-temp
+                   (ir:return (list 'c_result 'e_result 'k_result))
+                   (list c*-ast e*-ast k*-ast)
+                   (list 'c_result 'e_result 'k_result)))
                  (list c0-ast e0-ast k0-ast)
                  (list 'self 'e 'k))))
               ;; TODO this branch assumes that the c and e patterns
@@ -247,13 +301,74 @@
                 (list 'self 'c_arg 'e_arg)
                 (foldr
                  compile-pat
-                 (foldr
-                  compile-temp
-                  (ir:return (list 'c_result 'e_result 'k_result))
-                  (list c*-ast e*-ast k*-ast)
-                  (list 'c_result 'e_result 'k_result))
-                 (list k0-ast c0-ast e0-ast)
-                 (list 'self 'c_arg 'e_arg)))))])]))
+                 (compile-wheres
+                  wheres-asts
+                  (foldr
+                   compile-temp
+                   (ir:return (list 'c_result 'e_result 'k_result))
+                   (list c*-ast e*-ast k*-ast)
+                   (list 'c_result 'e_result 'k_result)))
+                  (list k0-ast c0-ast e0-ast)
+                  (list 'self 'c_arg 'e_arg)))))])]))
+  (define method-by-class-name
+    (for/fold ([method-map (hash)])
+              ([m (apply append (map step->methods steps))])
+      (match* (m (hash-ref method-map (method-class-name m) #f))
+        [((method class-name arg-names0 body0)
+          (method _ arg-names1 body1))
+         (when (and (not (equal? arg-names0 arg-names1))
+                    (not (equal? body0 body1)))
+           (error 'compile-cek "class ~a has two methods that are not equivalent\n  method 1: ~a\n  method 2: ~a"
+                  class-name
+                  body0
+                  body1))]
+        [(_ #f)
+         (void)])
+      (hash-set method-map (method-class-name m) m)))
 
-  (for-each (compose pretty-print step->methods) steps)
+  ;; check-for-super-method : name (U name 'top) -> (U ir:method-def 'super)
+  (define (check-for-super-method class-name super-name)
+    (let loop ([defining-class super-name])
+      (match defining-class
+        ['top
+         (ir:method-def
+          '()
+          (ir:error (format "class ~a does not implement a method" class-name)))]
+        [_
+         (if (hash-has-key? method-by-class-name defining-class)
+             'super
+             (loop (hash-ref parent-of defining-class)))])))
+
+  (define-values (other-class-defs nt-class-defs)
+    (values
+     (for/list ([sort (in-sequences compounds terminals)])
+       (define class-name (hash-ref sort->name sort))
+       (define parent-class-name (hash-ref sort->type sort))
+       (ir:class-def
+        class-name
+        parent-class-name
+        (match (hash-ref sort->field-names sort #f)
+          [(list field-names ...)
+           (for/list ([name field-names])
+             (ir:field-def name class-name))]
+          [_ #f])
+        (match (hash-ref method-by-class-name class-name #f)
+          [(method _ args body)
+           (ir:method-def args body)]
+          [_
+           (check-for-super-method class-name parent-class-name)])))
+     (for/list ([nt nonterminals])
+       (define class-name (nt-symbol nt))
+       (define parent-class-name (or (hash-ref parent-of class-name) 'top))
+       (ir:class-def
+        class-name
+        parent-class-name
+        #f
+        (match (hash-ref method-by-class-name class-name #f)
+          [(method _ args body)
+           (ir:method-def args body)]
+          [_
+           (check-for-super-method class-name parent-class-name)])))))
+  (for ([def (in-sequences nt-class-defs other-class-defs)])
+    (pretty-display (class-def->py def)))
   #'(void))

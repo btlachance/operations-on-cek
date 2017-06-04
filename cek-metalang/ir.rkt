@@ -1,6 +1,8 @@
 #lang racket/base
 (provide (all-defined-out))
 
+;; a name is a symbol
+
 ;; a IR is one of
 ;; - (ir:check-instance name name IR)
 ;; - (ir:let (listof (list name simple-IR)) IR)
@@ -21,6 +23,10 @@
 (struct ir:make (class-name args) #:transparent)
 (struct ir:project (class-name field-name arg) #:transparent)
 (struct ir:call-builtin (name args) #:transparent)
+
+;; a super-class is one of
+;; - 'top
+;; - name, where name != 'top
 
 ;; an ir:class-def is (ir:class-def name super-class (U #f (listof ir:field-def)) (U 'super ir:method-def))
 (struct ir:class-def (name super-name fields method) #:transparent)
