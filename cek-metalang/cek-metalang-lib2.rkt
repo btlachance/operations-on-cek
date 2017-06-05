@@ -394,7 +394,7 @@
   (match-define (parser simple-parse-template _)
     (lang-parser terminals '() compounds '() prim-parsers))
   (define (term->program stx)
-    (define ast (simple-parse-template stx))
+    (define ast (simple-parse-template (desugar stx)))
     (tc-temps/expecteds (list ast) (list (syntax-e c-id)) '())
     (define ir (compile-temp
                 ast 'program_ast
@@ -405,9 +405,43 @@
       "def main():"
       (ir->py ir #:indent "  "))
      "\n"))
-  (pretty-display (term->program #'((lam x ((lam y ((lam a (y a))
-                                                    (lam b (y b))))
-                                            (lam z ((lam q (z q))
-                                                    (lam r (z r))))))
-                                    (lam w (w w)))))
+  (pretty-display
+   (term->program
+    #'(let* ([Z (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
+                             (lambda (x) (f (lambda (v) ((x x) v))))))]
+             [add (lambda (m) (lambda (n) (lambda (f) (lambda (x) ((m f) ((n f) x))))))]
+             [zero (lambda (f) (lambda (x) x))]
+             [one (lambda (f) (lambda (x) (f x)))]
+             [two ((add one) one)]
+             [three ((add two) one)]
+             [four ((add three) one)]
+             [five ((add four) one)]
+             [mult (lambda (m) (lambda (n) (lambda (f) (lambda (x) ((n (m f)) x)))))]
+             [pred (lambda (n) (lambda (f) (lambda (x) (((n (lambda (g) (lambda (h) (h (g f)))))
+                                                         (lambda (u) x))
+                                                        (lambda (u) u)))))]
+             ;; ifzero must take thunks
+             [ifzero (lambda (n) (lambda (then) (lambda (else) ((n (lambda (x) (else x))) (then else)))))]
+             [fact (Z (lambda (fact0) (lambda (n) (((ifzero n) (lambda (_) one))
+                                                   (lambda (_) ((mult n) (fact0 (pred n))))))))])
+        (fact ((add five) two)))))
   #'(void))
+
+(define (desugar stx)
+  (syntax-parse stx
+    #:datum-literals (let lambda)
+    [(lambda (x) e)
+     #`(lam x #,(desugar #'e))]
+    [(let (x e) body)
+     (define e* (desugar #'e))
+     (define body* (desugar #'body))
+     #`((lam x #,body*) #,e*)]
+    [(let* () body)
+     (desugar #'body)]
+    [(let* ([x0 e0] [x e] ...) body)
+     (define e0* (desugar #'e0))
+     #`((lam x0 #,(desugar #'(let* ([x e] ...) body))) #,e0*)]
+    [(e1 e2)
+     #`(#,(desugar #'e1)
+        #,(desugar #'e2))]
+    [_ this-syntax]))

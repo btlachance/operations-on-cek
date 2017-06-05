@@ -36,7 +36,6 @@ def emptyenv():
 def lookup(e, x):
   return e.lookup(x)
 def extend(e, x, v):
-  print "extending with {}".format(x.literal)
   return ExtendedEnv(x, v, e)
 
 
