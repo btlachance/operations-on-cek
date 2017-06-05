@@ -390,4 +390,24 @@
            (check-for-super-method class-name parent-class-name)])))))
   (for ([def (in-sequences nt-class-defs other-class-defs)])
     (pretty-display (class-def->py def)))
+
+  (match-define (parser simple-parse-template _)
+    (lang-parser terminals '() compounds '() prim-parsers))
+  (define (term->program stx)
+    (define ast (simple-parse-template stx))
+    (tc-temps/expecteds (list ast) (list (syntax-e c-id)) '())
+    (define ir (compile-temp
+                ast 'program_ast
+                (ir:let (list (list 'result (ir:call-builtin 'run (list 'program_ast))))
+                        (ir:return (list 'result)))))
+    (string-join
+     (list
+      "def main():"
+      (ir->py ir #:indent "  "))
+     "\n"))
+  (pretty-display (term->program #'((lam x ((lam y ((lam a (y a))
+                                                    (lam b (y b))))
+                                            (lam z ((lam q (z q))
+                                                    (lam r (z r))))))
+                                    (lam w (w w)))))
   #'(void))

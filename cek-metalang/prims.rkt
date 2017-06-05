@@ -6,8 +6,8 @@
   (require "ir.rkt" racket/syntax)
   (provide (prefix-out variable- (all-defined-out)))
   (define ty 'variable)
-  (define (tc-fun var-name)
-    ty)
+  (define ((mk/tc-fun result-fun) var-name)
+    (result-fun ty))
   (define (compile-pat var-name source rest)
     (ir:check-instance
      source ty
@@ -25,13 +25,13 @@
     ;; to maintain an environment for the IR) so for now we'll just
     ;; always construct a new variable. So long as they don't have
     ;; object identity that should be fine.
-    (ir:let (list (list dest (ir:call-builtin 'mkvariable (symbol->string var-name)))
-            rest))))
+    (ir:let (list (list dest (ir:call-builtin 'mkvariable (list (symbol->string var-name)))))
+            rest)))
 (require (for-syntax 'variable-prim))
 (define-syntax variable
   (prim-data
-   variable-tc-fun
-   variable-tc-fun
+   (variable-mk/tc-fun tc-template-result)
+   (variable-mk/tc-fun (lambda (ty) (tc-pattern-result ty '())))
    variable-compile-temp
    variable-compile-pat
    variable-ty

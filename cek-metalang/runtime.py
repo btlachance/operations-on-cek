@@ -36,6 +36,7 @@ def emptyenv():
 def lookup(e, x):
   return e.lookup(x)
 def extend(e, x, v):
+  print "extending with {}".format(x.literal)
   return ExtendedEnv(x, v, e)
 
 
@@ -45,4 +46,6 @@ def run(p):
     try:
       c, e, k = c.interpret(e, k)
     except CEKError as err:
+      print err.__str__()
+      print c
       return c

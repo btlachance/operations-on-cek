@@ -1,6 +1,6 @@
 #lang racket
 (require "ir.rkt")
-(provide class-def->py)
+(provide class-def->py ir->py)
 
 ;; TODO Python identifiers are less liberal than Racket identifiers,
 ;; so we need to make sure we don't emit ill-formed Python. Either
@@ -248,7 +248,7 @@
     [(ir:call-builtin name args)
      (format "~a(~a)"
              name
-             (apply ~a #:separator ", " args))]
+             (apply ~s #:separator ", " args))]
     [name (symbol->string name)]))
 
 (module+ test
