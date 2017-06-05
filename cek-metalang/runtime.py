@@ -2,7 +2,7 @@ class CEKError(Exception):
   def __init__(self, message):
     self.message = message
   def __str__(self):
-    return repr(self.message)
+    return self.message
 
 def mkvariable(name):
   return PrimVariable(name)
@@ -19,7 +19,7 @@ class EmptyEnv(Env):
   def __init__(self):
     pass
   def lookup(self, y):
-    raise CEKError("Variable {} not found".format(y))
+    raise CEKError("Variable %s not found" % y)
 class ExtendedEnv(Env):
   def __init__(self, x, v, e):
     self.x = x
