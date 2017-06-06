@@ -1,5 +1,5 @@
 #lang racket
-(require "../cek-metalang/cek-metalang.rkt")
+(require "../../cek-metalang/cek-metalang.rkt")
 (define-cek lc
   #:grammar
   (e ::= var v (e e))

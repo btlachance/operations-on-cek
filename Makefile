@@ -1,40 +1,42 @@
-DEST=build
-_=$(shell mkdir -p $(DEST))
+RPYTHONCMD=python ~/projects/pypy/rpython/bin/rpython
+_=$(shell mkdir -p build)
 METALANGDEPS=$(wildcard cek-metalang/*.rkt)
 RTDEPS=cek-metalang/runtime.py
 .PHONY: all unittest inttest test clean fact7
 
-all: $(DEST)/cek-metalang.html test
+all: build/cek-metalang.html test
 
-$(DEST):
-	mkdir -p $(DEST)
+build/%.html: scribblings/%.scrbl
+	scribble --dest build/ --dest-name $(@F) $<
 
-$(DEST)/%.html: scribblings/%.scrbl
-	scribble --dest $(@D) --dest-name $(@F) $<
+examples/lc/lc.rkt: $(METALANGDEPS)
 
-examples/lc.rkt: $(METALANGDEPS)
-
-$(DEST)/lc-interp.py: examples/lc.rkt $(RTDEPS)
+build/lc-interp.py: examples/lc/lc.rkt $(RTDEPS)
 	{ racket $< --print-interp;\
 	  cat $(RTDEPS); } > $@
 
-$(DEST)/lc-basictests-linked.py: $(DEST)/lc-interp.py lc-basictests.py
+build/lc-basictests-linked.py: build/lc-interp.py examples/lc/lc-basictests.py
 	{ cat $^;\
 	  echo 'if __name__ == "__main__":';\
 	  echo '  tests()'; } > $@
 
-$(DEST)/lc-fact7-linked.py: $(DEST)/lc-interp.py examples/lc-fact7.txt
+build/lc-fact7-linked.py: build/lc-interp.py examples/lc/lc-fact7.txt
 	{ cat $<;\
-	  racket examples/lc.rkt --compile-term < examples/lc-fact7.txt;\
+	  racket examples/lc/lc.rkt --compile-term < examples/lc/lc-fact7.txt;\
 	  echo 'if __name__ == "__main__":';\
 	  echo '  main()'; } > $@
 
+build/targetlc-c: examples/lc/targetlc.py build/lc-fact7-linked.py
+	cp examples/lc/targetlc.py build/targetlc.py
+	mv build/lc-fact7-linked.py build/lc.py
+	(cd build/; $(RPYTHONCMD) targetlc.py)
+
 unittest:
 	raco test cek-metalang/
-inttest: $(DEST)/lc-basictests-linked.py
+inttest: build/lc-basictests-linked.py
 	python $<
 test: unittest inttest
-fact7: $(DEST)/lc-fact7-linked.py
+fact7: build/lc-fact7-linked.py
 	python $<
 clean:
-	rm -r $(DEST)
+	rm -rf build compiled
