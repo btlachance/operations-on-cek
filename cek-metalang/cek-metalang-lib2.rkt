@@ -10,17 +10,18 @@
  "compile.rkt"
  "ir.rkt"
  "py-from-ir.rkt"
- (for-template racket/base "prims.rkt"))
+ "prims.rkt"
+ (for-template racket/base))
 (provide -production -step compile-cek)
 
-(struct production (name forms))
+(struct production (name forms) #:prefab)
 (define-syntax-class -production
   #:attributes (name (form 1) data)
   #:datum-literals (::=)
   (pattern (name:id ::= form ...+)
            #:attr data (production #'name (attribute form))))
 
-(struct step (lhs rhs wheres))
+(struct step (lhs rhs wheres) #:prefab)
 (define-splicing-syntax-class where-clause
   #:attributes (body)
   (pattern (~seq #:where pattern template)
@@ -58,12 +59,12 @@
   ;; Looking up the prims in this function was tricky for me: because
   ;; it's required for-syntax by cek-metalang, we have to make sure
   ;; that the prims have for-template bindings.
-  (define variable-prim (syntax-local-value #'variable))
+  (define variable-prim variable)
   (define nonterminals
     ;; HACK Need to detect whether the grammar actually uses the
     ;; variable and actually insert the nonterminal into this list
     ;; like we do for other nonterminals
-    (append (map (compose nt syntax-e production-name) productions)
+    (append (map (compose nt production-name) productions)
             (list (nt (prim-data-name variable-prim)))))
   (define nonterminal-form? (form-in-nonterminals? nonterminals))
 
@@ -71,17 +72,16 @@
     (for/fold ([sort->name (hash)]
                [sort->field-names (hash)]
                [sort->type (hash)])
-              ([production-name (map syntax-e (map production-name productions))]
-               [form-stxs (map production-forms productions)]
+              ([production-name (map production-name productions)]
+               [forms (map production-forms productions)]
                #:when #t
-               [form-stx form-stxs]
-               [form (map syntax->datum form-stxs)]
+               [form forms]
                [idx (in-naturals)]
                #:when (not (nonterminal-form? form))
                ;; HACK And we need to make sure that primitives /in
                ;; general/ aren't treated like literals
-               #:when (not (and (identifier? form-stx)
-                                (free-identifier=? form-stx #'variable))))
+               #:when (not (and (symbol? form)
+                                (equal? form 'variable))))
       (cond
         [(symbol? form)
          (values
@@ -142,9 +142,9 @@
   (for/fold ([parent-of (make-immutable-hash (map nt->no-parent nonterminals))])
             ([p productions]
              #:when #t
-             [sub (map syntax-e (filter identifier? (production-forms p)))]
+             [sub (filter symbol? (production-forms p))]
              #:when (nonterminal-form? sub))
-    (define super (syntax-e (production-name p)))
+    (define super (production-name p))
     (hash-set parent-of sub super)))
 ;; mk/subtype? : (hash type (U type #f)) -> (type type -> bool)
 (define (mk/subtype? parent-of)
@@ -159,17 +159,18 @@
   (require rackunit)
   (define subtype?-t1 (mk/subtype?
                        (mk/parent-of (list (nt 'e) (nt 'x) (nt 'v) (nt 'z))
-                                     (list (production #'e (list #'x #'v))
-                                           (production #'x (list #'variable))
-                                           (production #'v (list #'(lambda x e) #'z))
-                                           (production #'z (list #'foo))))))
+                                     (list (production 'e (list 'x 'v))
+                                           (production 'x (list 'variable))
+                                           (production 'v (list '(lambda x e) 'z))
+                                           (production 'z (list 'foo))))))
   (check-true (subtype?-t1 'x 'e))
   (check-false (subtype?-t1 'e 'x))
   (check-true (subtype?-t1 'v 'e))
   (check-true (subtype?-t1 'z 'v))
   (check-true (subtype?-t1 'z 'e)))
 
-;; compile-cek : id (listof production) id id id (listof step) -> stx
+;; compile-cek : id (listof production) id id id (listof step)
+;;                 -> (values (-> (void)) (stx -> string))
 (define (compile-cek lang-id productions c-id e-id k-id steps)
   (match-define (lang-info nonterminals metafunctions prim-parsers
                            sort->name sort->field-names sort->type
@@ -388,13 +389,14 @@
            (ir:method-def args body)]
           [_
            (check-for-super-method class-name parent-class-name)])))))
-  (for ([def (in-sequences nt-class-defs other-class-defs)])
-    (pretty-display (class-def->py def)))
+  (define (print-interpreter)
+    (for ([def (in-sequences nt-class-defs other-class-defs)])
+      (pretty-display (class-def->py def))))
 
   (match-define (parser simple-parse-template _)
     (lang-parser terminals '() compounds '() prim-parsers))
   (define (term->program stx)
-    (define ast (simple-parse-template (desugar stx)))
+    (define ast (simple-parse-template stx))
     (tc-temps/expecteds (list ast) (list (syntax-e c-id)) '())
     (define ir (compile-temp
                 ast 'program_ast
@@ -405,43 +407,5 @@
       "def main():"
       (ir->py ir #:indent "  "))
      "\n"))
-  (pretty-display
-   (term->program
-    #'(let* ([Z (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
-                             (lambda (x) (f (lambda (v) ((x x) v))))))]
-             [add (lambda (m) (lambda (n) (lambda (f) (lambda (x) ((m f) ((n f) x))))))]
-             [zero (lambda (f) (lambda (x) x))]
-             [one (lambda (f) (lambda (x) (f x)))]
-             [two ((add one) one)]
-             [three ((add two) one)]
-             [four ((add three) one)]
-             [five ((add four) one)]
-             [mult (lambda (m) (lambda (n) (lambda (f) (lambda (x) ((n (m f)) x)))))]
-             [pred (lambda (n) (lambda (f) (lambda (x) (((n (lambda (g) (lambda (h) (h (g f)))))
-                                                         (lambda (u) x))
-                                                        (lambda (u) u)))))]
-             ;; ifzero must take thunks
-             [ifzero (lambda (n) (lambda (then) (lambda (else) ((n (lambda (x) (else x))) (then else)))))]
-             [fact (Z (lambda (fact0) (lambda (n) (((ifzero n) (lambda (_) one))
-                                                   (lambda (_) ((mult n) (fact0 (pred n))))))))])
-        (fact ((add five) two)))))
-  #'(void))
+  (values print-interpreter term->program))
 
-(define (desugar stx)
-  (syntax-parse stx
-    #:datum-literals (let lambda)
-    [(lambda (x) e)
-     #`(lam x #,(desugar #'e))]
-    [(let (x e) body)
-     (define e* (desugar #'e))
-     (define body* (desugar #'body))
-     #`((lam x #,body*) #,e*)]
-    [(let* () body)
-     (desugar #'body)]
-    [(let* ([x0 e0] [x e] ...) body)
-     (define e0* (desugar #'e0))
-     #`((lam x0 #,(desugar #'(let* ([x e] ...) body))) #,e0*)]
-    [(e1 e2)
-     #`(#,(desugar #'e1)
-        #,(desugar #'e2))]
-    [_ this-syntax]))

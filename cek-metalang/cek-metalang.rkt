@@ -4,7 +4,11 @@
   syntax/parse
   racket/syntax
   racket/sequence
-  "cek-metalang-lib2.rkt"))
+  (only-in "cek-metalang-lib2.rkt"
+           -production
+           -step))
+ (only-in "cek-metalang-lib2.rkt"
+          compile-cek))
 
 (provide define-cek)
 
@@ -18,10 +22,15 @@
        #:continuation k-nonterminal:id
        #:step
        s:-step ...)
-     (compile-cek
-      #'name
-      (attribute grammar.data)
-      #'c-nonterminal
-      #'e-nonterminal
-      #'k-nonterminal
-      (attribute s.data))]))
+     (with-syntax ([term->py (format-id #'name "~a-term->py" #'name)]
+                   [print-interp (format-id #'name "print-~a-interp" #'name)]
+                   [(productions ...) (attribute grammar.data)]
+                   [(steps ...) (attribute s.data)])
+       #`(define-values (print-interp term->py)
+           (compile-cek
+            #'name
+            (list productions ...)
+            #'c-nonterminal
+            #'e-nonterminal
+            #'k-nonterminal
+            (list steps ...))))]))

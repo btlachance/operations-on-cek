@@ -1,5 +1,5 @@
 #lang racket
-(require (for-syntax "rep.rkt" racket/pretty))
+(require "rep.rkt")
 (provide variable)
 
 (module variable-prim racket
@@ -27,8 +27,8 @@
     ;; object identity that should be fine.
     (ir:let (list (list dest (ir:call-builtin 'mkvariable (list (symbol->string var-name)))))
             rest)))
-(require (for-syntax 'variable-prim))
-(define-syntax variable
+(require 'variable-prim)
+(define variable
   (prim-data
    (variable-mk/tc-fun tc-template-result)
    (variable-mk/tc-fun (lambda (ty) (tc-pattern-result ty '())))
