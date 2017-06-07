@@ -22,7 +22,7 @@
 
 ;; class-def->py : ir:class-def -> string
 ;; where cdef's super-name is not #f
-(define (class-def->py cdef)
+(define (class-def->py cdef #:debug? [debug? #t])
   (match cdef
     [(ir:class-def name super-name fdefs mdef)
      (define header (format "class ~a(~a):"
@@ -32,7 +32,17 @@
                                 (class-name->py super-name))))
      (define constructor (field-defs->constructor-py name fdefs #:indent "  "))
      (define method (method-def->py mdef #:indent "  "))
-     (~a header constructor method #:separator "\n")]))
+     (string-append
+      (~a header
+          constructor
+          method
+          #:separator "\n")
+      (if debug?
+          (~a
+           ""
+           (make-pprint-method name fdefs)
+           #:separator "\n")
+          ""))]))
 
 (module+ test
   (define app-def (ir:class-def
@@ -41,7 +51,7 @@
                          (ir:field-def 'app_arg 'e))
                    (ir:method-def '(self env k)
                                   (ir:return '(self env k)))))
-  (check-equal? (class-def->py app-def)
+  (check-equal? (class-def->py app-def #:debug? #f)
                 (string-join
                  (list
                   "class cl_app(cl_e):"
@@ -50,6 +60,41 @@
                   "    self.app_arg = app_arg"
                   "  def interpret(self, env, k):"
                   "    return self, env, k")
+                 "\n")))
+
+(define (make-pprint-method class-name field-defs)
+  (match field-defs
+    [#f
+     (string-join
+      (list
+       "  def pprint(self, indent):"
+       (format "    return ' ' * indent + ~s" class-name))
+      "\n")]
+    [(list)
+     (string-join
+      (list
+       "  def pprint(self, indent):"
+       (format "    return ' ' * indent + '(~a)'" class-name))
+      "\n")]
+    [(list defs ...)
+     (define (fdef->print-field d)
+       (format "self.~a.pprint(0)" (ir:field-def-fieldname d)))
+     (string-join
+      (list
+       "  def pprint(self, indent):"
+       (format "    return ' ' * indent + '(~a ~a)' % (~a)"
+               class-name
+               (apply ~a (for/list ([d defs]) "%s") #:separator " ")
+               (apply ~a (for/list ([d defs]) (fdef->print-field d)) #:separator ", ")))
+      "\n")]))
+(module+ test
+  (define lam-pprint-fdefs (list (ir:field-def 'x 'top)
+                                (ir:field-def 'e 'top)))
+  (check-equal? (make-pprint-method 'lam lam-pprint-fdefs)
+                (string-join
+                 (list
+                  "  def pprint(self, indent):"
+                  "    return ' ' * indent + '(lam %s %s)' % (self.x.pprint(0), self.e.pprint(0))")
                  "\n")))
 
 ;; field-defs->constructor-py : name (U #f (listof field-def)) -> string 

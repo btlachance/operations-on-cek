@@ -9,6 +9,8 @@ def mkvariable(name):
 class PrimVariable(cl_variable):
   def __init__(self, name):
     self.literal = name
+  def pprint(self, indent):
+    return self.literal
 
 class Env(cl_env):
   def __init__(self):
@@ -46,5 +48,5 @@ def run(p):
       c, e, k = c.interpret(e, k)
     except CEKError as err:
       print err.__str__()
-      print c
+      print c.pprint(0)
       return c
