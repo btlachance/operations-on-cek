@@ -28,6 +28,15 @@
 ;; - 'top
 ;; - name, where name != 'top
 
+
+;; TODO Right now it's tricky for the class-def IR to distinguish
+;; between a nonterminal (e.g. k) and a form with no fields (e.g. a
+;; made-up one like (foo) where foo is a terminal). Currently, fields
+;; would be '() for k and for (foo). (It's not #f for k because we use
+;; #f to signal that it's a non-compound terminal class e.g. mt.) It
+;; would be nice to distinuish between k and (foo) so that we can
+;; raise a runtime error in the constructor for k
+
 ;; an ir:class-def is (ir:class-def name super-class (U #f (listof ir:field-def)) (U 'super ir:method-def))
 (struct ir:class-def (name super-name fields method) #:transparent)
 

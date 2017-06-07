@@ -383,7 +383,8 @@
        (ir:class-def
         class-name
         parent-class-name
-        #f
+        '() ;; The only time we have a #f field-defs is when the class
+            ;; represents a terminal
         (match (hash-ref method-by-class-name class-name #f)
           [(method _ args body)
            (ir:method-def args body)]
