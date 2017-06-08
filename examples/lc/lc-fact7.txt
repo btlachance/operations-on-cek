@@ -1,18 +1,25 @@
 (let* ([Z (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
                        (lambda (x) (f (lambda (v) ((x x) v))))))]
        [add (lambda (m) (lambda (n) (lambda (f) (lambda (x) ((m f) ((n f) x))))))]
-       [zero (lambda (f) (lambda (x) x))]
-       [one (lambda (f) (lambda (x) (f x)))]
-       [two ((add one) one)]
-       [three ((add two) one)]
-       [four ((add three) one)]
-       [five ((add four) one)]
        [mult (lambda (m) (lambda (n) (lambda (f) (lambda (x) ((n (m f)) x)))))]
        [pred (lambda (n) (lambda (f) (lambda (x) (((n (lambda (g) (lambda (h) (h (g f)))))
                                                    (lambda (u) x))
                                                   (lambda (u) u)))))]
        ;; ifzero must take thunks
-       [ifzero (lambda (n) (lambda (then) (lambda (else) ((n (lambda (x) (else x))) (then else)))))]
+       [ifzero (lambda (n) (lambda (then) (lambda (else) ((n (lambda (_) (else (lambda (x) x)))) (then (lambda (x) x))))))]
+       [sub (lambda (m) (lambda (n) ((n pred) m)))]
+       [zero (lambda (f) (lambda (x) x))]
+       [one (lambda (f) (lambda (x) (f x)))]
+       [two ((add one) one)]
+       [four ((add two) two)]
+       [five ((add four) one)]
+       [ten ((mult five) two)]
+       [hundred ((mult ten) ten)]
+       [thousand ((mult hundred) ten)]
        [fact (Z (lambda (fact0) (lambda (n) (((ifzero n) (lambda (_) one))
                                              (lambda (_) ((mult n) (fact0 (pred n))))))))])
-  (fact ((add five) two)))
+  (((ifzero
+     ((sub (fact ((add five) two)))
+      ((add ((mult thousand) five)) ((mult four) ten))))
+    (lambda (_) (lambda (success) success)))
+   (lambda (_) (lambda (failure) failure))))

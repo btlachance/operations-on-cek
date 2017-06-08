@@ -1,4 +1,5 @@
-RPYTHONCMD=python ~/projects/pypy/rpython/bin/rpython
+PYTHON=pypy
+RPYTHON=python ~/projects/pypy/rpython/bin/rpython
 _=$(shell mkdir -p build)
 METALANGDEPS=$(wildcard cek-metalang/*.rkt)
 RTDEPS=cek-metalang/runtime.py
@@ -29,14 +30,14 @@ build/lc-fact7-linked.py: build/lc-interp.py examples/lc/lc-fact7.txt
 build/targetlc-c: examples/lc/targetlc.py build/lc-fact7-linked.py
 	cp examples/lc/targetlc.py build/targetlc.py
 	mv build/lc-fact7-linked.py build/lc.py
-	(cd build/; $(RPYTHONCMD) targetlc.py)
+	(cd build/; $(RPYTHON) targetlc.py)
 
 unittest:
 	raco test cek-metalang/
 inttest: build/lc-basictests-linked.py
-	python $<
+	$(PYTHON) $<
 test: unittest inttest
 fact7: build/lc-fact7-linked.py
-	python $<
+	$(PYTHON) $<
 clean:
 	rm -rf build compiled
