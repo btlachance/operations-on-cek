@@ -1,6 +1,18 @@
 #lang racket
 (require "rep.rkt")
-(provide lang-typechecker)
+(provide
+ lang-typechecker
+ (struct-out pat*)
+ (struct-out where*)
+ (struct-out temp*))
+
+;; an ast* is one of
+;; - (pattern ast type)
+;; - (where ast ast)
+;; - (template ast type)
+(struct pat* (ast expected-ty))
+(struct where* (temp-ast pat-ast))
+(struct temp* (ast expected-ty))
 
 ;; a type is a symbol representing the name of a nonterminal from some
 ;; production
@@ -14,23 +26,6 @@
     ;; given a list of asts and a list of expected types, both of the
     ;; same length, tc-temps checks pairwise for each ast, type pair
     ;; if the ast is a subtype of the expected type
-    (define (tc-temps asts expected-tys)
-      (for ([ast asts]
-            [expected-ty expected-tys])
-        (match (tc-temp ast bindings)
-          [(tc-template-result actual-ty)
-           (unless (subtype? actual-ty expected-ty)
-             (raise-arguments-error
-              'tc-temp
-              "expected a template with a different type"
-              "expected" expected-ty
-              "got" actual-ty))]
-          [#f
-           (raise-arguments-error
-            'tc-temp
-            "template did not typecheck"
-            "template" ast)])))
-
     (match ast
       [(? symbol? s)
        (tc-template-result (hash-ref sort->type s))]
@@ -43,27 +38,27 @@
          [ty (tc-template-result ty)])]
       [(metafunction name args sort)
        (define expected-tys (map nt-symbol (filter nt? (cdr sort))))
-       (tc-temps args expected-tys)
+       (tc-temps/expecteds args expected-tys bindings)
        (tc-template-result (hash-ref metafunction->type name))]
       [(prim p data)
        ((prim-data-tc-temp data) p)]
       [(compound asts sort)
        (define expected-tys (map nt-symbol (filter nt? sort)))
-       (tc-temps asts expected-tys)
+       (tc-temps/expecteds asts expected-tys bindings)
        (tc-template-result (hash-ref sort->type sort))]))
+  (define (tc-temps/expecteds asts expecteds bindings)
+    (for ([ast asts]
+          [expected expecteds])
+      (match (tc-temp ast bindings)
+        [(tc-template-result ty)
+         (unless (subtype? ty expected)
+           (raise-user-error
+            'compile-cek
+            "expected template ~a to have type ~a but got ~a" ast expected ty))]
+        [_ (raise-user-error
+            'compile-cek
+            "could not typecheck template ~a" ast)])))
   (define (tc-pat ast)
-    (define (tc-pats asts expected-tys)
-      (append*
-       (for/list ([ast asts]
-                  [expected-ty expected-tys])
-         (match-define (tc-pattern-result actual-ty bindings) (tc-pat ast))
-         (if (subtype? actual-ty expected-ty)
-             bindings
-             (raise-arguments-error
-              'tc-pat
-              "expected a pattern with a different type"
-              "expected" expected-ty
-              "got" actual-ty)))))
     (match ast
       [(? symbol? s)
        (tc-pattern-result (hash-ref sort->type s) '())]
@@ -78,9 +73,40 @@
        ((prim-data-tc-pat data) p)]
       [(compound asts sort)
        (define expected-tys (map nt-symbol (filter nt? sort)))
-       (define bindings (tc-pats asts expected-tys))
+       (define bindings (tc-pats/expecteds asts expected-tys))
        (tc-pattern-result (hash-ref sort->type sort) bindings)]))
-  (values tc-temp tc-pat))
+  (define (tc-pats/expecteds asts expecteds)
+    (for/fold ([bs '()])
+              ([ast asts]
+               [expected expecteds])
+      (match (tc-pat ast)
+        [(tc-pattern-result ty bindings)
+         (if (subtype? ty expected)
+             (append bindings bs)
+             (raise-user-error
+              'compile-cek
+              "expected pattern ~a to have type ~a but got ~a" ast expected ty))]
+        [_ (raise-user-error
+            'compile-cek
+            "could not typecheck pattern ~a" ast)])))
+  (define (tc-ast*s ast*s)
+    (define (tc-ast* bindings ast*)
+      (match ast*
+        [(pat* ast expected-ty)
+         (tc-pats/expecteds (list ast) (list expected-ty))]
+        [(where* temp pat)
+         (match (tc-temp temp bindings)
+           [(tc-template-result ty)
+            (tc-pats/expecteds (list pat) (list ty))]
+           [_ (raise-user-error
+               'compile-cek
+               "could not typecheck template ~a" temp)])]
+        [(temp* ast expected-ty)
+         (tc-temps/expecteds (list ast) (list expected-ty) bindings)
+         bindings]))
+    (foldl tc-ast* ast*s '())
+    (void))
+  (values tc-temp tc-pat tc-temps/expecteds tc-pats/expecteds tc-ast*s))
 
 (module+ test
   (require rackunit)
@@ -99,7 +125,7 @@
       [('env 'env) #t]
       [('x 'e) #t]
       [(_ _) #f]))
-  (define-values (t1-tc-t t1-tc-p)
+  (define-values (t1-tc-t t1-tc-p t1-tc-ts/expct t1-tc-ps/expct t1-tc-ast*s)
     (lang-typechecker t1-sort->type t1-metafunction->type t1-subtype?))
 
   (check-match (t1-tc-t (metavar 'x #f) (list (binding (metavar 'x #f) 'x)))

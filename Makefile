@@ -10,19 +10,20 @@ all: build/cek-metalang.html test
 build/%.html: scribblings/%.scrbl
 	scribble --dest build/ --dest-name $(@F) $<
 
-examples/lc/lc.rkt: $(METALANGDEPS)
-
-build/lc-interp.py: examples/lc/lc.rkt $(RTDEPS)
-	{ racket $< --print-interp;\
+build/lc-interp.py: examples/lc/lc.rkt $(METALANGDEPS) $(RTDEPS)
+	{ set -e;\
+	  racket $< --print-interp;\
 	  cat $(RTDEPS); } > $@
 
 build/lc-basictests-linked.py: build/lc-interp.py examples/lc/lc-basictests.py
-	{ cat $^;\
+	{ set -e;\
+	  cat $^;\
 	  echo 'if __name__ == "__main__":';\
 	  echo '  tests()'; } > $@
 
 build/lc-fact7-linked.py: build/lc-interp.py examples/lc/lc-fact7.txt
-	{ cat $<;\
+	{ set -e;\
+	  cat $<;\
 	  racket examples/lc/lc.rkt --compile-term < examples/lc/lc-fact7.txt;\
 	  echo 'if __name__ == "__main__":';\
 	  echo '  main()'; } > $@

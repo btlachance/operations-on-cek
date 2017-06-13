@@ -2,6 +2,7 @@
 (require
  racket/hash
  racket/syntax
+ syntax/stx
  syntax/parse
  "rep.rkt"
  "util.rkt"
@@ -192,7 +193,7 @@
   (match-define (parser parse-template parse-pattern)
     (lang-parser terminals nonterminals compounds metafunctions prim-parsers))
   (define subtype? (mk/subtype? parent-of))
-  (define-values (tc-temp tc-pat)
+  (define-values (tc-temp tc-pat tc-temps/expecteds tc-pats/expecteds tc-ast*s)
     (lang-typechecker
      sort->type
      metafunction->type
@@ -200,136 +201,88 @@
   (define-values (compile-temp compile-pat)
     (lang-compiler sort->field-names sort->name))
 
-  (define (tc-pats/expecteds asts expecteds)
-    (for/fold ([bs '()])
-              ([ast asts]
-               [expected expecteds])
-      (match (tc-pat ast)
-        [(tc-pattern-result ty bindings)
-         (if (subtype? ty expected)
-             (append bindings bs)
-             (raise-user-error
-              'compile-cek
-              "expected pattern ~a to have type ~a but got ~a" ast expected ty))]
-        [_ (raise-user-error
-            'compile-cek
-            "could not typecheck pattern ~a" ast)])))
-  (define (tc-temps/expecteds asts expecteds bindings)
-    (for ([ast asts]
-          [expected expecteds])
-      (match (tc-temp ast bindings)
-        [(tc-template-result ty)
-         (unless (subtype? ty expected)
-           (raise-user-error
-            'compile-cek
-            "expected template ~a to have type ~a but got ~a" ast expected ty))]
-        [_ (raise-user-error
-            'compile-cek
-            "could not typecheck template ~a" ast)])))
-
   ;; a method is a (method symbol (listof symbol) IR)
   (struct method (class-name arg-names body) #:transparent)
   (define (step->methods step)
-    (syntax-parse (step-lhs step)
-      [(c0 e0 k0)
-       (define-values (c0-ast e0-ast k0-ast)
-         (values (parse-pattern #'c0) (parse-pattern #'e0) (parse-pattern #'k0)))
+    (define (parse-where w)
+      (match w
+        [(list pattern template)
+         (where* (parse-template template) (parse-pattern pattern))]))
 
-       (define (parse-where w)
-         (match w
-           [(list pattern template)
-            (list (parse-pattern pattern) (parse-template template))]))
-       (define wheres-asts (map parse-where (step-wheres step)))
+    (match-define (list c0-ast e0-ast k0-ast)
+      (stx-map parse-pattern (step-lhs step)))
+    (define where*s (map parse-where (step-wheres step)))
+    (match-define (list c*-ast e*-ast k*-ast)
+      (stx-map parse-template (step-rhs step)))
 
-       (syntax-parse (step-rhs step)
-         [(c* e* k*)
-          (define-values (c*-ast e*-ast k*-ast)
-            (values (parse-template #'c*) (parse-template #'e*) (parse-template #'k*)))
+    (define cek/tys (map syntax-e (list c-id e-id k-id)))
+    (tc-ast*s
+     (append
+      (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
+      where*s
+      (map temp* (list c*-ast e*-ast k*-ast) cek/tys)))
 
-          (define bindings
-            (let loop ([bindings (tc-pats/expecteds
-                                  (list c0-ast e0-ast k0-ast)
-                                  (map syntax-e (list c-id e-id k-id)))]
-                       [asts wheres-asts])
-              (match asts
-                [(cons (list pat-ast temp-ast) asts-rest)
-                 (define ty
-                   (match (tc-temp temp-ast bindings)
-                     [(tc-template-result ty)
-                      ty]
-                     [_ (raise-user-error
-                         'compile-cek
-                         "could not typecheck template ~a" temp-ast)]))
-                 (loop (append (tc-pats/expecteds (list pat-ast) (list ty)) bindings)
-                       asts-rest)]
-                [_
-                 bindings])))
+    (define (compile-wheres asts rest)
+      (define (compile-where w idx r)
+        (match w
+          [(where* temp-ast pat-ast)
+           (define tmp (format-symbol "w_tmp~a" idx))
+           (compile-temp
+            temp-ast tmp
+            (compile-pat
+             pat-ast tmp
+             rest))]))
+      (foldr
+       compile-where
+       rest
+       asts
+       (build-list (length asts) values)))
 
-          (tc-temps/expecteds (list c*-ast e*-ast k*-ast)
-                              (map syntax-e (list c-id e-id k-id))
-                              bindings)
-
-          (define (compile-wheres asts rest)
-            (define (compile-where w idx r)
-              (match w
-                [(list pat-ast temp-ast)
-                 (define tmp (format-symbol "w_tmp~a" idx))
-                 (compile-temp
-                  temp-ast tmp
-                  (compile-pat
-                   pat-ast tmp
-                   rest))]))
+    (if (or (metavar? k0-ast)
+            (prim? k0-ast))
+        (list
+         (method
+          (ast->name c0-ast)
+          (list 'self 'e 'k)
+          (foldr
+           compile-pat
+           (compile-wheres
+            where*s
             (foldr
-             compile-where
-             rest
-             asts
-             (build-list (length asts) values)))
-
-          (if (or (metavar? k0-ast)
-                  (prim? k0-ast))
-              (list
-               (method
-                (ast->name c0-ast)
-                (list 'self 'e 'k)
-                (foldr
-                 compile-pat
-                 (compile-wheres
-                  wheres-asts
-                  (foldr
-                   compile-temp
-                   (ir:return (list 'c_result 'e_result 'k_result))
-                   (list c*-ast e*-ast k*-ast)
-                   (list 'c_result 'e_result 'k_result)))
-                 (list c0-ast e0-ast k0-ast)
-                 (list 'self 'e 'k))))
-              ;; TODO this branch assumes that the c and e patterns
-              ;; are only metavar patterns; check this assumption and
-              ;; raise an error if it doesn't hold
-              (list
-               (method
-                (ast->name c0-ast)
-                (list 'self 'e 'k)
-                (foldr
-                 compile-pat
-                 (ir:send 'k (map metavar->symbol (list c0-ast e0-ast)))
-                 ;; We can insert the metavar k here because we know
-                 ;; it's the name of one of the arguments.
-                 (list c0-ast e0-ast (metavar 'k #f))
-                 (list 'self 'e 'k)))
-               (method
-                (ast->name k0-ast)
-                (list 'self 'c_arg 'e_arg)
-                (foldr
-                 compile-pat
-                 (compile-wheres
-                  wheres-asts
-                  (foldr
-                   compile-temp
-                   (ir:return (list 'c_result 'e_result 'k_result))
-                   (list c*-ast e*-ast k*-ast)
-                   (list 'c_result 'e_result 'k_result)))
-                  (list k0-ast c0-ast e0-ast)
-                  (list 'self 'c_arg 'e_arg)))))])]))
+             compile-temp
+             (ir:return (list 'c_result 'e_result 'k_result))
+             (list c*-ast e*-ast k*-ast)
+             (list 'c_result 'e_result 'k_result)))
+           (list c0-ast e0-ast k0-ast)
+           (list 'self 'e 'k))))
+        ;; TODO this branch assumes that the c and e patterns
+        ;; are only metavar patterns; check this assumption and
+        ;; raise an error if it doesn't hold
+        (list
+         (method
+          (ast->name c0-ast)
+          (list 'self 'e 'k)
+          (foldr
+           compile-pat
+           (ir:send 'k (map metavar->symbol (list c0-ast e0-ast)))
+           ;; We can insert the metavar k here because we know
+           ;; it's the name of one of the arguments.
+           (list c0-ast e0-ast (metavar 'k #f))
+           (list 'self 'e 'k)))
+         (method
+          (ast->name k0-ast)
+          (list 'self 'c_arg 'e_arg)
+          (foldr
+           compile-pat
+           (compile-wheres
+            where*s
+            (foldr
+             compile-temp
+             (ir:return (list 'c_result 'e_result 'k_result))
+             (list c*-ast e*-ast k*-ast)
+             (list 'c_result 'e_result 'k_result)))
+           (list k0-ast c0-ast e0-ast)
+           (list 'self 'c_arg 'e_arg))))))
   (define method-by-class-name
     (for/fold ([method-map (hash)])
               ([m (apply append (map step->methods steps))])
