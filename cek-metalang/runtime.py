@@ -3,6 +3,9 @@ class CEKError(Exception):
     self.message = message
   def __str__(self):
     return self.message
+class CEKDone(Exception):
+  def __init__(self, result):
+    self.result = result
 
 def mkvariable(name):
   return PrimVariable(name)
@@ -40,12 +43,17 @@ def lookup(e, x):
 def extend(e, x, v):
   return ExtendedEnv(x, v, e)
 
+def ret(v):
+  raise CEKDone(v)
 
 def run(p):
   c, e, k = p, emptyenv(), cl_mt()
   while True:
     try:
       c, e, k = c.interpret(e, k)
+    except CEKDone as d:
+      print d.result.pprint(0)
+      return d.result
     except CEKError as err:
       print err.__str__()
       print c.pprint(0)

@@ -13,7 +13,7 @@
  "py-from-ir.rkt"
  "prims.rkt"
  (for-template racket/base))
-(provide -production -step compile-cek)
+(provide -production -step -final compile-cek)
 
 (struct production (name forms) #:prefab)
 (define-syntax-class -production
@@ -39,6 +39,12 @@
             (~and rhs (e-r env-r k-r))
             wheres:where-clause ...]
            #:attr data (step #'lhs #'rhs (attribute wheres.body))))
+
+(struct final (state result) #:prefab)
+(define-syntax-class -final
+  #:datum-literals (-->)
+  (pattern [(~and state (e env k)) --> result]
+           #:attr data (final #'state #'result)))
 
 (define ((form-in-nonterminals? nonterminals) f)
   (memf (lambda (nt) (equal? (nt-symbol nt) f)) nonterminals))
@@ -174,7 +180,7 @@
   (check-true (subtype?-t1 'z 'v))
   (check-true (subtype?-t1 'z 'e)))
 
-;; compile-cek : id (listof production) id id id (listof step)
+;; compile-cek : id (listof production) id id id (listof step) final
 ;;                 -> (values (-> (void)) (stx -> string))
 (define (compile-cek lang-id productions c-id e-id k-id steps final)
   (match-define (lang-info nonterminals metafunctions prim-parsers
@@ -265,9 +271,57 @@
              (list 'c_result 'e_result 'k_result)))
            (list k0-ast c0-ast e0-ast)
            (list 'self 'c_arg 'e_arg))))))
+
+  (define (final->methods f)
+    (match-define (list c0-ast e0-ast k0-ast)
+      (stx-map parse-pat (final-state f)))
+    (define result-ast (parse-temp (final-result f)))
+    (define cek/tys (map syntax-e (list c-id e-id k-id)))
+    (tc-ast*s
+     (append (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
+             (list (temp* result-ast (syntax-e c-id)))))
+    (if (or (metavar? k0-ast)
+            (prim? k0-ast))
+        (list
+         (method
+          (ast->name c0-ast)
+          (list 'self 'e 'k)
+          (foldr
+           compile-pat
+           (compile-temp
+            result-ast
+            'result
+            (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
+                    (ir:error "Failed to halt the program in a final state")))
+           (list c0-ast e0-ast k0-ast)
+           (list 'self 'e 'k))))
+        (list
+         (method
+          (ast->name c0-ast)
+          (list 'self 'e 'k)
+          (foldr
+           compile-pat
+           (ir:send 'k (map metavar->symbol (list c0-ast e0-ast)))
+           (list c0-ast e0-ast (metavar 'k #f))
+           (list 'self 'e 'k)))
+         (method
+          (ast->name k0-ast)
+          (list 'self 'c_arg 'e_arg)
+          (foldr
+           compile-pat
+           (compile-temp
+            result-ast
+            'result
+            (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
+                    (ir:error "Failed to halt the program in a final state")))
+           (list k0-ast c0-ast e0-ast)
+           (list 'self 'c_arg 'e_arg))))))
+
   (define method-by-class-name
     (for/fold ([method-map (hash)])
-              ([m (apply append (map step->methods steps))])
+              ([m (in-sequences
+                   (apply append (map step->methods steps))
+                   (final->methods final))])
       (match* (m (hash-ref method-map (method-class-name m) #f))
         [((method class-name arg-names0 body0)
           (method _ arg-names1 body1))
