@@ -78,21 +78,21 @@
             'compile-cek
             "could not typecheck pattern ~a" ast)])))
   (define (tc-ast*s ast*s)
-    (define (tc-ast* bindings ast*)
+    (define (tc-ast* ast* bindings)
       (match ast*
         [(pat* ast expected-ty)
-         (tc-pats/expecteds (list ast) (list expected-ty))]
+         (append bindings (tc-pats/expecteds (list ast) (list expected-ty)))]
         [(where* temp pat)
          (match (tc-temp temp bindings)
            [(tc-template-result ty)
-            (tc-pats/expecteds (list pat) (list ty))]
+            (append bindings (tc-pats/expecteds (list pat) (list ty)))]
            [_ (raise-user-error
                'compile-cek
                "could not typecheck template ~a" temp)])]
         [(temp* ast expected-ty)
          (tc-temps/expecteds (list ast) (list expected-ty) bindings)
          bindings]))
-    (foldl tc-ast* ast*s '())
+    (foldl tc-ast* '() ast*s)
     (void))
   (values tc-temp tc-pat tc-temps/expecteds tc-pats/expecteds tc-ast*s))
 

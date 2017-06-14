@@ -225,7 +225,6 @@
       (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
       where*s
       (map temp* (list c*-ast e*-ast k*-ast) cek/tys)))
-
     (if (or (metavar? k0-ast)
             (prim? k0-ast))
         (list
