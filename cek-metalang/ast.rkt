@@ -1,9 +1,5 @@
 #lang racket
-(provide
- (struct-out metavar)
- (struct-out metafunction)
- (struct-out prim)
- (struct-out compound))
+(provide (all-defined-out))
 
 ;; a ast is one of
 ;; - symbol, representing a terminal
@@ -18,3 +14,11 @@
 (struct metafunction (name args sort) #:transparent)
 (struct prim (payload data) #:transparent)
 (struct compound (asts sort) #:transparent)
+
+;; an ast* is one of
+;; - (pattern ast type)
+;; - (where ast ast)
+;; - (template ast type)
+(struct pat* (ast expected-ty))
+(struct where* (temp-ast pat-ast))
+(struct temp* (ast expected-ty))

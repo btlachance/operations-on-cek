@@ -27,6 +27,10 @@
   #:attributes (body)
   (pattern (~seq #:where pattern template)
            #:attr body (list #'pattern #'template)))
+(define ((mk/parse-where* parse-temp parse-pat) w)
+  (match w
+    [(list pattern template)
+     (where* (parse-temp template) (parse-pat pattern))]))
 (define-syntax-class -step
   #:attributes (lhs rhs (wheres 1) data)
   #:datum-literals (-->)
@@ -172,7 +176,7 @@
 
 ;; compile-cek : id (listof production) id id id (listof step)
 ;;                 -> (values (-> (void)) (stx -> string))
-(define (compile-cek lang-id productions c-id e-id k-id steps)
+(define (compile-cek lang-id productions c-id e-id k-id steps final)
   (match-define (lang-info nonterminals metafunctions prim-parsers
                            sort->name sort->field-names sort->type
                            metafunction->type parent-of)
@@ -190,30 +194,24 @@
       [else (metavar-nt ast)]))
   (define-values (terminals compounds) (partition symbol? (hash-keys sort->type)))
 
-  (match-define (parser parse-template parse-pattern)
+  (match-define (parser parse-temp parse-pat)
     (lang-parser terminals nonterminals compounds metafunctions prim-parsers))
-  (define subtype? (mk/subtype? parent-of))
   (define-values (tc-temp tc-pat tc-temps/expecteds tc-pats/expecteds tc-ast*s)
     (lang-typechecker
      sort->type
      metafunction->type
-     subtype?))
-  (define-values (compile-temp compile-pat)
+     (mk/subtype? parent-of)))
+  (define-values (compile-temp compile-pat compile-where*s)
     (lang-compiler sort->field-names sort->name))
 
   ;; a method is a (method symbol (listof symbol) IR)
   (struct method (class-name arg-names body) #:transparent)
   (define (step->methods step)
-    (define (parse-where w)
-      (match w
-        [(list pattern template)
-         (where* (parse-template template) (parse-pattern pattern))]))
-
     (match-define (list c0-ast e0-ast k0-ast)
-      (stx-map parse-pattern (step-lhs step)))
-    (define where*s (map parse-where (step-wheres step)))
+      (stx-map parse-pat (step-lhs step)))
+    (define where*s (map (mk/parse-where* parse-temp parse-pat) (step-wheres step)))
     (match-define (list c*-ast e*-ast k*-ast)
-      (stx-map parse-template (step-rhs step)))
+      (stx-map parse-temp (step-rhs step)))
 
     (define cek/tys (map syntax-e (list c-id e-id k-id)))
     (tc-ast*s
@@ -221,22 +219,6 @@
       (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
       where*s
       (map temp* (list c*-ast e*-ast k*-ast) cek/tys)))
-
-    (define (compile-wheres asts rest)
-      (define (compile-where w idx r)
-        (match w
-          [(where* temp-ast pat-ast)
-           (define tmp (format-symbol "w_tmp~a" idx))
-           (compile-temp
-            temp-ast tmp
-            (compile-pat
-             pat-ast tmp
-             rest))]))
-      (foldr
-       compile-where
-       rest
-       asts
-       (build-list (length asts) values)))
 
     (if (or (metavar? k0-ast)
             (prim? k0-ast))
@@ -246,7 +228,7 @@
           (list 'self 'e 'k)
           (foldr
            compile-pat
-           (compile-wheres
+           (compile-where*s
             where*s
             (foldr
              compile-temp
@@ -274,7 +256,7 @@
           (list 'self 'c_arg 'e_arg)
           (foldr
            compile-pat
-           (compile-wheres
+           (compile-where*s
             where*s
             (foldr
              compile-temp

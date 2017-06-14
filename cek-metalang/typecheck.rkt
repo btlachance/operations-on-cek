@@ -1,18 +1,6 @@
 #lang racket
 (require "rep.rkt")
-(provide
- lang-typechecker
- (struct-out pat*)
- (struct-out where*)
- (struct-out temp*))
-
-;; an ast* is one of
-;; - (pattern ast type)
-;; - (where ast ast)
-;; - (template ast type)
-(struct pat* (ast expected-ty))
-(struct where* (temp-ast pat-ast))
-(struct temp* (ast expected-ty))
+(provide lang-typechecker)
 
 ;; a type is a symbol representing the name of a nonterminal from some
 ;; production

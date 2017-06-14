@@ -4,8 +4,9 @@
 
 ;; lang-compiler : (hash sort (listof symbol)) (hash sort symbol)
 ;;                                      -> (values (ast dest IR -> IR)
-;;                                                 (ast source IR -> IR))
-(define (lang-compiler sort->field-names sort->name [... #f])
+;;                                                 (ast source IR -> IR)
+;;                                                 ((listof where*) IR -> IR))
+(define (lang-compiler sort->field-names sort->name)
   (define (compile-temp ast dest rest)
     (match ast
       [(? symbol? s)
@@ -66,7 +67,23 @@
                  rest
                  asts
                  projection-dests)))]))
-  (values compile-temp compile-pat))
+  (define (compile-where*s asts rest)
+    (define (compile-where* w idx r)
+      (match w
+        [(where* temp-ast pat-ast)
+         (define tmp (format-symbol "w_tmp~a" idx))
+         (compile-temp
+          temp-ast tmp
+          (compile-pat
+           pat-ast tmp
+           rest))]))
+    (foldr
+     compile-where*
+     rest
+     asts
+     (build-list (length asts) values)))
+
+  (values compile-temp compile-pat compile-where*s))
 
 ;; TODO Think about what typechecking and compiling have in
 ;; common. One commonality: terminal patterns don't bind any
