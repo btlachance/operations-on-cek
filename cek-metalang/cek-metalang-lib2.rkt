@@ -130,12 +130,14 @@
   (lang-info nonterminals
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
-                   (list 'extend (nt 'env) (nt 'var) (nt 'w)))
+                   (list 'extend (nt 'env) (nt 'var) (nt 'w))
+                   (list 'pprint (nt 'v)))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun))
              sort->name sort->field-names sort->type
              (hash 'lookup 'w
-                   'extend 'env)
+                   'extend 'env
+                   'pprint 'v)
              (mk/parent-of nonterminals productions)))
 
 ;; mk/parent-of : (setof nonterminal) (listof production) -> (hash type (U type 'top))

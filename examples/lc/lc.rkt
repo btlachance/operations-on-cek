@@ -11,7 +11,7 @@
   #:control-string e
   #:environment env
   #:continuation k
-  #:final [(v env_0 mt) --> v]
+  #:final [(v env_0 mt) --> (pprint v)]
   #:step
   [(var env_0 k) --> (v env k)
    #:where (clo v env) (lookup env_0 var)]

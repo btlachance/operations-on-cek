@@ -43,6 +43,10 @@ def lookup(e, x):
 def extend(e, x, v):
   return ExtendedEnv(x, v, e)
 
+def pprint(v):
+  print v.pprint(0)
+  return v
+
 def ret(v):
   raise CEKDone(v)
 
@@ -52,7 +56,6 @@ def run(p):
     try:
       c, e, k = c.interpret(e, k)
     except CEKDone as d:
-      print d.result.pprint(0)
       return d.result
     except CEKError as err:
       print err.__str__()
