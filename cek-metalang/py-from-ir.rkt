@@ -68,7 +68,7 @@
      (string-join
       (list
        "  def pprint(self, indent):"
-       (format "    return ' ' * indent + ~s" class-name))
+       (format "    return ' ' * indent + '~a'" class-name))
       "\n")]
     [(list)
      (string-join
@@ -88,8 +88,14 @@
                (apply ~a (for/list ([d defs]) (fdef->print-field d)) #:separator ", ")))
       "\n")]))
 (module+ test
+  (check-equal? (make-pprint-method 'mt #f)
+                (string-join
+                 (list
+                  "  def pprint(self, indent):"
+                  "    return ' ' * indent + 'mt'")
+                 "\n"))
   (define lam-pprint-fdefs (list (ir:field-def 'x 'top)
-                                (ir:field-def 'e 'top)))
+                                 (ir:field-def 'e 'top)))
   (check-equal? (make-pprint-method 'lam lam-pprint-fdefs)
                 (string-join
                  (list
