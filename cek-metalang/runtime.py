@@ -3,6 +3,8 @@ class CEKError(Exception):
     self.message = message
   def __str__(self):
     return self.message
+class CEKMatchFailure(CEKError):
+  pass
 class CEKDone(Exception):
   def __init__(self, result):
     self.result = result

@@ -31,7 +31,7 @@
                                 "object"
                                 (class-name->py super-name))))
      (define constructor (field-defs->constructor-py name fdefs #:indent "  "))
-     (define method (method-def->py mdef #:indent "  "))
+     (define method (method-def->py name mdef #:indent "  "))
      (string-append
       (~a header
           constructor
@@ -50,7 +50,7 @@
                    (list (ir:field-def 'app_fn 'e)
                          (ir:field-def 'app_arg 'e))
                    (ir:method-def '(self env k)
-                                  (ir:return '(self env k)))))
+                                  (list (ir:return '(self env k))))))
   (check-equal? (class-def->py app-def #:debug? #f)
                 (string-join
                  (list
@@ -59,7 +59,11 @@
                   "    self.app_fn = app_fn"
                   "    self.app_arg = app_arg"
                   "  def interpret(self, env, k):"
-                  "    return self, env, k")
+                  "    try:"
+                  "      return self, env, k"
+                  "    except CEKMatchFailure as matchf:"
+                  "      pass"
+                  "    raise CEKError(\"No cases matched for method in class app\")")
                  "\n")))
 
 (define (make-pprint-method class-name field-defs)
@@ -153,49 +157,83 @@
                  "\n")))
 
 
-;; method-def->py : (U 'super ir:method-def) -> string
-(define (method-def->py mdef #:indent [prefix ""])
+;; method-def->py : name (U 'super ir:method-def) -> string
+(define (method-def->py class-name mdef #:indent [prefix ""])
   (match mdef
     ['super
      (format "~a# method inherited from super class" prefix)]
-    ;; I'm not happy with this special-case, but we need the
-    ;; unimplemented "implementations" to accept an arbitrary # of
-    ;; arguments. We only know the number of arguments when we emit
-    ;; code for implemented methods, and we can't leave the
-    ;; unimplemented ones at zero arguments: we don't want Python
-    ;; errors that say e.g.  "interpret() takes no arguments (3
-    ;; given)"
-    [(ir:method-def (list) (and err (ir:error message)))
+    [(ir:unimplemented-method msg)
+     ;; We only know the number of arguments when we emit code for
+     ;; implemented methods, and we can't leave the unimplemented
+     ;; ones at zero arguments: we don't want Python errors that say
+     ;; e.g.  "interpret() takes no arguments (3 given)"
      (define header (format "~adef interpret(*args):" prefix))
-     (string-join (list header (ir->py err #:indent (string-append prefix "  "))) "\n")]
-    [(ir:method-def args body)
+     (define error-ir (ir:error msg))
+     (string-join (list header (ir->py error-ir #:indent (string-append prefix "  "))) "\n")]
+    [(ir:method-def args cases)
      (define header (format "~adef interpret(~a):" prefix (apply ~a #:separator ", " args)))
-     (string-join (list header (ir->py body #:indent (string-append prefix "  "))) "\n")]))
+     (define (case->py ir)
+       (ir->py/handle-match-failure ir #:indent (string-append prefix "  ")))
+     (define fallthrough-error
+       (format "~araise CEKError(~s)"
+               (string-append prefix "  ")
+               (format "No cases matched for method in class ~a" class-name)))
+     (~a
+      header
+      (string-join (map case->py cases) "\n")
+      fallthrough-error
+      #:separator "\n")]))
 
 (module+ test
-  (check-equal? (method-def->py 'super) ;; low-value test...
+  (check-equal? (method-def->py 'blah 'super) ;; low-value test...
                 "# method inherited from super class")
 
   ;; TODO currently, upstream code puts the self argument explicitly
   ;; in the IR. I'm not sure if that's what we necessarily want; these
   ;; tests assume that it is what we want.
-  (check-equal? (method-def->py (ir:method-def '() (ir:return '())))
+  (check-equal? (method-def->py 'swimmer (ir:method-def '() (list (ir:return '()))))
                 (string-join
                  (list
                   "def interpret():"
-                  "  return")
+                  "  try:"
+                  "    return"
+                  "  except CEKMatchFailure as matchf:"
+                  "    pass"
+                  "  raise CEKError(\"No cases matched for method in class swimmer\")")
                  "\n"))
 
   (define method-3args
     (ir:method-def '(self env k)
-                   (ir:return '(self env k))))
-  (check-equal? (method-def->py method-3args)
+                   (list (ir:return '(self env k)))))
+  (check-equal? (method-def->py 'infswimmer method-3args)
                 (string-join
                  (list
                   "def interpret(self, env, k):"
-                  "  return self, env, k")
+                  "  try:"
+                  "    return self, env, k"
+                  "  except CEKMatchFailure as matchf:"
+                  "    pass"
+                  "  raise CEKError(\"No cases matched for method in class infswimmer\")")
                  "\n")))
 
+;; ir->py/handle-match-failure : ir -> string
+(define (ir->py/handle-match-failure ir #:indent [prefix ""])
+  (format
+   "~atry:\n~a\n~aexcept CEKMatchFailure as matchf:\n~a  pass"
+   prefix
+   (ir->py ir #:indent (string-append prefix "  "))
+   prefix
+   prefix))
+
+(module+ test
+  (check-equal? (ir->py/handle-match-failure (ir:return '(self env k)) #:indent "  ")
+                (string-join
+                 (list
+                  "  try:"
+                  "    return self, env, k"
+                  "  except CEKMatchFailure as matchf:"
+                  "    pass")
+                 "\n")))
 
 ;; ir->py : ir -> string
 (define (ir->py ir #:indent [prefix ""])
@@ -206,7 +244,7 @@
                            n
                            (class-name->py class-name)))
      (define failure-message (format "Expected ~a to be an ~a" n class-name))
-     (define failure (format "~araise CEKError(~s)" prefix failure-message))
+     (define failure (format "~araise CEKMatchFailure(~s)" prefix failure-message))
 
      (format "~a\n  ~a\n~a"
              guard
@@ -243,14 +281,14 @@
                 (string-join
                  (list
                   "if not(isinstance(e1, cl_e)):"
-                  "  raise CEKError(\"Expected e1 to be an e\")"
+                  "  raise CEKMatchFailure(\"Expected e1 to be an e\")"
                   "return e1")
                  "\n"))
   (check-equal? (ir->py (ir:check-instance 'e1 'e (ir:return '(e1))) #:indent "  ")
                 (string-join
                  (list
                   "  if not(isinstance(e1, cl_e)):"
-                  "    raise CEKError(\"Expected e1 to be an e\")"
+                  "    raise CEKMatchFailure(\"Expected e1 to be an e\")"
                   "  return e1")
                  "\n"))
   (check-equal? (ir->py (ir:let '() (ir:return '(e1))))

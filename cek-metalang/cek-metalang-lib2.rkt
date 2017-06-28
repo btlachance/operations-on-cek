@@ -341,9 +341,8 @@
     (let loop ([defining-class super-name])
       (match defining-class
         ['top
-         (ir:method-def
-          '()
-          (ir:error (format "class ~a does not implement a method" class-name)))]
+         (ir:unimplemented-method
+          (format "class ~a does not implement a method" class-name))]
         [_
          (if (hash-has-key? method-by-class-name defining-class)
              'super
@@ -364,7 +363,7 @@
           [_ #f])
         (match (hash-ref method-by-class-name class-name #f)
           [(method _ args body)
-           (ir:method-def args body)]
+           (ir:method-def args (list body))]
           [_
            (check-for-super-method class-name parent-class-name)])))
      (for/list ([nt nonterminals])
@@ -377,7 +376,7 @@
             ;; represents a terminal
         (match (hash-ref method-by-class-name class-name #f)
           [(method _ args body)
-           (ir:method-def args body)]
+           (ir:method-def args (list body))]
           [_
            (check-for-super-method class-name parent-class-name)])))))
   (define (print-interpreter)

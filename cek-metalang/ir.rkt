@@ -43,5 +43,8 @@
 ;; an ir:field-def is (ir:field-def name name)
 (struct ir:field-def (fieldname classname) #:transparent)
 
-;; an ir:method-def is (ir:method-def (listof name) IR)
-(struct ir:method-def (args body) #:transparent)
+;; an ir:method-def is one of
+;; - (ir:method-def (listof name) (listof IR))
+;; - (ir:unimplemented-method string)
+(struct ir:method-def (args cases) #:transparent)
+(struct ir:unimplemented-method (msg) #:transparent)
