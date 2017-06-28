@@ -238,18 +238,12 @@
 ;; ir->py : ir -> string
 (define (ir->py ir #:indent [prefix ""])
   (match ir
-    [(ir:check-instance n class-name rest)
-     (define guard (format "~aif not(isinstance(~a, ~a)):"
-                           prefix
-                           n
-                           (class-name->py class-name)))
-     (define failure-message (format "Expected ~a to be an ~a" n class-name))
-     (define failure (format "~araise CEKMatchFailure(~s)" prefix failure-message))
-
-     (format "~a\n  ~a\n~a"
-             guard
-             failure
-             (ir->py rest #:indent prefix))]
+    [(ir:if test then else)
+     (~a (format "~aif ~a:" prefix (test-ir->py test))
+         (ir->py then #:indent (string-append prefix "  "))
+         (format "~aelse:" prefix)
+         (ir->py else #:indent (string-append prefix "  "))
+         #:separator "\n")]
     [(ir:let (list (list lhss rhss) ...) rest)
      (define (binding-pair->py name simple-ir)
        (format "~a~a = ~a" prefix name (simple-ir->py simple-ir)))
@@ -272,25 +266,21 @@
     [(ir:return results)
      (format "~areturn ~a" prefix (apply ~a results #:separator ", "))]
     [(ir:error message)
-     (format "~araise CEKError(~s)" prefix message)]))
+     (format "~araise CEKError(~s)" prefix message)]
+    [(ir:match-failure message)
+     (format "~araise CEKMatchFailure(~s)" prefix message)]))
 
 (module+ test
+  (check-equal? (ir->py (ir:if (ir:is-instance 'tofu 'food) (ir:error "then") (ir:error "else")))
+                (string-join
+                 (list
+                  "if isinstance(tofu, cl_food):"
+                  "  raise CEKError(\"then\")"
+                  "else:"
+                  "  raise CEKError(\"else\")")
+                 "\n"))
   (check-equal? (ir->py (ir:return '()))
                 "return")
-  (check-equal? (ir->py (ir:check-instance 'e1 'e (ir:return '(e1))))
-                (string-join
-                 (list
-                  "if not(isinstance(e1, cl_e)):"
-                  "  raise CEKMatchFailure(\"Expected e1 to be an e\")"
-                  "return e1")
-                 "\n"))
-  (check-equal? (ir->py (ir:check-instance 'e1 'e (ir:return '(e1))) #:indent "  ")
-                (string-join
-                 (list
-                  "  if not(isinstance(e1, cl_e)):"
-                  "    raise CEKMatchFailure(\"Expected e1 to be an e\")"
-                  "  return e1")
-                 "\n"))
   (check-equal? (ir->py (ir:let '() (ir:return '(e1))))
                 "return e1")
   (check-equal? (ir->py (ir:let '((e2 e1)
@@ -320,8 +310,18 @@
   (check-equal? (ir->py (ir:return '(c e k)))
                 "return c, e, k")
   (check-equal? (ir->py (ir:error "Expected c but got e"))
-                "raise CEKError(\"Expected c but got e\")"))
-  
+                "raise CEKError(\"Expected c but got e\")")
+  (check-equal? (ir->py (ir:match-failure "Expected e but got mt"))
+                "raise CEKMatchFailure(\"Expected e but got mt\")"))
+
+(define (test-ir->py test-ir)
+  (match test-ir
+    [(ir:is-instance arg class-name)
+     (format "isinstance(~a, ~a)" arg (class-name->py class-name))]))
+
+(module+ test
+  (check-equal? (test-ir->py (ir:is-instance 'person 'swimmer))
+                "isinstance(person, cl_swimmer)"))
 
 ;; simple-ir->py : simple-ir -> string
 (define (simple-ir->py simple-ir)

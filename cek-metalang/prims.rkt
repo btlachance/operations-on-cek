@@ -3,13 +3,13 @@
 (provide variable)
 
 (module variable-prim racket
-  (require "ir.rkt" racket/syntax)
+  (require "ir.rkt" "compile.rkt" racket/syntax)
   (provide (prefix-out variable- (all-defined-out)))
   (define ty 'variable)
   (define ((mk/tc-fun result-fun) var-name)
     (result-fun ty))
   (define (compile-pat var-name source rest)
-    (ir:check-instance
+    (check-instance
      source ty
      rest))
   (define (compile-temp var-name dest rest)

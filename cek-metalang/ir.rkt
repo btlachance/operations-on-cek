@@ -4,16 +4,21 @@
 ;; a name is a symbol
 
 ;; a IR is one of
-;; - (ir:check-instance name name IR)
+;; - (ir:if test-IR IR IR)
 ;; - (ir:let (listof (list name simple-IR)) IR)
 ;; - (ir:send name (listof name))
 ;; - (ir:return (listof name))
 ;; - (ir:error string)
-(struct ir:check-instance (arg class-name rest) #:transparent)
+(struct ir:if (test then else) #:transparent)
 (struct ir:let (bindings rest) #:transparent)
 (struct ir:send (receiver args) #:transparent)
 (struct ir:return (results)  #:transparent)
 (struct ir:error (message) #:transparent)
+(struct ir:match-failure (message) #:transparent)
+
+;; a test-IR is one of
+;; - (ir:is-instance name name)
+(struct ir:is-instance (arg class-name) #:transparent)
 
 ;; a simple-IR is one of
 ;; - name

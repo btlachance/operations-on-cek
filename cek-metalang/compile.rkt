@@ -1,6 +1,6 @@
 #lang racket
 (require "rep.rkt" "ir.rkt" "util.rkt" racket/syntax)
-(provide lang-compiler)
+(provide lang-compiler check-instance)
 
 ;; lang-compiler : (hash sort (listof symbol)) (hash sort symbol)
 ;;                                      -> (values (ast dest IR -> IR)
@@ -42,11 +42,9 @@
   (define (compile-pat ast source rest)
     (match ast
       [(? symbol? s)
-       (ir:check-instance
-        source s
-        rest)]
+       (check-instance source s rest)]
       [(metavar nt suffix)
-       (ir:check-instance
+       (check-instance
         source nt
         (ir:let (list (list (metavar->symbol ast) source))
                 rest))]
@@ -57,7 +55,7 @@
          (for/list ([field-name (hash-ref sort->field-names sort)])
            (format-symbol "~a_~a" source field-name)))
 
-       (ir:check-instance
+       (check-instance
         source (hash-ref sort->name sort)
         (ir:let (for/list ([dest projection-dests]
                            [field-name (hash-ref sort->field-names sort)])
@@ -84,6 +82,12 @@
      (build-list (length asts) values)))
 
   (values compile-temp compile-pat compile-where*s))
+
+(define (check-instance source s then)
+  (ir:if
+   (ir:is-instance source s)
+   then
+   (ir:match-failure (format "Expected ~a to be an ~a" source s))))
 
 ;; TODO Think about what typechecking and compiling have in
 ;; common. One commonality: terminal patterns don't bind any
