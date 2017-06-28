@@ -258,16 +258,13 @@
              (list 'c_result 'e_result 'k_result)))
            (list c0-ast e0-ast k0-ast)
            (list 'self 'e 'k))))
-        ;; TODO this branch assumes that the c and e patterns
-        ;; are only metavar patterns; check this assumption and
-        ;; raise an error if it doesn't hold
         (list
          (method
           (ast->name c0-ast)
           (list 'self 'e 'k)
           (foldr
            compile-pat
-           (ir:send 'k (map metavar->symbol (list c0-ast e0-ast)))
+           (ir:send 'k (list 'self 'e))
            ;; We can insert the metavar k here because we know
            ;; it's the name of one of the arguments.
            (list c0-ast e0-ast (metavar 'k #f))
