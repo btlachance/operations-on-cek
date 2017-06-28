@@ -212,8 +212,11 @@
   (define-values (compile-temp compile-pat compile-where*s)
     (lang-compiler sort->field-names sort->name))
 
-  ;; a method is a (method symbol (listof symbol) IR)
-  (struct method (class-name arg-names body) #:transparent)
+  ;; a method is a (method symbol (listof symbol) (U IR (listof IR)))
+  ;; HACK a method only has its cases as a single IR (not a list of
+  ;; IR) when it's the immediate result of step->methods. Once the
+  ;; method is in method-by-class-name cases is a (listof IR)
+  (struct method (class-name arg-names cases) #:transparent)
   (define (step->methods step)
     (match-define (list c0-ast e0-ast k0-ast)
       (stx-map parse-pat (step-lhs step)))
@@ -324,17 +327,18 @@
                    (apply append (map step->methods steps))
                    (final->methods final))])
       (match* (m (hash-ref method-map (method-class-name m) #f))
-        [((method class-name arg-names0 body0)
-          (method _ arg-names1 body1))
-         (when (and (not (equal? arg-names0 arg-names1))
-                    (not (equal? body0 body1)))
-           (error 'compile-cek "class ~a has two methods that are not equivalent\n  method 1: ~a\n  method 2: ~a"
-                  class-name
-                  body0
-                  body1))]
-        [(_ #f)
-         (void)])
-      (hash-set method-map (method-class-name m) m)))
+        [((method class-name arg-names0 case)
+          (method _ arg-names1 cases))
+         (unless (equal? arg-names0 arg-names1)
+           (error 'compile-cek
+                  "class ~a has two methods with differing argument names: ~a and ~a"
+                  arg-names0
+                  arg-names1))
+         (hash-set method-map
+                   class-name
+                   (method class-name arg-names0 (append cases (list case))))]
+        [((method class-name arg-names case) #f)
+         (hash-set method-map class-name (method class-name arg-names (list case)))])))
 
   ;; check-for-super-method : name (U name 'top) -> (U ir:method-def 'super)
   (define (check-for-super-method class-name super-name)
@@ -362,8 +366,8 @@
              (ir:field-def name class-name))]
           [_ #f])
         (match (hash-ref method-by-class-name class-name #f)
-          [(method _ args body)
-           (ir:method-def args (list body))]
+          [(method _ args cases)
+           (ir:method-def args cases)]
           [_
            (check-for-super-method class-name parent-class-name)])))
      (for/list ([nt nonterminals])
@@ -375,8 +379,8 @@
         '() ;; The only time we have a #f field-defs is when the class
             ;; represents a terminal
         (match (hash-ref method-by-class-name class-name #f)
-          [(method _ args body)
-           (ir:method-def args (list body))]
+          [(method _ args cases)
+           (ir:method-def args cases)]
           [_
            (check-for-super-method class-name parent-class-name)])))))
   (define (print-interpreter)
