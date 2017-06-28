@@ -244,6 +244,14 @@
          (format "~aelse:" prefix)
          (ir->py else #:indent (string-append prefix "  "))
          #:separator "\n")]
+    [(ir:if-match-fails cmd then)
+     (~a (format "~atry:" prefix)
+         (ir->py cmd #:indent (string-append prefix "  "))
+         (format "~aexcept CEKMatchFailure as matchf:" prefix)
+         (ir->py then #:indent (string-append prefix "  "))
+         (format "~aexcept CEKUnlessFailure:" prefix)
+         (format "~a  pass" prefix)
+         #:separator "\n")]
     [(ir:let (list (list lhss rhss) ...) rest)
      (define (binding-pair->py name simple-ir)
        (format "~a~a = ~a" prefix name (simple-ir->py simple-ir)))
@@ -268,7 +276,9 @@
     [(ir:error message)
      (format "~araise CEKError(~s)" prefix message)]
     [(ir:match-failure message)
-     (format "~araise CEKMatchFailure(~s)" prefix message)]))
+     (format "~araise CEKMatchFailure(~s)" prefix message)]
+    [(ir:unless-failure)
+     (format "~araise CEKUnlessFailure()" prefix)]))
 
 (module+ test
   (check-equal? (ir->py (ir:if (ir:is-instance 'tofu 'food) (ir:error "then") (ir:error "else")))
@@ -278,6 +288,16 @@
                   "  raise CEKError(\"then\")"
                   "else:"
                   "  raise CEKError(\"else\")")
+                 "\n"))
+  (check-equal? (ir->py (ir:if-match-fails (ir:match-failure "failed!") (ir:error "bailed anyway")))
+                (string-join
+                 (list
+                  "try:"
+                  "  raise CEKMatchFailure(\"failed!\")"
+                  "except CEKMatchFailure as matchf:"
+                  "  raise CEKError(\"bailed anyway\")"
+                  "except CEKUnlessFailure:"
+                  "  pass")
                  "\n"))
   (check-equal? (ir->py (ir:return '()))
                 "return")
@@ -312,7 +332,9 @@
   (check-equal? (ir->py (ir:error "Expected c but got e"))
                 "raise CEKError(\"Expected c but got e\")")
   (check-equal? (ir->py (ir:match-failure "Expected e but got mt"))
-                "raise CEKMatchFailure(\"Expected e but got mt\")"))
+                "raise CEKMatchFailure(\"Expected e but got mt\")")
+  (check-equal? (ir->py (ir:unless-failure))
+                "raise CEKUnlessFailure()"))
 
 (define (test-ir->py test-ir)
   (match test-ir

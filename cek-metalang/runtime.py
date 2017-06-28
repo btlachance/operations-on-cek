@@ -5,6 +5,9 @@ class CEKError(Exception):
     return self.message
 class CEKMatchFailure(CEKError):
   pass
+class CEKUnlessFailure(CEKError):
+  def __init__(self):
+    pass
 class CEKDone(Exception):
   def __init__(self, result):
     self.result = result

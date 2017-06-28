@@ -22,23 +22,34 @@
   (pattern (name:id ::= form ...+)
            #:attr data (production #'name (attribute form))))
 
-(struct step (lhs rhs wheres) #:prefab)
+(define-splicing-syntax-class clause
+  #:attributes (body)
+  (pattern :where-clause)
+  (pattern :unless-clause))
+(define ((mk/parse-clause parse-temp parse-pat) w)
+  (match w
+    [(list 'where pattern template)
+     (where* (parse-temp template) (parse-pat pattern))]
+    [(list 'unless pattern template)
+     (unless* (parse-temp template) (parse-pat pattern))]))
 (define-splicing-syntax-class where-clause
   #:attributes (body)
   (pattern (~seq #:where pattern template)
-           #:attr body (list #'pattern #'template)))
-(define ((mk/parse-where* parse-temp parse-pat) w)
-  (match w
-    [(list pattern template)
-     (where* (parse-temp template) (parse-pat pattern))]))
+           #:attr body (list 'where #'pattern #'template)))
+(define-splicing-syntax-class unless-clause
+  #:attributes (body)
+  (pattern (~seq #:unless pattern template)
+           #:attr body (list 'unless #'pattern #'template)))
+
+(struct step (lhs rhs clauses) #:prefab)
 (define-syntax-class -step
-  #:attributes (lhs rhs (wheres 1) data)
+  #:attributes (lhs rhs (clauses 1) data)
   #:datum-literals (-->)
   (pattern [(~and lhs (e-l env-l k-l))
             -->
             (~and rhs (e-r env-r k-r))
-            wheres:where-clause ...]
-           #:attr data (step #'lhs #'rhs (attribute wheres.body))))
+            clauses:clause ...]
+           #:attr data (step #'lhs #'rhs (attribute clauses.body))))
 
 (struct final (state result) #:prefab)
 (define-syntax-class -final
@@ -209,7 +220,7 @@
      sort->type
      metafunction->type
      (mk/subtype? parent-of)))
-  (define-values (compile-temp compile-pat compile-where*s)
+  (define-values (compile-temp compile-pat compile-clauses)
     (lang-compiler sort->field-names sort->name))
 
   ;; a method is a (method symbol (listof symbol) (U IR (listof IR)))
@@ -220,7 +231,7 @@
   (define (step->methods step)
     (match-define (list c0-ast e0-ast k0-ast)
       (stx-map parse-pat (step-lhs step)))
-    (define where*s (map (mk/parse-where* parse-temp parse-pat) (step-wheres step)))
+    (define clauses (map (mk/parse-clause parse-temp parse-pat) (step-clauses step)))
     (match-define (list c*-ast e*-ast k*-ast)
       (stx-map parse-temp (step-rhs step)))
 
@@ -228,7 +239,7 @@
     (tc-ast*s
      (append
       (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
-      where*s
+      clauses
       (map temp* (list c*-ast e*-ast k*-ast) cek/tys)))
     (if (or (metavar? k0-ast)
             (prim? k0-ast))
@@ -238,8 +249,8 @@
           (list 'self 'e 'k)
           (foldr
            compile-pat
-           (compile-where*s
-            where*s
+           (compile-clauses
+            clauses
             (foldr
              compile-temp
              (ir:return (list 'c_result 'e_result 'k_result))
@@ -266,8 +277,8 @@
           (list 'self 'c_arg 'e_arg)
           (foldr
            compile-pat
-           (compile-where*s
-            where*s
+           (compile-clauses
+            clauses
             (foldr
              compile-temp
              (ir:return (list 'c_result 'e_result 'k_result))

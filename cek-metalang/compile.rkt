@@ -5,7 +5,7 @@
 ;; lang-compiler : (hash sort (listof symbol)) (hash sort symbol)
 ;;                                      -> (values (ast dest IR -> IR)
 ;;                                                 (ast source IR -> IR)
-;;                                                 ((listof where*) IR -> IR))
+;;                                                 ((listof clause) IR -> IR))
 (define (lang-compiler sort->field-names sort->name)
   (define (compile-temp ast dest rest)
     (match ast
@@ -65,29 +65,38 @@
                  rest
                  asts
                  projection-dests)))]))
-  (define (compile-where*s asts rest)
-    (define (compile-where* w idx r)
-      (match w
+
+  (define (compile-clauses clauses rest)
+    (define (compile-clause c idx r)
+      (define tmp (format-symbol "w_tmp~a" idx))
+      (match c
         [(where* temp-ast pat-ast)
-         (define tmp (format-symbol "w_tmp~a" idx))
          (compile-temp
           temp-ast tmp
           (compile-pat
            pat-ast tmp
+           rest))]
+        [(unless* temp-ast pat-ast)
+         (compile-temp
+          temp-ast tmp
+          (ir:if-match-fails
+           (compile-pat
+            pat-ast tmp
+            (ir:unless-failure))
            rest))]))
     (foldr
-     compile-where*
+     compile-clause
      rest
-     asts
-     (build-list (length asts) values)))
-
-  (values compile-temp compile-pat compile-where*s))
+     clauses
+     (build-list (length clauses) values)))
+  (values compile-temp compile-pat compile-clauses))
 
 (define (check-instance source s then)
   (ir:if
    (ir:is-instance source s)
    then
    (ir:match-failure (format "Expected ~a to be an ~a" source s))))
+
 
 ;; TODO Think about what typechecking and compiling have in
 ;; common. One commonality: terminal patterns don't bind any

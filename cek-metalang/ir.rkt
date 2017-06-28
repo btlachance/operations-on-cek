@@ -5,16 +5,26 @@
 
 ;; a IR is one of
 ;; - (ir:if test-IR IR IR)
+;; - (ir:if-match-fails (IR IR))
 ;; - (ir:let (listof (list name simple-IR)) IR)
 ;; - (ir:send name (listof name))
 ;; - (ir:return (listof name))
 ;; - (ir:error string)
+;; - (ir:match-failure string)
+;; - (ir:unless-failure)
 (struct ir:if (test then else) #:transparent)
+(struct ir:if-match-fails (cmd then) #:transparent)
 (struct ir:let (bindings rest) #:transparent)
 (struct ir:send (receiver args) #:transparent)
 (struct ir:return (results)  #:transparent)
 (struct ir:error (message) #:transparent)
 (struct ir:match-failure (message) #:transparent)
+(struct ir:unless-failure () #:transparent)
+
+;; TODO Figure out if there's a better way to compile #:unless.
+;; Currently the IR for if-match-fails and unless-failure are meant to
+;; be used in pairs (see how if-match-fails is compiled in ir->py),
+;; and that pairing feels really odd.
 
 ;; a test-IR is one of
 ;; - (ir:is-instance name name)
@@ -53,3 +63,10 @@
 ;; - (ir:unimplemented-method string)
 (struct ir:method-def (args cases) #:transparent)
 (struct ir:unimplemented-method (msg) #:transparent)
+
+;; TODO There is a invariant lurking somehwere in the IR datatype that
+;; all IR will (when compiled to Python) cause either an exception to
+;; be raised or a value to be returned---i.e. there isn't a "default"
+;; return. Is there a name for this sort of guarantee? (It's odd to
+;; phrase it in terms of the resulting Python, but I don't know how to
+;; phrase it in terms of the IR.)

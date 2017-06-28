@@ -16,9 +16,13 @@
 (struct compound (asts sort) #:transparent)
 
 ;; an ast* is one of
-;; - (pattern ast type)
-;; - (where ast ast)
-;; - (template ast type)
+;; - (pat* ast type)
+;; - clause
+;; - (temp* ast type)
+;; where a clause is one of
+;; - (unless* ast ast)
+;; - (where* ast ast)
 (struct pat* (ast expected-ty) #:transparent)
+(struct unless* (temp-ast pat-ast) #:transparent)
 (struct where* (temp-ast pat-ast) #:transparent)
 (struct temp* (ast expected-ty) #:transparent)
