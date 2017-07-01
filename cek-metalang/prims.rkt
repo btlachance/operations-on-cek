@@ -1,6 +1,6 @@
 #lang racket
 (require "rep.rkt")
-(provide variable)
+(provide variable integer)
 
 (module variable-prim racket
   (require "ir.rkt" "compile.rkt" racket/syntax)
@@ -36,3 +36,34 @@
    variable-compile-pat
    variable-ty
    variable-ty))
+
+(module integer-prim racket
+  (require "ir.rkt" "compile.rkt" racket/syntax)
+  (provide (prefix-out integer- (all-defined-out)))
+  (define ty 'integer)
+  (define ((mk/tc-fun result-fun) var-name)
+    (result-fun ty))
+  (define (compile-pat int source rest [... #f])
+    (define tmp (format-symbol "~a_cmp" source))
+    (define failure-msg (format "Expected ~a to equal ~a but it wasn't" source int))
+    ;; There is an isinstance check in the equality test for integer
+    ;; prims; for consistency's sake we'll also check its type via IR.
+    (check-instance
+     source ty
+     (ir:let
+      (list (list tmp (ir:call-builtin 'mkint (list int))))
+      (ir:if (ir:is-equal source tmp)
+             rest
+             (ir:match-failure failure-msg)))))
+  (define (compile-temp int dest rest)
+    (ir:let (list (list dest (ir:call-builtin 'mkint (list int))))
+            rest)))
+(require 'integer-prim)
+(define integer
+  (prim-data
+   (integer-mk/tc-fun tc-template-result)
+   (integer-mk/tc-fun (lambda (ty) (tc-pattern-result ty '())))
+   integer-compile-temp
+   integer-compile-pat
+   integer-ty
+   integer-ty))

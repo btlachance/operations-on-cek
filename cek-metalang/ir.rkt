@@ -28,13 +28,15 @@
 
 ;; a test-IR is one of
 ;; - (ir:is-instance name name)
+;; - (ir:is-equal name name)
 (struct ir:is-instance (arg class-name) #:transparent)
+(struct ir:is-equal (arg1 arg2) #:transparent)
 
 ;; a simple-IR is one of
 ;; - name
 ;; - (ir:make name (U #f (listof name)))
 ;; - (ir:project name name name)
-;; - (ir:call-builtin name (listof (U name string)))
+;; - (ir:call-builtin name (listof (U name string exact-integer)))
 (struct ir:make (class-name args) #:transparent)
 (struct ir:project (class-name field-name arg) #:transparent)
 (struct ir:call-builtin (name args) #:transparent)

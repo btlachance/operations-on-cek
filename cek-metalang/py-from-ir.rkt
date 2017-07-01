@@ -339,11 +339,15 @@
 (define (test-ir->py test-ir)
   (match test-ir
     [(ir:is-instance arg class-name)
-     (format "isinstance(~a, ~a)" arg (class-name->py class-name))]))
+     (format "isinstance(~a, ~a)" arg (class-name->py class-name))]
+    [(ir:is-equal arg1 arg2)
+     (format "~a == ~a" arg1 arg2)]))
 
 (module+ test
   (check-equal? (test-ir->py (ir:is-instance 'person 'swimmer))
-                "isinstance(person, cl_swimmer)"))
+                "isinstance(person, cl_swimmer)")
+  (check-equal? (test-ir->py (ir:is-equal 'int1 'int2))
+                "int1 == int2"))
 
 ;; simple-ir->py : simple-ir -> string
 (define (simple-ir->py simple-ir)

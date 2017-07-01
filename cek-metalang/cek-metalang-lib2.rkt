@@ -11,7 +11,7 @@
  "compile.rkt"
  "ir.rkt"
  "py-from-ir.rkt"
- "prims.rkt"
+ (prefix-in prim: "prims.rkt")
  (for-template racket/base))
 (provide -production -step -final compile-cek)
 
@@ -81,13 +81,13 @@
   ;; Looking up the prims in this function was tricky for me: because
   ;; it's required for-syntax by cek-metalang, we have to make sure
   ;; that the prims have for-template bindings.
-  (define variable-prim variable)
   (define nonterminals
     ;; HACK Need to detect whether the grammar actually uses the
     ;; variable and actually insert the nonterminal into this list
     ;; like we do for other nonterminals
     (append (map (compose nt production-name) productions)
-            (list (nt (prim-data-name variable-prim)))))
+            (list (nt (prim-data-name prim:variable))
+                  (nt (prim-data-name prim:integer)))))
   (define nonterminal-form? (form-in-nonterminals? nonterminals))
 
   (define-values (sort->name sort->field-names sort->type)
@@ -136,19 +136,29 @@
   (define variable-parse-fun
     (syntax-parser
       [:id
-       (prim (syntax-e this-syntax) variable-prim)]
+       (prim (syntax-e this-syntax) prim:variable)]
+      [_ #f]))
+  (define integer-parse-fun
+    (syntax-parser
+      [:exact-integer
+       (prim (syntax-e this-syntax) prim:integer)]
       [_ #f]))
   (lang-info nonterminals
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
                    (list 'extend (nt 'env) (nt 'var) (nt 'w))
-                   (list 'pprint (nt 'v)))
+                   (list 'pprint (nt 'v))
+                   (list 'succimpl (nt 'int))
+                   (list 'predimpl (nt 'int)))
              ;; TODO hard-code the environment prim
-             (list (parser variable-parse-fun variable-parse-fun))
+             (list (parser variable-parse-fun variable-parse-fun)
+                   (parser integer-parse-fun integer-parse-fun))
              sort->name sort->field-names sort->type
              (hash 'lookup 'w
                    'extend 'env
-                   'pprint 'v)
+                   'pprint 'v
+                   'succimpl 'integer
+                   'predimpl 'integer)
              (mk/parent-of nonterminals productions)))
 
 ;; mk/parent-of : (setof nonterminal) (listof production) -> (hash type (U type 'top))

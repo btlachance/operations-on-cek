@@ -20,6 +20,20 @@ class PrimVariable(cl_variable):
   def pprint(self, indent):
     return self.literal
 
+def mkint(n):
+  return Integer(n)
+class Integer(cl_integer):
+  def __init__(self, n):
+    self.value = n
+  def __eq__(self, other):
+    return isinstance(other, Integer) and self.value == other.value
+  def __ne__(self, other):
+    return not self == other
+def succimpl(n):
+  return Integer(n.value + 1)
+def predimpl(n):
+  return Integer(n.value - 1)
+
 class Env(cl_env):
   def __init__(self):
     pass

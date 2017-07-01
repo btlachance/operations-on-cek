@@ -1,13 +1,8 @@
-;; #lang racket
-;; (struct succ (n))
-;; (struct -z ())
-;; (define z (-z))
-;; (define pred succ-n)
-;; (define iszero -z?)
-;; (define (->num n)
-;;   (match n
-;;     [(-z) 0]
-;;     [(succ n) (add1 (->num n))]))
+;; #lang racket/base
+;; (define pred sub1)
+;; (define succ add1)
+;; (define iszero zero?)
+;; (define (->num n) n)
 
 (let* ([Z (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
                        (lambda (x) (f (lambda (v) ((x x) v))))))]
@@ -15,14 +10,14 @@
                                                           n
                                                           ((add0 (pred m)) (succ n)))))))]
        [mult (Z (lambda (mult0) (lambda (m) (lambda (n) (if (iszero m)
-                                                            z
+                                                            0
                                                             (if (iszero (pred m))
                                                                 n
                                                                 ((add n) ((mult0 (pred m)) n))))))))]
        [sub (Z (lambda (sub0) (lambda (m) (lambda (n) (if (iszero n)
                                                           m
                                                           ((sub0 (pred m)) (pred n)))))))]
-       [one (succ z)]
+       [one (succ 0)]
        [two ((add one) one)]
        [four ((add two) two)]
        [five ((add four) one)]

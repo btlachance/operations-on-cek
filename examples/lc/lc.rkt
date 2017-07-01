@@ -4,9 +4,9 @@
   #:grammar
   (e ::= var v (e e) (if e e e) (iszero e) (succ e) (pred e))
   (var ::= variable)
-  (v ::= (lam var e) bool nat)
+  (v ::= (lam var e) bool int)
   (bool ::= true false)
-  (nat ::= z (s nat))
+  (int ::= integer)
   (w ::= (clo v env))
   (env ::= dummy)
   (k ::= mt (arg e env k) (fn v env k) (sel e e env k) (zerop env k)
@@ -30,11 +30,16 @@
   [(false env_0 (sel e_then e_else env k)) --> (e_else env k)]
   [(v env_0 (sel e_then e_else env k)) --> (e_then env k)
    #:unless false v]
-  [(nat env_0 (zerop env k)) --> (false env k)
-   #:unless z nat]
-  [(z env_0 (zerop env k)) --> (true env k)]
-  [(nat env_0 (add1 env k)) --> ((s nat) env k)]
-  [((s nat) env_0 (sub1 env k)) --> (nat env k)])
+  [(int env_0 (zerop env k)) --> (false env k)
+   #:unless 0 int]
+  [(int env_0 (zerop env k)) --> (true env k)
+   ;; TODO if we match on 0, then I don't think our current strategy
+   ;; of adding a method to 0's class (which comes from a prim) will
+   ;; work---how could the code we generate modify a class it doesn't
+   ;; generate?
+   #:where 0 int]
+  [(int env_0 (add1 env k)) --> ((succimpl int) env k)]
+  [(int env_0 (sub1 env k)) --> ((predimpl int) env k)])
 
 (module+ main
   (require syntax/parse)
