@@ -25,10 +25,10 @@ def mkint(n):
 class Integer(cl_integer):
   def __init__(self, n):
     self.value = n
-  def __eq__(self, other):
+  def eq(self, other):
     return isinstance(other, Integer) and self.value == other.value
-  def __ne__(self, other):
-    return not self == other
+  def ne(self, other):
+    return not self.eq(other)
 def succimpl(n):
   return Integer(n.value + 1)
 def predimpl(n):
