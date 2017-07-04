@@ -17,17 +17,9 @@
        [sub (Z (lambda (sub0) (lambda (m) (lambda (n) (if (iszero n)
                                                           m
                                                           ((sub0 (pred m)) (pred n)))))))]
-       [one (succ 0)]
-       [two ((add one) one)]
-       [four ((add two) two)]
-       [five ((add four) one)]
-       [ten ((mult five) two)]
-       [hundred ((mult ten) ten)]
-       [thousand ((mult hundred) ten)]
        [fact (Z (lambda (fact0) (lambda (n) (if (iszero n)
-                                                one
+                                                1
                                                 ((mult n) (fact0 (pred n)))))))])
-  (if (iszero ((sub (fact ((add five) two)))
-               ((add ((mult thousand) five)) ((mult four) ten))))
+  (if (iszero ((sub (fact 7)) 5040))
       (lambda (success) success)
       (lambda (failure) failure)))
