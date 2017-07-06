@@ -19,6 +19,7 @@
        #:control-string c-nonterminal:id
        #:environment e-nonterminal:id
        #:continuation k-nonterminal:id
+       #:initial i:-initial
        #:final f:-final
        #:step
        s:-step ...)
@@ -26,6 +27,7 @@
                    [print-interp (format-id #'name "print-~a-interp" #'name)]
                    [(productions ...) (attribute grammar.data)]
                    [(steps ...) (attribute s.data)]
+                   [initial (attribute i.data)]
                    [final (attribute f.data)])
        #`(define-values (print-interp term->py)
            (compile-cek
@@ -35,4 +37,5 @@
             #'e-nonterminal
             #'k-nonterminal
             (list steps ...)
+            initial
             final)))]))

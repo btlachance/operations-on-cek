@@ -13,7 +13,7 @@
  "py-from-ir.rkt"
  (prefix-in prim: "prims.rkt")
  (for-template racket/base))
-(provide -production -step -final compile-cek)
+(provide -production -step -final -initial compile-cek)
 
 (struct production (name forms) #:prefab)
 (define-syntax-class -production
@@ -56,6 +56,12 @@
   #:datum-literals (-->)
   (pattern [(~and state (e env k)) --> result]
            #:attr data (final #'state #'result)))
+
+(struct initial (program state) #:prefab)
+(define-syntax-class -initial
+  #:datum-literals (-->)
+  (pattern [program --> (~and state (e env k))]
+           #:attr data (initial #'program #'state)))
 
 (define ((form-in-nonterminals? nonterminals) f)
   (memf (lambda (nt) (equal? (nt-symbol nt) f)) nonterminals))
@@ -148,8 +154,10 @@
              (list (list 'lookup (nt 'env) (nt 'var))
                    (list 'extend (nt 'env) (nt 'var) (nt 'w))
                    (list 'pprint (nt 'v))
-                   (list 'succimpl (nt 'int))
-                   (list 'predimpl (nt 'int)))
+                   (list 'zeropimpl (nt 'e))
+                   (list 'succimpl (nt 'e))
+                   (list 'predimpl (nt 'e))
+                   (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
                    (parser integer-parse-fun integer-parse-fun))
@@ -157,8 +165,10 @@
              (hash 'lookup 'w
                    'extend 'env
                    'pprint 'v
-                   'succimpl 'integer
-                   'predimpl 'integer)
+                   'zeropimpl 'e
+                   'succimpl 'e
+                   'predimpl 'e
+                   'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 
 ;; mk/parent-of : (setof nonterminal) (listof production) -> (hash type (U type 'top))
@@ -203,9 +213,9 @@
   (check-true (subtype?-t1 'z 'v))
   (check-true (subtype?-t1 'z 'e)))
 
-;; compile-cek : id (listof production) id id id (listof step) final
+;; compile-cek : id (listof production) id id id (listof step) initial final
 ;;                 -> (values (-> (void)) (stx -> string))
-(define (compile-cek lang-id productions c-id e-id k-id steps final)
+(define (compile-cek lang-id productions c-id e-id k-id steps initial final)
   (match-define (lang-info nonterminals metafunctions prim-parsers
                            sort->name sort->field-names sort->type
                            metafunction->type parent-of)
@@ -339,6 +349,26 @@
            (list k0-ast c0-ast e0-ast)
            (list 'self 'c_arg 'e_arg))))))
 
+  (define (initial->method-def i)
+    (define c0-ast (parse-pat (initial-program i)))
+    (match-define (list c*-ast e*-ast k*-ast)
+      (stx-map parse-temp (initial-state i)))
+    (define cek/tys (map syntax-e (list c-id e-id k-id)))
+    (tc-ast*s
+     (cons (pat* c0-ast (syntax-e c-id))
+           (map temp* (list c*-ast e*-ast k*-ast) cek/tys)))
+    (ir:method-def
+     (list 'p)
+     (list
+      (compile-pat
+       c0-ast
+       'p
+       (foldr
+        compile-temp
+        (ir:return (list 'c_init 'e_init 'k_init))
+        (list c*-ast e*-ast k*-ast)
+        (list 'c_init 'e_init 'k_init))))))
+
   (define method-by-class-name
     (for/fold ([method-map (hash)])
               ([m (in-sequences
@@ -403,7 +433,15 @@
            (check-for-super-method class-name parent-class-name)])))))
   (define (print-interpreter)
     (for ([def (in-sequences nt-class-defs other-class-defs)])
-      (pretty-display (class-def->py def))))
+      (pretty-display (class-def->py def)))
+    (pretty-display
+     (match (initial->method-def initial)
+       [(ir:method-def (list p) (list body))
+        (string-join
+         (list
+          (format "def init(~a):" p)
+          (ir->py body #:indent "  "))
+         "\n")])))
 
   (match-define (parser simple-parse-template _)
     (lang-parser terminals '() compounds '() prim-parsers))

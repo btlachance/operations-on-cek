@@ -29,10 +29,34 @@ class Integer(cl_integer):
     return isinstance(other, Integer) and self.value == other.value
   def ne(self, other):
     return not self.eq(other)
+  def pprint(self, indent):
+    return ' ' * indent + '%s' % self.value
+
+class UnaryPrimK(cl_k):
+  def __init__(self, opname, op, ret):
+    self.opname = opname
+    self.op = op
+    self.ret = ret
+  def interpret(self, v, env):
+    return self.op(v), env, self.ret
+  def pprint(self, indent):
+    return ' ' * indent + '(%s %s)' % (self.opname, self.ret.pprint(0))
+class UnaryPrim(cl_e):
+  def __init__(self, arg, opname, op):
+    self.arg = arg
+    self.opname = opname
+    self.op = op
+  def interpret(self, env, k):
+    return self.arg, env, UnaryPrimK(self.opname, self.op, k)
+  def pprint(self, indent):
+    return ' ' * indent + '(%s %s)' % (self.opname, self.arg.pprint(0))
+
+def zeropimpl(n):
+  return UnaryPrim(n, 'zerop', lambda n: cl_true() if n.value == 0 else cl_false())
 def succimpl(n):
-  return Integer(n.value + 1)
+  return UnaryPrim(n, 'succ', lambda n: Integer(n.value + 1))
 def predimpl(n):
-  return Integer(n.value - 1)
+  return UnaryPrim(n, 'pred', lambda n: Integer(n.value - 1))
 
 class Env(cl_env):
   def __init__(self):
@@ -70,8 +94,9 @@ def ret(v):
   raise CEKDone(v)
 
 def run(p):
-  c, e, k = p, emptyenv(), cl_mt()
+  c, e, k = init(p)
   while True:
+    # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
     try:
       c, e, k = c.interpret(e, k)
     except CEKDone as d:
