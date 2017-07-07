@@ -34,10 +34,10 @@ build/lc-fib-linked.py: build/lc-interp.py examples/lc/lc-fib.txt
 	  echo 'if __name__ == "__main__":';\
 	  echo '  main()'; } > $@
 
-build/targetlc-c: examples/lc/targetlc.py build/lc-fact7-linked.py
-	cp examples/lc/targetlc.py build/targetlc.py
+build/fact-c: examples/lc/targetlc.py build/lc-fact7-linked.py
+	cp examples/lc/targetlc.py build/fact.py
 	mv build/lc-fact7-linked.py build/lc.py
-	(cd build/; $(RPYTHON) targetlc.py)
+	(cd build/; $(RPYTHON) fact.py)
 build/fib-c: examples/lc/targetlc.py build/lc-fib-linked.py
 	cp examples/lc/targetlc.py build/fib.py
 	mv build/lc-fib-linked.py build/lc.py

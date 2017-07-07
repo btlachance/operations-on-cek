@@ -1,25 +1,21 @@
 ;; #lang racket/base
+;; (require
+;;  (rename-in racket/base
+;;             [- r:-]
+;;             [* r:*]))
 ;; (define pred sub1)
-;; (define succ add1)
 ;; (define iszero zero?)
 ;; (define (->num n) n)
+;; (define ((- m) n) (r:- m n))
+;; (define ((* m) n) (r:* m n))
 
 (let* ([Z (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
                        (lambda (x) (f (lambda (v) ((x x) v))))))]
-       [add (Z (lambda (add0) (lambda (m) (lambda (n) (if (iszero m)
-                                                          n
-                                                          ((add0 (pred m)) (succ n)))))))]
-       [mult (Z (lambda (mult0) (lambda (m) (lambda (n) (if (iszero m)
-                                                            0
-                                                            (if (iszero (pred m))
-                                                                n
-                                                                ((add n) ((mult0 (pred m)) n))))))))]
-       [sub (Z (lambda (sub0) (lambda (m) (lambda (n) (if (iszero n)
-                                                          m
-                                                          ((sub0 (pred m)) (pred n)))))))]
        [fact (Z (lambda (fact0) (lambda (n) (if (iszero n)
                                                 1
-                                                ((mult n) (fact0 (pred n)))))))])
-  (if (iszero ((sub (fact 7)) 5040))
+                                                ((* n) (fact0 (pred n)))))))])
+  (if (iszero ((- (fact 7)) 5040))
+      #;(iszero ((- (fact 20)) 2432902008176640000))
+      #;(iszero ((- (fact 50)) 30414093201713378043612608166064768844377641568960512000000000000))
       (lambda (success) success)
       (lambda (failure) failure)))
