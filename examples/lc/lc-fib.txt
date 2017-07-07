@@ -1,0 +1,22 @@
+;; #lang racket/base
+;; (require
+;;  (rename-in racket/base
+;;             [+ r:+]
+;;             [- r:-]
+;;             [* r:*]))
+;; (define iszero zero?)
+;; (define (->num n) n)
+;; (define ((+ m) n) (r:+ m n))
+;; (define ((- m) n) (r:- m n))
+;; (define ((* m) n) (r:* m n))
+
+(let* ([Z (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
+                       (lambda (x) (f (lambda (v) ((x x) v))))))]
+       [fib (Z (lambda (fib0) (lambda (n) (if (iszero n)
+                                              0
+                                              (if (iszero ((- n) 1))
+                                                  1
+                                                  ((+ (fib0 ((- n) 1))) (fib0 ((- n) 2))))))))])
+  (if (iszero ((- (fib 30)) 832040))
+      (lambda (success) success)
+      (lambda (failure) failure)))

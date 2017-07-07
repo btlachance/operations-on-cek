@@ -157,6 +157,9 @@
                    (list 'zeropimpl (nt 'e))
                    (list 'succimpl (nt 'e))
                    (list 'predimpl (nt 'e))
+                   (list 'addimpl (nt 'e) (nt 'e))
+                   (list 'subimpl (nt 'e) (nt 'e))
+                   (list 'multimpl (nt 'e) (nt 'e))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -168,6 +171,9 @@
                    'zeropimpl 'e
                    'succimpl 'e
                    'predimpl 'e
+                   'addimpl 'e
+                   'subimpl 'e
+                   'multimpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

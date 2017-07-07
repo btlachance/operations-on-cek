@@ -13,10 +13,13 @@
   #:control-string e
   #:environment env
   #:continuation k
-  #:initial [e --> ((app (app (app (lam iszero (lam succ (lam pred e)))
-                                   (lam n (zeropimpl n)))
-                              (lam n (succimpl n)))
-                         (lam n (predimpl n)))
+  #:initial [e --> ((app (app (app (app (app (app (lam iszero (lam succ (lam pred (lam + (lam - (lam * e))))))
+                                                  (lam n (zeropimpl n)))
+                                             (lam n (succimpl n)))
+                                        (lam n (predimpl n)))
+                                   (lam m (lam n (addimpl m n))))
+                              (lam m (lam n (subimpl m n))))
+                         (lam m (lam n (multimpl m n))))
                     (emptyenv)
                     mt)]
   #:final [(v env_0 mt) --> (pprint v)]

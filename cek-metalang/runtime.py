@@ -58,6 +58,43 @@ def succimpl(n):
 def predimpl(n):
   return UnaryPrim(n, 'pred', lambda n: Integer(n.value - 1))
 
+class BinaryPrimK1(cl_k):
+  def __init__(self, arg2, env, k, opname, op):
+    self.arg2 = arg2
+    self.env = env
+    self.k = k
+    self.opname = opname
+    self.op = op
+  def interpret(self, v1, env):
+    return self.arg2, self.env, BinaryPrimK2(v1, env, self.k, self.opname, self.op)
+  def pprint(self, indent):
+    return ' ' * indent + '(%s1 %s %s %s)' % (self.opname, self.arg2.pprint(0), self.env.pprint(0), self.k.pprint(0))
+class BinaryPrimK2(cl_k):
+  def __init__(self, v1, env, k, opname, op):
+    self.v1 = v1
+    self.env = env
+    self.k = k
+    self.opname = opname
+    self.op = op
+  def interpret(self, v2, env):
+    return self.op(self.v1, v2), env, self.k
+  def pprint(self, indent):
+    return ' ' * indent + '(%s2 %s %s %s)' % (self.opname, self.v1.pprint(0), self.env.pprint(0), self.k.pprint(0))
+class BinaryPrim(cl_e):
+  def __init__(self, arg1, arg2, opname, op):
+    self.arg1 = arg1
+    self.arg2 = arg2
+    self.opname = opname
+    self.op = op
+  def interpret(self, env, k):
+    return self.arg1, env, BinaryPrimK1(self.arg2, env, k, self.opname, self.op)
+def addimpl(n1, n2):
+  return BinaryPrim(n1, n2, '+', lambda n1, n2: Integer(n1.value + n2.value))
+def subimpl(n1, n2):
+  return BinaryPrim(n1, n2, '-', lambda n1, n2: Integer(n1.value - n2.value))
+def multimpl(n1, n2):
+  return BinaryPrim(n1, n2, '*', lambda n1, n2: Integer(n1.value * n2.value))
+
 class Env(cl_env):
   def __init__(self):
     pass
