@@ -75,7 +75,7 @@
           temp-ast tmp
           (compile-pat
            pat-ast tmp
-           rest))]
+           r))]
         [(unless* temp-ast pat-ast)
          (compile-temp
           temp-ast tmp
@@ -83,7 +83,7 @@
            (compile-pat
             pat-ast tmp
             (ir:unless-failure))
-           rest))]))
+           r))]))
     (foldr
      compile-clause
      rest
