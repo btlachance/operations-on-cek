@@ -1,14 +1,45 @@
 ;; #lang racket/base
-;; (require
-;;  (rename-in racket/base
-;;             [+ r:+]
-;;             [- r:-]
-;;             [* r:*]))
-;; (define iszero zero?)
-;; (define (->num n) n)
-;; (define ((+ m) n) (r:+ m n))
-;; (define ((- m) n) (r:- m n))
-;; (define ((* m) n) (r:* m n))
+;; (module boxed-repr racket/base
+;;   (require
+;;    racket/match racket/list
+;;    (rename-in (only-in racket/base + - * #%datum)
+;;               [+ r:+]
+;;               [- r:-]
+;;               [* r:*]
+;;               [#%datum r:#%datum])
+;;    (for-syntax racket/base racket/match syntax/parse))
+;;   (provide (all-defined-out))
+;;   (define integer list)
+;;   (define-match-expander integer:
+;;     (lambda (stx)
+;;       (syntax-case stx ()
+;;         [(_ n) #'(list n)])))
+;;   (define (integer-n n) (match n [(integer: n*) n*]))
+;;   (define (iszero n) (match n [(integer: n*) (zero? n*)]))
+;;   (define (((binop op) m) n)
+;;     (match* (m n)
+;;       [((integer: m*) (integer: n*))
+;;        (integer (op m* n*))]))
+;;   (define-values (+ - *) (values (binop r:+) (binop r:-) (binop r:*)))
+;;   (define-syntax (#%datum stx)
+;;     (syntax-parse stx
+;;       #:literals (#%datum r:#%datum)
+;;       [(#%datum . n:integer)
+;;        #'(integer (r:#%datum . n))]
+;;       [(#%datum . else)
+;;        #'(r:#%datum . else)])))
+;; (module unboxed-repr racket/base
+;;   (require
+;;    (rename-in (only-in racket/base + - * #%datum)
+;;               [+ r:+]
+;;               [- r:-]
+;;               [* r:*]))
+;;   (provide (all-defined-out))
+;;   (define iszero zero?)
+;;   (define ((+ m) n) (r:+ m n))
+;;   (define ((- m) n) (r:- m n))
+;;   (define ((* m) n) (r:* m n)))
+;; (require 'boxed-repr)
 
 (let* ([Z (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
                        (lambda (x) (f (lambda (v) ((x x) v))))))]
