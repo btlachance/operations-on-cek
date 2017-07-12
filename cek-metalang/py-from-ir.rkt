@@ -347,7 +347,7 @@
   (check-equal? (test-ir->py (ir:is-instance 'person 'swimmer))
                 "isinstance(person, cl_swimmer)")
   (check-equal? (test-ir->py (ir:is-equal 'int1 'int2))
-                "int1 == int2"))
+                "int1.eq(int2)"))
 
 ;; simple-ir->py : simple-ir -> string
 (define (simple-ir->py simple-ir)

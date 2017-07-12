@@ -291,8 +291,6 @@
           (foldr
            compile-pat
            (ir:send 'k (list 'self 'e))
-           ;; We can insert the metavar k here because we know
-           ;; it's the name of one of the arguments.
            (list c0-ast e0-ast (metavar 'k #f))
            (list 'self 'e 'k)))
          (method
@@ -339,7 +337,7 @@
           (list 'self 'e 'k)
           (foldr
            compile-pat
-           (ir:send 'k (map metavar->symbol (list c0-ast e0-ast)))
+           (ir:send 'k (list 'self 'e))
            (list c0-ast e0-ast (metavar 'k #f))
            (list 'self 'e 'k)))
          (method

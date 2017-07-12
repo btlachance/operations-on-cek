@@ -23,7 +23,7 @@ def test1():
   idz = cl_lam(cl_z(), cl_z())
   idx = cl_lam(cl_x(), cl_x())
   # k idz idx
-  p = cl_e_comb2(cl_e_comb2(k, idz), idx)
+  p = cl_app(cl_app(k, idz), idx)
   result = run(p)
 
   if not isinstance(result, cl_lam):
@@ -34,11 +34,11 @@ def test1():
 
 def test2():
   # lam x. lam y. y x
-  revapp = cl_lam(cl_x(), cl_lam(cl_y(), cl_e_comb2(cl_y(), cl_x())))
+  revapp = cl_lam(cl_x(), cl_lam(cl_y(), cl_app(cl_y(), cl_x())))
   idx = cl_lam(cl_x(), cl_x())
   idz = cl_lam(cl_z(), cl_z())
   # revapp idx idz
-  p = cl_e_comb2(cl_e_comb2(revapp, idx), idz)
+  p = cl_app(cl_app(revapp, idx), idz)
   result = run(p)
 
   if not isinstance(result, cl_lam):
@@ -58,12 +58,12 @@ def test3():
   # lam x. lam z. x
   k = cl_lam(cl_x(), cl_lam(cl_z(), cl_x()))
   # lam y. lam x. y x
-  app = cl_lam(cl_y(), cl_lam(cl_x(), cl_e_comb2(cl_y(), cl_x())))
+  app = cl_lam(cl_y(), cl_lam(cl_x(), cl_app(cl_y(), cl_x())))
   idy = cl_lam(cl_y(), cl_y())
   idz = cl_lam(cl_z(), cl_z())
 
   # app (k idy) idz
-  p = cl_e_comb2(cl_e_comb2(app, cl_e_comb2(k, idy)), idz)
+  p = cl_app(cl_app(app, cl_app(k, idy)), idz)
   result = run(p)
 
   if not isinstance(result, cl_lam):
