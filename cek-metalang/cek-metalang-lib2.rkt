@@ -160,6 +160,9 @@
                    (list 'addimpl (nt 'var) (nt 'var))
                    (list 'subimpl (nt 'var) (nt 'var))
                    (list 'multimpl (nt 'var) (nt 'var))
+                   (list 'boximpl (nt 'var))
+                   (list 'unboximpl (nt 'var))
+                   (list 'setboximpl (nt 'var) (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -174,6 +177,9 @@
                    'addimpl 'e
                    'subimpl 'e
                    'multimpl 'e
+                   'boximpl 'e
+                   'unboximpl 'e
+                   'setboximpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 
