@@ -2,14 +2,13 @@
 (require "../../cek-metalang/cek-metalang.rkt")
 (define-cek lc
   #:grammar
-  (e ::= var v (app e e) (if e e e))
+  (e ::= var l (app e e) (quot b) (if e e e) ignore)
   (var ::= variable)
-  (v ::= (lam var e) bool int)
-  (bool ::= true false)
-  (int ::= integer)
-  (w ::= (clo v env))
+  (l ::= (lam var e))
+  (v ::= (clo l env) b)
+  (b ::= true false integer)
   (env ::= dummy)
-  (k ::= mt (arg e env k) (fn v env k) (sel e e env k))
+  (k ::= mt (arg e env k) (fn v k) (sel e e env k) (ret v k))
   #:control-string e
   #:environment env
   #:continuation k
@@ -22,24 +21,26 @@
                          (lam m (lam n (multimpl m n))))
                     (emptyenv)
                     mt)]
-  #:final [(v env_0 mt) --> (pprint v)]
+  #:final [(ignore env_0 (ret v mt)) --> (pprint v)]
   #:step
-  [(var env_0 k) --> (v env k)
-   #:where (clo v env) (lookup env_0 var)]
+  [(var env_0 k) --> (ignore env_0 (ret (lookup env_0 var) k))]
+  [((lam var e_0) env_0 k) --> (ignore env_0 (ret (clo (lam var e_0) env_0) k))]
+  [((quot b) env_0 k) --> (ignore env_0 (ret b k))]
   [((app e_1 e_2) env k) --> (e_1 env (arg e_2 env k))]
   [((if e_test e_then e_else) env k) --> (e_test env (sel e_then e_else env k))]
 
-  [(v env_0 (arg e env k)) --> (e env (fn v env_0 k))]
-  [(v env_0 (fn (lam var e) env k)) --> (e (extend env var (clo v env_0)) k)]
-  [(false env_0 (sel e_then e_else env k)) --> (e_else env k)]
-  [(v env_0 (sel e_then e_else env k)) --> (e_then env k)
+  [(ignore env_0 (ret v (arg e env k))) --> (e env (fn v k))]
+  [(ignore env_0 (ret v (fn (clo (lam var e) env) k))) --> (e (extend env var v) k)]
+  [(ignore env_0 (ret false (sel e_then e_else env k))) --> (e_else env k)]
+  [(ignore env_0 (ret v (sel e_then e_else env k))) --> (e_then env k)
    #:unless false v])
 
 (module+ main
   (require syntax/parse)
   (define (desugar stx)
     (syntax-parse stx
-      #:datum-literals (let* let lambda if app)
+      #:datum-literals (let* let lambda if app quot)
+      [:exact-integer #`(quot #,this-syntax)]
       [(app e1 e2)
        #`(app #,(desugar #'e1) #,(desugar #'e2))]
       [(lambda (x) e)
@@ -63,7 +64,9 @@
              #,(desugar #'e3))]
       [_ this-syntax]))
 
-  (define desugar/lc-term->py (compose lc-term->py desugar))
+  (define (desugar/lc-term->py stx)
+    #;(pretty-print (syntax->datum stx) (current-error-port))
+    (lc-term->py (desugar stx)))
   (command-line
    #:program "lc"
    #:once-any

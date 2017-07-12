@@ -32,25 +32,16 @@ class Integer(cl_integer):
   def pprint(self, indent):
     return ' ' * indent + '%s' % self.value
 
-class UnaryPrimK(cl_k):
-  def __init__(self, opname, op, ret):
-    self.opname = opname
-    self.op = op
-    self.ret = ret
-  def interpret(self, v, env):
-    return self.op(v), env, self.ret
-  def pprint(self, indent):
-    return ' ' * indent + '(%s %s)' % (self.opname, self.ret.pprint(0))
 class UnaryPrim(cl_e):
   def __init__(self, arg, opname, op):
     self.arg = arg
     self.opname = opname
     self.op = op
   def interpret(self, env, k):
-    return self.arg, env, UnaryPrimK(self.opname, self.op, k)
+    v = lookup(env, self.arg)
+    return _ignore_sing, env, cl_ret(self.op(v), k)
   def pprint(self, indent):
     return ' ' * indent + '(%s %s)' % (self.opname, self.arg.pprint(0))
-
 def zeropimpl(n):
   return UnaryPrim(n, 'zerop', lambda n: cl_true() if n.value == 0 else cl_false())
 def succimpl(n):
@@ -58,28 +49,6 @@ def succimpl(n):
 def predimpl(n):
   return UnaryPrim(n, 'pred', lambda n: Integer(n.value - 1))
 
-class BinaryPrimK1(cl_k):
-  def __init__(self, arg2, env, k, opname, op):
-    self.arg2 = arg2
-    self.env = env
-    self.k = k
-    self.opname = opname
-    self.op = op
-  def interpret(self, v1, env):
-    return self.arg2, self.env, BinaryPrimK2(v1, env, self.k, self.opname, self.op)
-  def pprint(self, indent):
-    return ' ' * indent + '(%s1 %s %s %s)' % (self.opname, self.arg2.pprint(0), self.env.pprint(0), self.k.pprint(0))
-class BinaryPrimK2(cl_k):
-  def __init__(self, v1, env, k, opname, op):
-    self.v1 = v1
-    self.env = env
-    self.k = k
-    self.opname = opname
-    self.op = op
-  def interpret(self, v2, env):
-    return self.op(self.v1, v2), env, self.k
-  def pprint(self, indent):
-    return ' ' * indent + '(%s2 %s %s %s)' % (self.opname, self.v1.pprint(0), self.env.pprint(0), self.k.pprint(0))
 class BinaryPrim(cl_e):
   def __init__(self, arg1, arg2, opname, op):
     self.arg1 = arg1
@@ -87,7 +56,11 @@ class BinaryPrim(cl_e):
     self.opname = opname
     self.op = op
   def interpret(self, env, k):
-    return self.arg1, env, BinaryPrimK1(self.arg2, env, k, self.opname, self.op)
+    v1 = lookup(env, self.arg1)
+    v2 = lookup(env, self.arg2)
+    return _ignore_sing, env, cl_ret(self.op(v1, v2), k)
+  def pprint(self, indent):
+    return ' '* indent + '(%s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0))
 def addimpl(n1, n2):
   return BinaryPrim(n1, n2, '+', lambda n1, n2: Integer(n1.value + n2.value))
 def subimpl(n1, n2):

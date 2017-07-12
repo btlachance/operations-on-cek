@@ -28,6 +28,11 @@
         subtemp-dests)]
       [(prim p data)
        ((prim-data-compile-temp data) p dest rest)]
+      [(compound asts (? symbol? s))
+       ;; XXX The ignore terminal means terminals can be control
+       ;; strings, and so they need to be singletons
+       (ir:let (list (list dest (format-symbol "__~a_sing" s)))
+               rest)]
       [(compound asts sort)
        (define subtemp-dests
          (for/list ([name (hash-ref sort->field-names sort)])

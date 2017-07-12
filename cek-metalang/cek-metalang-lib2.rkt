@@ -152,22 +152,22 @@
   (lang-info nonterminals
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
-                   (list 'extend (nt 'env) (nt 'var) (nt 'w))
+                   (list 'extend (nt 'env) (nt 'var) (nt 'v))
                    (list 'pprint (nt 'v))
-                   (list 'zeropimpl (nt 'e))
-                   (list 'succimpl (nt 'e))
-                   (list 'predimpl (nt 'e))
-                   (list 'addimpl (nt 'e) (nt 'e))
-                   (list 'subimpl (nt 'e) (nt 'e))
-                   (list 'multimpl (nt 'e) (nt 'e))
+                   (list 'zeropimpl (nt 'var))
+                   (list 'succimpl (nt 'var))
+                   (list 'predimpl (nt 'var))
+                   (list 'addimpl (nt 'var) (nt 'var))
+                   (list 'subimpl (nt 'var) (nt 'var))
+                   (list 'multimpl (nt 'var) (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
                    (parser integer-parse-fun integer-parse-fun))
              sort->name sort->field-names sort->type
-             (hash 'lookup 'w
+             (hash 'lookup 'v
                    'extend 'env
-                   'pprint 'v
+                   'pprint 'e
                    'zeropimpl 'e
                    'succimpl 'e
                    'predimpl 'e
