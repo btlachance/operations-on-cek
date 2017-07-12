@@ -103,15 +103,22 @@ def pprint(v):
 def ret(v):
   raise CEKDone(v)
 
+from rpython.rlib import jit
+driver = jit.JitDriver(reds = ['e', 'k'],
+                       greens = ['c'],
+                       get_printable_location=lambda c: c.pprint(0))
 def run(p):
   c, e, k = init(p)
   while True:
+    driver.jit_merge_point(c = c, e = e, k = k)
     # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
     try:
       c, e, k = c.interpret(e, k)
+      if isinstance(c, cl_app):
+        driver.can_enter_jit(c = c, e = e, k = k)
     except CEKDone as d:
       return d.result
     except CEKError as err:
       print err.__str__()
       print c.pprint(0)
-      return c
+      return None

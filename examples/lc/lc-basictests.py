@@ -16,6 +16,8 @@ def tests():
   test1()
   test2()
   test3()
+def get_closure_lambda(c):
+  return c.l0
 
 def test1():
   # lam x. lam y. x
@@ -24,7 +26,7 @@ def test1():
   idx = cl_lam(cl_x(), cl_x())
   # k idz idx
   p = cl_app(cl_app(k, idz), idx)
-  result = run(p)
+  result = get_closure_lambda(run(p))
 
   if not isinstance(result, cl_lam):
     print "error! result was not a lambda"
@@ -39,7 +41,7 @@ def test2():
   idz = cl_lam(cl_z(), cl_z())
   # revapp idx idz
   p = cl_app(cl_app(revapp, idx), idz)
-  result = run(p)
+  result = get_closure_lambda(run(p))
 
   if not isinstance(result, cl_lam):
     print "error! result was not a lambda"
@@ -64,7 +66,7 @@ def test3():
 
   # app (k idy) idz
   p = cl_app(cl_app(app, cl_app(k, idy)), idz)
-  result = run(p)
+  result = get_closure_lambda(run(p))
 
   if not isinstance(result, cl_lam):
     print "error! result was not a lambda"

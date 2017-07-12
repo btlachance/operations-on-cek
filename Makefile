@@ -1,5 +1,6 @@
 PYTHON=pypy
-RPYTHON=python ~/projects/pypy/rpython/bin/rpython
+RPYTHON=$(PYTHON) ~/projects/pypy/rpython/bin/rpython
+RPYTHONOPTS=
 _=$(shell mkdir -p build)
 METALANGDEPS=$(wildcard cek-metalang/*.rkt)
 RTDEPS=cek-metalang/runtime.py
@@ -37,11 +38,15 @@ build/lc-fib-linked.py: build/lc-interp.py examples/lc/lc-fib.txt
 build/fact-c: examples/lc/targetlc.py build/lc-fact7-linked.py
 	cp examples/lc/targetlc.py build/fact.py
 	mv build/lc-fact7-linked.py build/lc.py
-	(cd build/; $(RPYTHON) fact.py)
-build/fib-c: examples/lc/targetlc.py build/lc-fib-linked.py
-	cp examples/lc/targetlc.py build/fib.py
+	(cd build/; $(RPYTHON) $(RPYTHONOPTS) fact.py)
+build/fib-jit-c: examples/lc/targetlc.py build/lc-fib-linked.py
+	cp examples/lc/targetlc.py build/fib-jit.py
 	mv build/lc-fib-linked.py build/lc.py
-	(cd build/; $(RPYTHON) fib.py)
+	(cd build/; $(RPYTHON) -Ojit $(RPYTHONOPTS) fib-jit.py)
+build/fib-nojit-c: examples/lc/targetlc.py build/lc-fib-linked.py
+	cp examples/lc/targetlc.py build/fib-nojit.py
+	mv build/lc-fib-linked.py build/lc.py
+	(cd build/; $(RPYTHON) $(RPYTHONOPTS) fib-nojit.py)
 
 unittest:
 	raco test cek-metalang/

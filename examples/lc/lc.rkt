@@ -2,7 +2,7 @@
 (require "../../cek-metalang/cek-metalang.rkt")
 (define-cek lc
   #:grammar
-  (e ::= var l (app e e) (quot b) (if e e e) ignore)
+  (e ::= var l (app e e) (quote b) (if e e e) ignore)
   (var ::= variable)
   (l ::= (lam var e))
   (v ::= (clo l env) b)
@@ -25,7 +25,7 @@
   #:step
   [(var env_0 k) --> (ignore env_0 (ret (lookup env_0 var) k))]
   [((lam var e_0) env_0 k) --> (ignore env_0 (ret (clo (lam var e_0) env_0) k))]
-  [((quot b) env_0 k) --> (ignore env_0 (ret b k))]
+  [((quote b) env_0 k) --> (ignore env_0 (ret b k))]
   [((app e_1 e_2) env k) --> (e_1 env (arg e_2 env k))]
   [((if e_test e_then e_else) env k) --> (e_test env (sel e_then e_else env k))]
 
@@ -39,8 +39,8 @@
   (require syntax/parse)
   (define (desugar stx)
     (syntax-parse stx
-      #:datum-literals (let* let lambda if app quot)
-      [:exact-integer #`(quot #,this-syntax)]
+      #:datum-literals (let* let lambda if app quote)
+      [:exact-integer #`(quote #,this-syntax)]
       [(app e1 e2)
        #`(app #,(desugar #'e1) #,(desugar #'e2))]
       [(lambda (x) e)
