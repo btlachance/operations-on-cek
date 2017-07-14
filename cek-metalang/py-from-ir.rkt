@@ -42,14 +42,6 @@
            ""
            (make-pprint-method name fdefs)
            #:separator "\n")
-          "")
-      (if (not fdefs) ;; XXX The ignore terminal means terminals can
-                      ;; be control strings, and so they need to be
-                      ;; singletons
-          (~a
-           ""
-           (format "_~a_sing = ~a()" name (class-name->py name))
-           #:separator "\n")
           ""))]))
 
 (module+ test

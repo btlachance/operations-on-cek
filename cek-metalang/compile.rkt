@@ -10,9 +10,7 @@
   (define (compile-temp ast dest rest)
     (match ast
       [(? symbol? s)
-       ;; XXX The ignore terminal means terminals can be control
-       ;; strings, and so they need to be singletons
-       (ir:let (list (list dest (format-symbol "_~a_sing" s)))
+       (ir:let (list (list dest (ir:make s #f)))
                rest)]
       [(metavar nt suffix)
        (ir:let (list (list dest (metavar->symbol ast)))

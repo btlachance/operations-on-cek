@@ -2,13 +2,13 @@
 (require "../../cek-metalang/cek-metalang.rkt")
 (define-cek lc
   #:grammar
-  (e ::= var l (app e e) (quote b) (if e e e) ignore)
+  (e ::= var l (app e e) (quote b) (if e e e) (exp v))
   (var ::= variable)
   (l ::= (lam var e))
   (v ::= (clo l env) b)
   (b ::= true false integer)
   (env ::= dummy)
-  (k ::= mt (arg e env k) (fn v k) (sel e e env k) (ret v k))
+  (k ::= mt (arg e env k) (fn v k) (sel e e env k))
   #:control-string e
   #:environment env
   #:continuation k
@@ -21,18 +21,18 @@
                          (lam m (lam n (multimpl m n))))
                     (emptyenv)
                     mt)]
-  #:final [(ignore env_0 (ret v mt)) --> (pprint v)]
+  #:final [((exp v) env mt) --> (pprint v)]
   #:step
-  [(var env_0 k) --> (ignore env_0 (ret (lookup env_0 var) k))]
-  [((lam var e_0) env_0 k) --> (ignore env_0 (ret (clo (lam var e_0) env_0) k))]
-  [((quote b) env_0 k) --> (ignore env_0 (ret b k))]
+  [(var env_0 k) --> ((mkexp (lookup env_0 var)) env_0 k)]
+  [((lam var e_0) env k) --> ((mkexp (clo (lam var e_0) env)) env k)]
+  [((quote b) env_0 k) --> ((mkexp b) env_0 k)]
   [((app e_1 e_2) env k) --> (e_1 env (arg e_2 env k))]
   [((if e_test e_then e_else) env k) --> (e_test env (sel e_then e_else env k))]
 
-  [(ignore env_0 (ret v (arg e env k))) --> (e env (fn v k))]
-  [(ignore env_0 (ret v (fn (clo (lam var e) env) k))) --> (e (extend env var v) k)]
-  [(ignore env_0 (ret false (sel e_then e_else env k))) --> (e_else env k)]
-  [(ignore env_0 (ret v (sel e_then e_else env k))) --> (e_then env k)
+  [((exp v) env_0 (arg e env k)) --> (e env (fn v k))]
+  [((exp v) env_0 (fn (clo (lam var e) env) k)) --> (e (extend env var v) k)]
+  [((exp false) env_0 (sel e_then e_else env k)) --> (e_else env k)]
+  [((exp v) env_0 (sel e_then e_else env k)) --> (e_then env k)
    #:unless false v])
 
 (module+ main

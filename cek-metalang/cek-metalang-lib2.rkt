@@ -153,6 +153,7 @@
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
                    (list 'extend (nt 'env) (nt 'var) (nt 'v))
+                   (list 'mkexp (nt 'v))
                    (list 'pprint (nt 'v))
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
@@ -167,6 +168,7 @@
              sort->name sort->field-names sort->type
              (hash 'lookup 'v
                    'extend 'env
+                   'mkexp 'e
                    'pprint 'e
                    'zeropimpl 'e
                    'succimpl 'e

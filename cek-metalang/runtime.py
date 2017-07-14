@@ -1,3 +1,4 @@
+from rpython.rlib import jit
 class CEKError(Exception):
   def __init__(self, message):
     self.message = message
@@ -39,7 +40,7 @@ class UnaryPrim(cl_e):
     self.op = op
   def interpret(self, env, k):
     v = lookup(env, self.arg)
-    return _ignore_sing, env, cl_ret(self.op(v), k)
+    return mkexp(self.op(v)), env, k
   def pprint(self, indent):
     return ' ' * indent + '(%s %s)' % (self.opname, self.arg.pprint(0))
 def zeropimpl(n):
@@ -58,7 +59,7 @@ class BinaryPrim(cl_e):
   def interpret(self, env, k):
     v1 = lookup(env, self.arg1)
     v2 = lookup(env, self.arg2)
-    return _ignore_sing, env, cl_ret(self.op(v1, v2), k)
+    return mkexp(self.op(v1, v2)), env, k
   def pprint(self, indent):
     return ' '* indent + '(%s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0))
 def addimpl(n1, n2):
@@ -96,17 +97,26 @@ def lookup(e, x):
 def extend(e, x, v):
   return ExtendedEnv(x, v, e)
 
+# Any cl_v will do here; it's just a placeholder
+_sing_exp = cl_exp(None)
+def mkexp(v):
+  _sing_exp.v0 = v
+  return _sing_exp
+
 def pprint(v):
-  print v.pprint(0)
+  if isinstance(v, cl_clo):
+    print v.l0.pprint(0)
+  else:
+    print v.pprint(0)
   return v
 
 def ret(v):
   raise CEKDone(v)
 
-from rpython.rlib import jit
 driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c'],
                        get_printable_location=lambda c: c.pprint(0))
+
 def run(p):
   c, e, k = init(p)
   while True:
