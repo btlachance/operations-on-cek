@@ -39,8 +39,8 @@
   (require syntax/parse)
   (define (desugar stx)
     (syntax-parse stx
-      #:datum-literals (let* let lambda if app quote)
-      [:exact-integer #`(quote #,this-syntax)]
+      #:datum-literals (let* let lambda if app quote false true)
+      [(~or :exact-integer false true) #`(quote #,this-syntax)]
       [(app e1 e2)
        #`(app #,(desugar #'e1) #,(desugar #'e2))]
       [(lambda (x) e)
