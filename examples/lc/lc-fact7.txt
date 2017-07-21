@@ -1,21 +1,6 @@
-;; #lang racket/base
-;; (require
-;;  (rename-in racket/base
-;;             [- r:-]
-;;             [* r:*]))
-;; (define pred sub1)
-;; (define iszero zero?)
-;; (define (->num n) n)
-;; (define ((- m) n) (r:- m n))
-;; (define ((* m) n) (r:* m n))
-
-(let* ([Z (lambda (f) ((lambda (x) (f (lambda (v) ((x x) v))))
-                       (lambda (x) (f (lambda (v) ((x x) v))))))]
-       [fact (Z (lambda (fact0) (lambda (n) (if (iszero n)
-                                                1
-                                                ((* n) (fact0 (pred n)))))))])
-  (if (iszero ((- (fact 7)) 5040))
-      #;(iszero ((- (fact 20)) 2432902008176640000))
-      #;(iszero ((- (fact 50)) 30414093201713378043612608166064768844377641568960512000000000000))
-      (lambda (success) success)
-      (lambda (failure) failure)))
+#lang racket
+(define (fact n)
+  (if (zero? n)
+      1
+      (* n (fact (sub1 n)))))
+(fact 7)

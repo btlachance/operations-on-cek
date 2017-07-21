@@ -1,60 +1,8 @@
-;; #lang racket/base
-;; (module boxed-repr racket/base
-;;   (require
-;;    racket/match racket/list
-;;    (rename-in (only-in racket/base + - * #%datum)
-;;               [+ r:+]
-;;               [- r:-]
-;;               [* r:*]
-;;               [#%datum r:#%datum])
-;;    (for-syntax racket/base racket/match syntax/parse))
-;;   (provide (all-defined-out))
-;;   (define integer list)
-;;   (define-match-expander integer:
-;;     (lambda (stx)
-;;       (syntax-case stx ()
-;;         [(_ n) #'(list n)])))
-;;   (define (integer-n n) (match n [(integer: n*) n*]))
-;;   (define (iszero n) (match n [(integer: n*) (zero? n*)]))
-;;   (define (((binop op) m) n)
-;;     (match* (m n)
-;;       [((integer: m*) (integer: n*))
-;;        (integer (op m* n*))]))
-;;   (define-values (+ - *) (values (binop r:+) (binop r:-) (binop r:*)))
-;;   (define-syntax (#%datum stx)
-;;     (syntax-parse stx
-;;       #:literals (#%datum r:#%datum)
-;;       [(#%datum . n:integer)
-;;        #'(integer (r:#%datum . n))]
-;;       [(#%datum . else)
-;;        #'(r:#%datum . else)])))
-;; (module unboxed-repr racket/base
-;;   (require
-;;    (rename-in (only-in racket/base + - * #%datum)
-;;               [+ r:+]
-;;               [- r:-]
-;;               [* r:*]))
-;;   (provide (all-defined-out))
-;;   (define iszero zero?)
-;;   (define ((+ m) n) (r:+ m n))
-;;   (define ((- m) n) (r:- m n))
-;;   (define ((* m) n) (r:* m n)))
-;; (require 'boxed-repr
-;;          (rename-in (only-in racket/base set-box!)
-;;                     [set-box! r:set-box!]))
-;; (define ((set-box! b) v) (r:set-box! b v))
-;; (define false #f)
-
-(let* ([Z! (lambda (f)
-             (let* ([b0 (box false)]
-                    [_ ((set-box! b0) (lambda (x) ((f (unbox b0)) x)))])
-               (unbox b0)))]
-       [fib (Z! (lambda (fib0) (lambda (n) (if (iszero n)
-                                               0
-                                               (if (iszero ((- n) 1))
-                                                   1
-                                                   ((+ (fib0 ((- n) 1))) (fib0 ((- n) 2))))))))])
-  (if (iszero ((- (fib 15)) 610))
-      #;(iszero ((- (fib 30)) 832040))
-      (lambda (success) success)
-      (lambda (failure) failure)))
+#lang racket
+(define (fib n)
+  (if (zero? n)
+      0
+      (if (zero? (- n 1))
+          1
+          (+ (fib (- n 1)) (fib (- n 2))))))
+(fib 30)

@@ -163,6 +163,9 @@
                    (list 'boximpl (nt 'var))
                    (list 'unboximpl (nt 'var))
                    (list 'setboximpl (nt 'var) (nt 'var))
+                   (list 'modformsreverse (nt 'modforms))
+                   (list 'mkcell (nt 'v))
+                   (list 'setcell (nt 'var) (nt 'env) (nt 'v))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -180,6 +183,9 @@
                    'boximpl 'e
                    'unboximpl 'e
                    'setboximpl 'e
+                   'modformsreverse 'modforms
+                   'mkcell 'v
+                   'setcell 'v
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

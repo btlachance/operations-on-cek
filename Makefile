@@ -4,7 +4,7 @@ RPYTHONOPTS=
 _=$(shell mkdir -p build)
 METALANGDEPS=$(wildcard cek-metalang/*.rkt)
 RTDEPS=cek-metalang/runtime.py
-.PHONY: all unittest inttest test clean fact7 fib
+.PHONY: all unittest inttest test clean fact7 fib quicktest
 
 all: build/cek-metalang.html test
 
@@ -25,13 +25,13 @@ build/lc-basictests-linked.py: build/lc-interp.py examples/lc/lc-basictests.py
 build/lc-fact7-linked.py: build/lc-interp.py examples/lc/lc-fact7.txt
 	{ set -e;\
 	  cat $<;\
-	  racket examples/lc/lc.rkt --compile-term < examples/lc/lc-fact7.txt;\
+	  raco expand examples/lc/lc-fact7.txt | racket examples/lc/lc.rkt --compile-term;\
 	  echo 'if __name__ == "__main__":';\
 	  echo '  main()'; } > $@
 build/lc-fib-linked.py: build/lc-interp.py examples/lc/lc-fib.txt
 	{ set -e;\
 	  cat $<;\
-	  racket examples/lc/lc.rkt --compile-term < examples/lc/lc-fib.txt;\
+	  raco expand examples/lc/lc-fib.txt | racket examples/lc/lc.rkt --compile-term;\
 	  echo 'if __name__ == "__main__":';\
 	  echo '  main()'; } > $@
 
@@ -57,5 +57,13 @@ fact7: build/lc-fact7-linked.py
 	$(PYTHON) $<
 fib: build/lc-fib-linked.py
 	$(PYTHON) $<
+quicktest: build/lc-interp.py
+	TMP=$$(mktemp build/runtest-XXXX).py;\
+	{ set -e;\
+	  cat $<;\
+	  racket examples/lc/lc.rkt --compile-term;\
+	  echo 'if __name__ == "__main__":';\
+	  echo '  main()'; } > "$$TMP";\
+	$(PYTHON) $$TMP
 clean:
 	rm -rf build compiled

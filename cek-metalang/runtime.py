@@ -115,7 +115,10 @@ class ExtendedEnv(Env):
 def emptyenv():
   return EmptyEnv()
 def lookup(e, x):
-  return e.lookup(x)
+  result = e.lookup(x)
+  if isinstance(result, Cell):
+    result = result.get()
+  return result
 def extend(e, x, v):
   return ExtendedEnv(x, v, e)
 
@@ -128,6 +131,32 @@ def pprint(v):
 
 def ret(v):
   raise CEKDone(v)
+
+def modformsreverse(mfs):
+  result = _mfnil_sing
+  rest = mfs
+
+  while not isinstance(rest, cl_mfnil):
+    old_head = rest
+    rest = rest.modforms1
+
+    old_head.modforms1 = result
+    result = old_head
+  return result
+
+class Cell(cl_v):
+  def __init__(self, init):
+    self.val = init
+  def set(self, v):
+    self.val = v
+    return v
+  def get(self):
+    return self.val
+def mkcell(v):
+  return Cell(v)
+def setcell(var, env, v):
+  cell = env.lookup(var)
+  return cell.set(v)
 
 from rpython.rlib import jit
 driver = jit.JitDriver(reds = ['e', 'k'],
