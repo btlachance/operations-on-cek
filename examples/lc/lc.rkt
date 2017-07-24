@@ -90,14 +90,14 @@
   [((quote c) env_0 expk) --> (ignore env_0 (ret c expk))]
   [((app e_1 e_2) env expk) --> (e_1 env (arg e_2 env expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
-  #;[((let ([p var e_0]) e_1) env expk) --> (e_0 env (bind var e_1 env expk))]
+  [((let ([p var e_0]) e_1) env expk) --> (e_0 env (bind var e_1 env expk))]
 
   [(ignore env_0 (ret v (arg e env expk))) --> (e env (fn v expk))]
   [(ignore env_0 (ret v (fn (clo (lam var e) env) expk))) --> (e (extend env var v) expk)]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
-  #;[(ignore env_0 (ret v (bind var e env expk))) --> (e (extend env var v) expk)])
+  [(ignore env_0 (ret v (bind var e env expk))) --> (e (extend env var v) expk)])
 
 (module+ main
   (require syntax/parse)

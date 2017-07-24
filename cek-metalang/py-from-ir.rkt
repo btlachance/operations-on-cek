@@ -30,10 +30,12 @@
                             (if (equal? 'top super-name)
                                 "object"
                                 (class-name->py super-name))))
+     (define attrs (field-defs->attrs fdefs #:indent "  "))
      (define constructor (field-defs->constructor-py name fdefs #:indent "  "))
      (define method (method-def->py name mdef #:indent "  " #:super super-name))
      (string-append
       (~a header
+          attrs
           constructor
           method
           #:separator "\n")
@@ -123,7 +125,7 @@
   (match fdefs
     [#f
      (define header (format "~adef __init__(self):" prefix))
-     (define body (format "~aself.literal = ~s" prefix (~a class-name)))
+     (define body (format "~apass" prefix))
      (format "~a\n  ~a" header body)]
     [(list) ;; explicit empty case for similar reasons as ir:return
             ;; but also since we need to emit "pass"
@@ -146,7 +148,7 @@
                 (string-join
                  (list
                   "def __init__(self):"
-                  "  self.literal = \"mt\"")
+                  "  pass")
                  "\n"))
   (check-equal? (field-defs->constructor-py 'unit '())
                 (string-join
@@ -164,9 +166,17 @@
                   "  self.app_arg = app_arg")
                  "\n")))
 
+(define (field-defs->attrs fdefs #:indent [prefix ""])
+  (define attrs-rhs
+    (match fdefs
+      [(or #f (list)) ""]
+      [(list (ir:field-def names _) ...)
+       (define (format-attr-name s) (format "'~a'" s))
+       (apply ~a #:separator ", " (map format-attr-name names))]))
+  (format "~a_attrs_ = [~a]" prefix attrs-rhs))
 
 ;; method-def->py : name (U 'super ir:method-def) -> string
-(define (method-def->py class-name mdef #:indent [prefix ""] #:super [super-name #f])
+(define (method-def->py class-name mdef #:indent [prefix ""] #:super [super-name 'top])
   (match mdef
     ['super
      (format "~a# method inherited from super class" prefix)]

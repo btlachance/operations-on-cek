@@ -31,18 +31,22 @@ class Integer(cl_integer):
     return not self.eq(other)
   def pprint(self, indent):
     return ' ' * indent + '%s' % self.value
+def guardint(v):
+  if not isinstance(v, Integer):
+    raise CEKError("Expected an integer")
+  return v
 def zeropimpl(n):
-  return UnaryPrim(n, 'zerop', lambda n: cl_true() if n.value == 0 else cl_false())
+  return UnaryPrim(n, 'zerop', lambda n: cl_true() if guardint(n).value == 0 else cl_false())
 def succimpl(n):
-  return UnaryPrim(n, 'succ', lambda n: Integer(n.value + 1))
+  return UnaryPrim(n, 'succ', lambda n: Integer(guardint(n).value + 1))
 def predimpl(n):
-  return UnaryPrim(n, 'pred', lambda n: Integer(n.value - 1))
+  return UnaryPrim(n, 'pred', lambda n: Integer(guardint(n).value - 1))
 def addimpl(n1, n2):
-  return BinaryPrim(n1, n2, '+', lambda n1, n2: Integer(n1.value + n2.value))
+  return BinaryPrim(n1, n2, '+', lambda n1, n2: Integer(guardint(n1).value + guardint(n2).value))
 def subimpl(n1, n2):
-  return BinaryPrim(n1, n2, '-', lambda n1, n2: Integer(n1.value - n2.value))
+  return BinaryPrim(n1, n2, '-', lambda n1, n2: Integer(guardint(n1).value - guardint(n2).value))
 def multimpl(n1, n2):
-  return BinaryPrim(n1, n2, '*', lambda n1, n2: Integer(n1.value * n2.value))
+  return BinaryPrim(n1, n2, '*', lambda n1, n2: Integer(guardint(n1).value * guardint(n2).value))
 
 def mkbox(v):
   return Box(v)
@@ -105,7 +109,9 @@ class ExtendedEnv(Env):
     self.v = v
     self.e = e
   def lookup(self, y):
-    if self.x.literal == y.literal:
+    if (isinstance(self.x, PrimVariable) and
+        isinstance(y, PrimVariable) and
+        self.x.literal == y.literal):
       return self.v
     else:
       return self.e.lookup(y)
@@ -134,15 +140,14 @@ def ret(v):
 
 def modformsreverse(mfs):
   result = _mfnil_sing
-  rest = mfs
 
-  while not isinstance(rest, cl_mfnil):
-    old_head = rest
-    rest = rest.modforms1
-
-    old_head.modforms1 = result
-    result = old_head
-  return result
+  if isinstance(mfs, cl_mfnil):
+    return result
+  else:
+    while isinstance(mfs, cl_mf):
+      result = cl_mf(mfs.modform0, result)
+      mfs = mfs.modforms1
+    return result
 
 class Cell(cl_v):
   def __init__(self, init):
