@@ -8,22 +8,24 @@
   (modform ::= gtopform)
   (gtopform ::= e (define var e))
 
-  (e ::= var l (app e es) (quote c) (if e e e) (let binding e) ignore)
+  (e ::= var l (app e es) (quote c) (if e e e) (let binding e) ignore
+     (car e) (cdr e) (nullp e) (mkcons e e))
   (es ::= esnil (el e es))
   (binding ::= (bp))
   (bp ::= (p var e))
   (var ::= variable)
   (vars ::= varsnil (varl var vars))
   (l ::= (lam vars e))
-  (v ::= (clo l env) c)
+  (v ::= (clo l env) c (cons v v))
   (vs ::= vsnil (vl v vs))
-  (c ::= true false integer)
+  (c ::= nil true false integer)
 
   (env ::= dummy)
 
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms modforms k))
   (expk ::= (args es env k) (fn v vs es env k) (sel e e env k) (bind var e env k) (ret v k)
+        (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k)
         (evaldefs modform modforms env k))
   #:control-string term
   #:environment env
@@ -39,7 +41,11 @@
                                        (mf (define box (lam (varl b varsnil) (boximpl b)))
                                            (mf (define unbox  (lam (varl b varsnil) (unboximpl b)))
                                                (mf (define set-box! (lam (varl b (varl val varsnil)) (setboximpl b val)))
-                                                   modforms))))))))))
+                                                   (mf (define cons (lam (varl val1 (varl val2 varsnil)) (mkcons val1 val2)))
+                                                       (mf (define car (lam (varl val varsnil) (car val)))
+                                                           (mf (define cdr (lam (varl val varsnil) (cdr val)))
+                                                               (mf (define null? (lam (varl val varsnil) (nullp val)))
+                                                                   modforms))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> (pprint v)]
@@ -93,6 +99,10 @@
   [((app e_1 es) env expk) --> (e_1 env (args es env expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
   [((let ([p var e_0]) e_1) env expk) --> (e_0 env (bind var e_1 env expk))]
+  [((car e_0) env k) --> (e_0 env (cark k))]
+  [((cdr e_0) env k) --> (e_0 env (cdrk k))]
+  [((nullp e_0) env k) --> (e_0 env (nullk k))]
+  [((mkcons e_1 e_2) env k) --> (e_1 env (consr e_2 env k))]
 
   [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
    #:where (clo (lam varsnil e) env) v]
@@ -103,7 +113,14 @@
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
-  [(ignore env_0 (ret v (bind var e env expk))) --> (e (extend1 env var v) expk)])
+  [(ignore env_0 (ret v (bind var e env expk))) --> (e (extend1 env var v) expk)]
+  [(ignore env_0 (ret (cons v_1 v_2) (cark expk))) --> (ignore env_0 (ret v_1 expk))]
+  [(ignore env_0 (ret (cons v_1 v_2) (cdrk expk))) --> (ignore env_0 (ret v_2 expk))]
+  [(ignore env_0 (ret nil (nullk expk))) --> (ignore env_0 (ret true expk))]
+  [(ignore env_0 (ret v (nullk expk))) --> (ignore env_0 (ret false expk))
+   #:unless nil v]
+  [(ignore env_0 (ret v (consr e env expk))) --> (e env (pair v expk))]
+  [(ignore env_0 (ret v_right (pair v_left expk))) --> (ignore env_0 (ret (cons v_left v_right) expk))])
 
 (module+ main
   (require syntax/parse)
@@ -163,6 +180,7 @@
              #,(kernel->core #'e3))]
       [(quote #t) #'(quote true)]
       [(quote #f) #'(quote false)]
+      [(quote ()) #'(quote nil)]
       [_ this-syntax]))
 
   (define (corify/lc-term->py stx)
