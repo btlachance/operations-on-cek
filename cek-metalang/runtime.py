@@ -131,6 +131,8 @@ def extend(e, xs, vs):
     x, xs = xs.var0, xs.vars1
     v, vs = vs.v0, vs.vs1
     result = ExtendedEnv(x, v, result)
+  if isinstance(xs, cl_varl) or isinstance(vs, cl_vl):
+    raise CEKError("Function called with the wrong number of arguments")
   return result
 def extend1(e, x, v):
   return ExtendedEnv(x, v, e)
