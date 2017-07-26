@@ -47,23 +47,25 @@
    (modform_1 env (binddefs mfnil env modforms_1 k))
    #:where (mf modform_1 modforms_1) (modformsreverse (mf modform_0 modforms_0))]
 
-  [((define var e_0) env (binddefs modforms_bound env_0 (mf modform modforms_unbound) k))
+  [(gtopform env (binddefs modforms_bound env_0 (mf modform modforms_unbound) k))
    -->
-   (modform env (binddefs (mf (define var e_0) modforms_bound) env_1 modforms_unbound k))
+   (modform env (binddefs (mf gtopform modforms_bound) env_1 modforms_unbound k))
+   #:where (define var e_0) gtopform
    #:where v (mkcell false)
    #:where env_1 (extend env_0 var v)]
   [(e_0 env (binddefs modforms_bound env_0 (mf modform modforms_unbound) k))
    -->
    (modform env (binddefs (mf e_0 modforms_bound) env_0 modforms_unbound k))]
-
-  [((define var e_0) env (binddefs modforms_bound env_0 mfnil k))
+  [(gtopform env (binddefs modforms_bound env_0 mfnil k))
    -->
-   (e_0 env_1 (evaldefs (define var e_0) modforms_bound env_1 k))
+   (gtopform env_1 (evaldefs gtopform modforms_bound env_1 k))
+   #:where (define var e_0) gtopform
    #:where v (mkcell false)
    #:where env_1 (extend env_0 var v)]
-  ;; Tricky here: we assume that modform is identical to (define var
-  ;; e_0). That should be the case, given how a modform is duplicated
-  ;; when it's popped out of evaldefs
+  [(e_0 env (binddefs modforms_bound env_0 mfnil k))
+   -->
+   (e_0 env_0 (evaldefs e_0 modforms_bound env_0 k))]
+
   [((define var e_0) env (evaldefs modform modforms env_0 k))
    -->
    (e_0 env_0 (evaldefs modform modforms env_0 k))]
@@ -75,9 +77,6 @@
    -->
    (ignore env (ret v k))]
 
-  [(e_0 env (binddefs modforms_bound env_0 mfnil k))
-   -->
-   (e_0 env_0 (evaldefs e_0 modforms_bound env_0 k))]
   [(ignore env (ret v (evaldefs e_0 (mf modform modforms) env_0 k)))
    -->
    (modform env_0 (evaldefs modform modforms env_0 k))]
