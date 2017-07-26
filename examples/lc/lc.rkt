@@ -121,6 +121,7 @@
                         [lam lambda]
                         [c-w-v call-with-values]
                         [p-v print-values]
+                        quote
                         define-values
                         if)
       [(module id lang
@@ -151,38 +152,10 @@
        #`(if #,(kernel->core #'e1)
              #,(kernel->core #'e2)
              #,(kernel->core #'e3))]
+      [(quote #t) #'(quote true)]
+      [(quote #f) #'(quote false)]
       [_ this-syntax]))
 
-  (define (desugar stx)
-    (syntax-parse stx
-      #:datum-literals (let let* lambda if app quote true false)
-      [(~or :exact-integer true false) #`(quote #,this-syntax)]
-      [(app e1 e2)
-       #`(app #,(desugar #'e1) #,(desugar #'e2))]
-      [(lambda (x) e)
-       #`(lam x #,(desugar #'e))]
-      [(let ([x0 e0]) e)
-       #`(let ([p x0 #,(desugar #'e0)]) #,(desugar #'e))]
-      [(let* () body)
-       (desugar #'body)]
-      [(let* ([x0 e0] [x e] ...) body)
-       #`(let ([p x0 #,(desugar #'e0)])
-           #,(desugar
-              #`(let* ([x e] ...)
-                  body)))]
-      [(if e1 e2 e3)
-       #`(if #,(desugar #'e1)
-             #,(desugar #'e2)
-             #,(desugar #'e3))]
-      [(e1 e2)
-       #`(app
-          #,(desugar #'e1)
-          #,(desugar #'e2))]
-      [_ this-syntax]))
-
-  (define (desugar/lc-term->py stx)
-    #;(pretty-print (syntax->datum stx) (current-error-port))
-    (lc-term->py (desugar stx)))
   (define (corify/lc-term->py stx)
     #;(pretty-print (syntax->datum stx) (current-error-port))
     #;(pretty-print (syntax->datum (kernel->core stx)) (current-error-port))

@@ -34,6 +34,12 @@ build/lc-fib-linked.py: build/lc-interp.py examples/lc/lc-fib.txt
 	  raco expand examples/lc/lc-fib.txt | racket examples/lc/lc.rkt --compile-term;\
 	  echo 'if __name__ == "__main__":';\
 	  echo '  main()'; } > $@
+build/lc-evenodd-linked.py: build/lc-interp.py examples/lc/lc-evenodd.txt
+	{ set -e;\
+	  cat $<;\
+	  raco expand examples/lc/lc-evenodd.txt | racket examples/lc/lc.rkt --compile-term;\
+	  echo 'if __name__ == "__main__":';\
+	  echo '  main()'; } > $@
 
 build/fact-c: examples/lc/targetlc.py build/lc-fact7-linked.py
 	cp examples/lc/targetlc.py build/fact.py
@@ -56,6 +62,8 @@ test: unittest inttest
 fact7: build/lc-fact7-linked.py
 	$(PYTHON) $<
 fib: build/lc-fib-linked.py
+	$(PYTHON) $<
+evenodd: build/lc-evenodd-linked.py
 	$(PYTHON) $<
 quicktest: build/lc-interp.py
 	TMP=$$(mktemp build/runtest-XXXX).py;\
