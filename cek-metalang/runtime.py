@@ -141,13 +141,10 @@ def ret(v):
 def modformsreverse(mfs):
   result = _mfnil_sing
 
-  if isinstance(mfs, cl_mfnil):
-    return result
-  else:
-    while isinstance(mfs, cl_mf):
-      result = cl_mf(mfs.modform0, result)
-      mfs = mfs.modforms1
-    return result
+  while isinstance(mfs, cl_mf):
+    result = cl_mf(mfs.modform0, result)
+    mfs = mfs.modforms1
+  return result
 
 class Cell(cl_v):
   def __init__(self, init):
