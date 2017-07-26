@@ -32,19 +32,18 @@ build/lc-%-jit-c: examples/lc/targetlc.py build/lc-%-linked.py
 	mv build/lc-$*-linked.py build/lc.py
 	(cd build/; $(RPYTHON) -Ojit $(RPYTHONOPTS) lc-$*-jit.py)
 
-build/lc-%-linked.py: build/lc-interp.py examples/lc/lc-%.txt
+build/lc-%-linked.py: build/lc-interp.py examples/lc/lc-%.rkt
 	{ set -e;\
 	  cat $<;\
-	  raco expand examples/lc/lc-$*.txt | racket examples/lc/lc.rkt --compile-term;\
+	  raco expand examples/lc/lc-$*.rkt | racket examples/lc/lc.rkt --compile-term;\
 	  echo 'if __name__ == "__main__":';\
 	  echo '  main()'; } > $@
 runlc-%: build/lc-%-linked.py
-	$(PYTHON) $<
+	@$(PYTHON) $<
 
 unittest:
 	raco test cek-metalang/
-inttest: build/lc-basictests-linked.py
-	$(PYTHON) $<
+inttest: $(foreach f, $(shell find . -name "lc-*.rkt"), $(addprefix run,$(notdir $(basename $f))))
 test: unittest inttest
 
 quicktest: build/lc-interp.py
