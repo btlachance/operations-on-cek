@@ -5,6 +5,7 @@ _=$(shell mkdir -p build)
 METALANGDEPS=$(wildcard cek-metalang/*.rkt)
 RTDEPS=cek-metalang/runtime.py
 .PHONY: all unittest inttest test clean quicktest
+.PRECIOUS: build/lc-%-linked.py
 
 all: build/cek-metalang.html test
 
