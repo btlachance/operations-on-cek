@@ -152,7 +152,8 @@
   (lang-info nonterminals
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
-                   (list 'extend (nt 'env) (nt 'var) (nt 'v))
+                   (list 'extend (nt 'env) (nt 'vars) (nt 'vs))
+                   (list 'extend1 (nt 'env) (nt 'var) (nt 'v))
                    (list 'pprint (nt 'v))
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
@@ -166,6 +167,7 @@
                    (list 'modformsreverse (nt 'modforms))
                    (list 'mkcell (nt 'v))
                    (list 'setcell (nt 'var) (nt 'env) (nt 'v))
+                   (list 'vsreverse (nt 'vs))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -173,6 +175,7 @@
              sort->name sort->field-names sort->type
              (hash 'lookup 'v
                    'extend 'env
+                   'extend1 'env
                    'pprint 'e
                    'zeropimpl 'e
                    'succimpl 'e
@@ -186,6 +189,7 @@
                    'modformsreverse 'modforms
                    'mkcell 'v
                    'setcell 'v
+                   'vsreverse 'vs
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

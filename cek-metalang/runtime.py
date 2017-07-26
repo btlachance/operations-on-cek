@@ -125,7 +125,14 @@ def lookup(e, x):
   if isinstance(result, Cell):
     result = result.get()
   return result
-def extend(e, x, v):
+def extend(e, xs, vs):
+  result = e
+  while isinstance(xs, cl_varl) and isinstance(vs, cl_vl):
+    x, xs = xs.var0, xs.vars1
+    v, vs = vs.v0, vs.vs1
+    result = ExtendedEnv(x, v, result)
+  return result
+def extend1(e, x, v):
   return ExtendedEnv(x, v, e)
 
 def pprint(v):
@@ -144,6 +151,21 @@ def modformsreverse(mfs):
   while isinstance(mfs, cl_mf):
     result = cl_mf(mfs.modform0, result)
     mfs = mfs.modforms1
+  return result
+
+def varsreverse(vars):
+  result = _varsnil_sing
+
+  while isinstance(vars, cl_varl):
+    result = cl_varl(vars.var0, result)
+    vars = vars.vars1
+  return result
+
+def vsreverse(vs):
+  result = _vsnil_sing
+  while isinstance(vs, cl_vl):
+    result = cl_vl(vs.v0, result)
+    vs = vs.vs1
   return result
 
 class Cell(cl_v):

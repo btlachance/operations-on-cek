@@ -8,34 +8,37 @@
   (modform ::= gtopform)
   (gtopform ::= e (define var e))
 
-  (e ::= var l (app e e) (quote c) (if e e e) (let binding e) ignore)
+  (e ::= var l (app e es) (quote c) (if e e e) (let binding e) ignore)
+  (es ::= esnil (el e es))
   (binding ::= (bp))
   (bp ::= (p var e))
   (var ::= variable)
-  (l ::= (lam var e))
+  (vars ::= varsnil (varl var vars))
+  (l ::= (lam vars e))
   (v ::= (clo l env) c)
+  (vs ::= vsnil (vl v vs))
   (c ::= true false integer)
 
   (env ::= dummy)
 
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms modforms k))
-  (expk ::= (arg e env k) (fn v k) (sel e e env k) (bind var e env k) (ret v k)
+  (expk ::= (args es env k) (fn v vs es env k) (sel e e env k) (bind var e env k) (ret v k)
         (evaldefs modform modforms env k))
   #:control-string term
   #:environment env
   #:continuation k
   #:initial [(modbegin modforms) -->
              ((modbegin
-               (mf (define zero? (lam n (zeropimpl n)))
-                   (mf (define add1 (lam n (succimpl n)))
-                       (mf (define sub1 (lam n (predimpl n)))
-                           (mf (define + (lam m (lam n (addimpl m n))))
-                               (mf (define - (lam m (lam n (subimpl m n))))
-                                   (mf (define * (lam m (lam n (multimpl m n))))
-                                       (mf (define box (lam b (boximpl b)))
-                                           (mf (define unbox  (lam b (unboximpl b)))
-                                               (mf (define set-box! (lam b (lam val (setboximpl b val))))
+               (mf (define zero? (lam (varl n varsnil) (zeropimpl n)))
+                   (mf (define add1 (lam (varl n varsnil) (succimpl n)))
+                       (mf (define sub1 (lam (varl n varsnil) (predimpl n)))
+                           (mf (define + (lam (varl m (varl n varsnil)) (addimpl m n)))
+                               (mf (define - (lam (varl m (varl n varsnil)) (subimpl m n)))
+                                   (mf (define * (lam (varl m (varl n varsnil)) (multimpl m n)))
+                                       (mf (define box (lam (varl b varsnil) (boximpl b)))
+                                           (mf (define unbox  (lam (varl b varsnil) (unboximpl b)))
+                                               (mf (define set-box! (lam (varl b (varl val varsnil)) (setboximpl b val)))
                                                    modforms))))))))))
               (emptyenv)
               mt)]
@@ -52,7 +55,7 @@
    (modform env_1 (binddefs (mf gtopform modforms_bound) modforms_unbound k))
    #:where (define var e_0) gtopform
    #:where v (mkcell false)
-   #:where env_1 (extend env_0 var v)]
+   #:where env_1 (extend1 env_0 var v)]
   [(e_0 env (binddefs modforms_bound (mf modform modforms_unbound) k))
    -->
    (modform env (binddefs (mf e_0 modforms_bound) modforms_unbound k))]
@@ -61,7 +64,7 @@
    (gtopform env_1 (evaldefs gtopform modforms_bound env_1 k))
    #:where (define var e_0) gtopform
    #:where v (mkcell false)
-   #:where env_1 (extend env_0 var v)]
+   #:where env_1 (extend1 env_0 var v)]
   [(e_0 env (binddefs modforms_bound mfnil k))
    -->
    (e_0 env (evaldefs e_0 modforms_bound env k))]
@@ -85,18 +88,22 @@
    (ignore env (ret v k))]
 
   [(var env_0 expk) --> (ignore env_0 (ret (lookup env_0 var) expk))]
-  [((lam var e_0) env_0 expk) --> (ignore env_0 (ret (clo (lam var e_0) env_0) expk))]
+  [(l env_0 expk) --> (ignore env_0 (ret (clo l env_0) expk))]
   [((quote c) env_0 expk) --> (ignore env_0 (ret c expk))]
-  [((app e_1 e_2) env expk) --> (e_1 env (arg e_2 env expk))]
+  [((app e_1 es) env expk) --> (e_1 env (args es env expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
   [((let ([p var e_0]) e_1) env expk) --> (e_0 env (bind var e_1 env expk))]
 
-  [(ignore env_0 (ret v (arg e env expk))) --> (e env (fn v expk))]
-  [(ignore env_0 (ret v (fn (clo (lam var e) env) expk))) --> (e (extend env var v) expk)]
+  [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
+   #:where (clo (lam varsnil e) env) v]
+  [(ignore env_0 (ret v (args (el e es) env expk))) --> (e env (fn v vsnil es env expk))]
+  [(ignore env_0 (ret v (fn v_op vs (el e es) env expk))) --> (e env (fn v_op (vl v vs) es env expk))]
+  [(ignore env_0 (ret v (fn (clo (lam vars e) env) vs_rev esnil env_1 expk))) --> (e (extend env vars vs) expk)
+   #:where vs (vsreverse (vl v vs_rev))]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
-  [(ignore env_0 (ret v (bind var e env expk))) --> (e (extend env var v) expk)])
+  [(ignore env_0 (ret v (bind var e env expk))) --> (e (extend1 env var v) expk)])
 
 (module+ main
   (require syntax/parse)
@@ -134,18 +141,20 @@
              (filter-not ignored-modform? (syntax->list #'(form ...)))))]
       [(app c-w-v (lam () exp) p-v)
        (kernel->core #'exp)]
-      [(app e1 e2 e-rest ...)
-       (foldr
-        (lambda (arg app-so-far)
-          #`(app #,app-so-far #,(kernel->core arg)))
-        #`(app #,(kernel->core #'e1) #,(kernel->core #'e2))
-        (syntax->list #'(e-rest ...)))]
-      [(lam (x x-rest ...) e)
-       (foldr
-        (lambda (id lam-so-far)
-          #`(lam id #,lam-so-far))
-        #`(lam x #,(kernel->core #'e))
-        (syntax->list #'(x-rest ...)))]
+      [(app e1 e-rest ...)
+       #`(app
+          #,(kernel->core #'e1)
+          #,(foldr
+             (lambda (arg args) #`(el #,(kernel->core arg) #,args))
+             #'esnil
+             (syntax->list #'(e-rest ...))))]
+      [(lam (xs ...) e)
+       #`(lam
+          #,(foldr
+             (lambda (id ids) #`(varl #,id #,ids))
+             #'varsnil
+             (syntax->list #'(xs ...)))
+          #,(kernel->core #'e))]
       [(define-values (id) e)
        #`(define id #,(kernel->core #'e))]
       [(if e1 e2 e3)
