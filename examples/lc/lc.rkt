@@ -15,7 +15,7 @@
   (bp ::= (p var e))
   (var ::= variable)
   (vars ::= varsnil (varl var vars))
-  (l ::= (lam vars e))
+  (l ::= (lam vars e) (lamrest vars var e))
   (v ::= (clo l env) c (cons v v))
   (vs ::= vsnil (vl v vs))
   (c ::= nil true false integer)
@@ -106,10 +106,16 @@
 
   [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
    #:where (clo (lam varsnil e) env) v]
+  [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
+   #:where (clo (lamrest varsnil var_rest e) env_clo) v
+   #:where env (extend1 env_clo var_rest nil)]
   [(ignore env_0 (ret v (args (el e es) env expk))) --> (e env (fn v vsnil es env expk))]
   [(ignore env_0 (ret v (fn v_op vs (el e es) env expk))) --> (e env (fn v_op (vl v vs) es env expk))]
   [(ignore env_0 (ret v (fn (clo (lam vars e) env) vs_rev esnil env_1 expk))) --> (e (extend env vars vs) expk)
    #:where vs (vsreverse (vl v vs_rev))]
+  [(ignore env_0 (ret v (fn (clo (lamrest vars var_rest e) env_clo) vs_rev esnil env_1 expk))) --> (e env expk)
+   #:where vs (vsreverse (vl v vs_rev))
+   #:where env (extendrest env_clo vars var_rest vs)]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
@@ -171,6 +177,14 @@
              (lambda (id ids) #`(varl #,id #,ids))
              #'varsnil
              (syntax->list #'(xs ...)))
+          #,(kernel->core #'e))]
+      [(lam (xs ... . rest:id) e)
+       #`(lamrest
+          #,(foldr
+             (lambda (id ids) #`(varl #,id #,ids))
+             #'varsnil
+             (syntax->list #'(xs ...)))
+          rest
           #,(kernel->core #'e))]
       [(define-values (id) e)
        #`(define id #,(kernel->core #'e))]

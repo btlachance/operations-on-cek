@@ -136,6 +136,21 @@ def extend(e, xs, vs):
   return result
 def extend1(e, x, v):
   return ExtendedEnv(x, v, e)
+def extendrest(e, xs, x_rest, vs):
+  result = e
+  while isinstance(xs, cl_varl) and isinstance(vs, cl_vl):
+    x, xs = xs.var0, xs.vars1
+    v, vs = vs.v0, vs.vs1
+    result = ExtendedEnv(x, v, result)
+  if isinstance(xs, cl_varl):
+    raise CEKError("Function called with too few arguments")
+
+  restvs_reversed = vsreverse(vs)
+  rest_list = _nil_sing
+  while isinstance(restvs_reversed, cl_vl):
+    rest_list = cl_cons(restvs_reversed.v0, rest_list)
+    restvs_reversed = restvs_reversed.vs1
+  return ExtendedEnv(x_rest, rest_list, result)
 
 def pprint(v):
   if isinstance(v, cl_clo):

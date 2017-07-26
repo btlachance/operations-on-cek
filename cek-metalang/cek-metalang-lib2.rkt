@@ -155,6 +155,7 @@
                    (list 'extend (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extend1 (nt 'env) (nt 'var) (nt 'v))
                    (list 'pprint (nt 'v))
+                   (list 'extendrest (nt 'env) (nt 'vars) (nt 'var) (nt 'vs))
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
                    (list 'predimpl (nt 'var))
@@ -176,6 +177,7 @@
              (hash 'lookup 'v
                    'extend 'env
                    'extend1 'env
+                   'extendrest 'env
                    'pprint 'e
                    'zeropimpl 'e
                    'succimpl 'e
