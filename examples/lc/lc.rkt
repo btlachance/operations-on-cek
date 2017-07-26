@@ -19,7 +19,7 @@
   (env ::= dummy)
 
   (k ::= modk expk mt)
-  (modk ::= (binddefs modforms env modforms k))
+  (modk ::= (binddefs modforms modforms k))
   (expk ::= (arg e env k) (fn v k) (sel e e env k) (bind var e env k) (ret v k)
         (evaldefs modform modforms env k))
   #:control-string term
@@ -44,27 +44,27 @@
   ;; IDK what to do when the module body is empty... I don't yet have
   ;; a void value, but I guess that's what I need.
   [((modbegin (mf modform_0 modforms_0)) env k) -->
-   (modform_1 env (binddefs mfnil env modforms_1 k))
+   (modform_1 env (binddefs mfnil modforms_1 k))
    #:where (mf modform_1 modforms_1) (modformsreverse (mf modform_0 modforms_0))]
 
-  [(gtopform env (binddefs modforms_bound env_0 (mf modform modforms_unbound) k))
+  [(gtopform env_0 (binddefs modforms_bound (mf modform modforms_unbound) k))
    -->
-   (modform env (binddefs (mf gtopform modforms_bound) env_1 modforms_unbound k))
+   (modform env_1 (binddefs (mf gtopform modforms_bound) modforms_unbound k))
    #:where (define var e_0) gtopform
    #:where v (mkcell false)
    #:where env_1 (extend env_0 var v)]
-  [(e_0 env (binddefs modforms_bound env_0 (mf modform modforms_unbound) k))
+  [(e_0 env (binddefs modforms_bound (mf modform modforms_unbound) k))
    -->
-   (modform env (binddefs (mf e_0 modforms_bound) env_0 modforms_unbound k))]
-  [(gtopform env (binddefs modforms_bound env_0 mfnil k))
+   (modform env (binddefs (mf e_0 modforms_bound) modforms_unbound k))]
+  [(gtopform env_0 (binddefs modforms_bound mfnil k))
    -->
    (gtopform env_1 (evaldefs gtopform modforms_bound env_1 k))
    #:where (define var e_0) gtopform
    #:where v (mkcell false)
    #:where env_1 (extend env_0 var v)]
-  [(e_0 env (binddefs modforms_bound env_0 mfnil k))
+  [(e_0 env (binddefs modforms_bound mfnil k))
    -->
-   (e_0 env_0 (evaldefs e_0 modforms_bound env_0 k))]
+   (e_0 env (evaldefs e_0 modforms_bound env k))]
 
   [((define var e_0) env (evaldefs modform modforms env_0 k))
    -->
