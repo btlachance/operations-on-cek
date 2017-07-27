@@ -16,7 +16,7 @@
   (var ::= variable)
   (vars ::= varsnil (varl var vars))
   (l ::= (lam vars e) (lamrest vars var e))
-  (v ::= (clo l env) c (cons v v))
+  (v ::= (clo l env) c (cons v v) undefined)
   (vs ::= vsnil (vl v vs))
   (c ::= nil true false integer)
 
@@ -60,7 +60,7 @@
    -->
    (modform env_1 (binddefs (mf gtopform modforms_bound) modforms_unbound k))
    #:where (define var e_0) gtopform
-   #:where v (mkcell false)
+   #:where v (mkcell undefined)
    #:where env_1 (extend1 env_0 var v)]
   [(e_0 env (binddefs modforms_bound (mf modform modforms_unbound) k))
    -->
@@ -69,7 +69,7 @@
    -->
    (gtopform env_1 (evaldefs gtopform modforms_bound env_1 k))
    #:where (define var e_0) gtopform
-   #:where v (mkcell false)
+   #:where v (mkcell undefined)
    #:where env_1 (extend1 env_0 var v)]
   [(e_0 env (binddefs modforms_bound mfnil k))
    -->
