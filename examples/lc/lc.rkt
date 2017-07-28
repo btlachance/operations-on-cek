@@ -49,7 +49,11 @@
                (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n)))
                (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2)))
                (mf (define apply (lam (varl fun (varl args varsnil)) (apply fun args)))
-                 modforms))))))))))))))))))
+               (mf (define vector (lamrest varsnil args (vectorimpl args)))
+               (mf (define vector-ref (lam (varl vec (varl pos varsnil)) (vecrefimpl vec pos)))
+               (mf (define vector-length (lam (varl vec varsnil) (veclengthimpl vec)))
+               (mf (define current-command-line-arguments (lam varsnil (quote 0)))
+                 modforms))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -151,6 +155,11 @@
          _ ...)
        (equal? 'configure-runtime (syntax-e #'id))]
       [(define-syntaxes _ ...) #t]
+      [(define-values (id) _)
+       ;; These three identifiers are never used
+       (memq (syntax-e #'id) (list 'open-output-file/truncate
+                                   'call-with-output-file/truncate
+                                   'fatal-error))]
       [_ #f]))
 
   (define (kernel->core stx)

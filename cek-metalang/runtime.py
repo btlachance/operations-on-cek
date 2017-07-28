@@ -221,6 +221,33 @@ class String(cl_string):
 def mkstr(str):
   return String(str)
 
+class Vector(cl_v):
+  def __init__(self, vs):
+    self.vs = vs
+  def ref(self, pos):
+    current = self.vs
+    while pos > 0:
+      current = current.vs1
+      pos = pos - 1
+    return current.v0
+  def length(self):
+    result = 0
+    current = self.vs
+    while isinstance(current, cl_vl):
+      current = current.vs1
+      result = result + 1
+    return result
+def guardvector(v):
+  if not isinstance(v, Vector):
+    raise CEKError("Expected a vector")
+  return v
+def vectorimpl(vlist):
+  return UnaryPrim(vlist, 'vector', lambda vlist: Vector(vlisttovs(vlist)))
+def vecrefimpl(vec, pos):
+  return BinaryPrim(vec, pos, 'vector-ref', lambda v, p: guardvector(v).ref(guardint(p).value))
+def veclengthimpl(vec):
+  return UnaryPrim(vec, 'vector-length', lambda v: mkint(guardvector(v).length()))
+
 def vlisttovs(vlist):
   result_reversed = _vsnil_sing
   while isinstance(vlist, cl_cons):

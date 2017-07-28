@@ -178,6 +178,9 @@
                    (list 'ltimpl (nt 'var) (nt 'var))
                    (list 'eqlimpl (nt 'var) (nt 'var))
                    (list 'vlisttovs (nt 'v))
+                   (list 'vectorimpl (nt 'var))
+                   (list 'vecrefimpl (nt 'var) (nt 'var))
+                   (list 'veclengthimpl (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -205,6 +208,9 @@
                    'ltimpl 'e
                    'eqlimpl 'e
                    'vlisttovs 'vs
+                   'vectorimpl 'e
+                   'vecrefimpl 'e
+                   'veclengthimpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 
