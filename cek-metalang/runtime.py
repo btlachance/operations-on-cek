@@ -221,6 +221,15 @@ class String(cl_string):
 def mkstr(str):
   return String(str)
 
+def vlisttovs(vlist):
+  result_reversed = _vsnil_sing
+  while isinstance(vlist, cl_cons):
+    result_reversed = cl_vl(vlist.v0, result_reversed)
+    vlist = vlist.v1
+  if not isinstance(vlist, cl_nil):
+    raise CEKError("apply only accepts proper lists")
+  return vsreverse(result_reversed)
+
 driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c'],
                        get_printable_location=lambda c: c.pprint(0))

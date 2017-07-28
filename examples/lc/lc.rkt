@@ -9,7 +9,7 @@
   (gtopform ::= e (define var e))
 
   (e ::= var l (app e es) (quote c) (if e e e) (let binding e) ignore
-     (car e) (cdr e) (nullp e) (mkcons e e))
+     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e))
   (es ::= esnil (el e es))
   (binding ::= (bp))
   (bp ::= (p var e))
@@ -25,7 +25,7 @@
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms modforms k))
   (expk ::= (args es env k) (fn v vs es env k) (sel e e env k) (bind var e env k) (ret v k)
-        (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k)
+        (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k))
   #:control-string term
   #:environment env
@@ -48,7 +48,8 @@
                                          (mf (define print (lam (varl val varsnil) (printimpl val)))
                                            (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n)))
                                              (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2)))
-                                               modforms)))))))))))))))))
+                                               (mf (define apply (lam (varl fun (varl args varsnil)) (apply fun args)))
+                                                 modforms))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -106,6 +107,7 @@
   [((cdr e_0) env k) --> (e_0 env (cdrk k))]
   [((nullp e_0) env k) --> (e_0 env (nullk k))]
   [((mkcons e_1 e_2) env k) --> (e_1 env (consr e_2 env k))]
+  [((apply e_1 e_2) env k) --> (e_1 env (getargs e_2 env k))]
 
   [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
    #:where (clo (lam varsnil e) env) v]
@@ -129,7 +131,12 @@
   [(ignore env_0 (ret v (nullk expk))) --> (ignore env_0 (ret false expk))
    #:unless nil v]
   [(ignore env_0 (ret v (consr e env expk))) --> (e env (pair v expk))]
-  [(ignore env_0 (ret v_right (pair v_left expk))) --> (ignore env_0 (ret (cons v_left v_right) expk))])
+  [(ignore env_0 (ret v_right (pair v_left expk))) --> (ignore env_0 (ret (cons v_left v_right) expk))]
+  [(ignore env_0 (ret v (getargs e_args env expk))) --> (e_args env (applyk v expk))]
+  [(ignore env_0 (ret v (applyk (clo (lam vars e) env) expk))) --> (e (extend env vars vs) expk)
+   #:where vs (vlisttovs v)]
+  [(ignore env_0 (ret v (applyk (clo (lamrest vars var_rest e) env) expk))) --> (e (extendrest env vars var_rest vs) expk)
+   #:where vs (vlisttovs v)])
 
 (module+ main
   (require syntax/parse)
