@@ -187,6 +187,9 @@ def vsreverse(vs):
     vs = vs.vs1
   return result
 
+def printimpl(x):
+  return UnaryPrim(x, 'print', lambda v: pprint(v))
+
 class Cell(cl_v):
   def __init__(self, init):
     self.val = init

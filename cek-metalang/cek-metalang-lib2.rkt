@@ -154,7 +154,6 @@
              (list (list 'lookup (nt 'env) (nt 'var))
                    (list 'extend (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extend1 (nt 'env) (nt 'var) (nt 'v))
-                   (list 'pprint (nt 'v))
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'var) (nt 'vs))
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
@@ -169,6 +168,7 @@
                    (list 'mkcell (nt 'v))
                    (list 'setcell (nt 'var) (nt 'env) (nt 'v))
                    (list 'vsreverse (nt 'vs))
+                   (list 'printimpl (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -178,7 +178,6 @@
                    'extend 'env
                    'extend1 'env
                    'extendrest 'env
-                   'pprint 'e
                    'zeropimpl 'e
                    'succimpl 'e
                    'predimpl 'e
@@ -192,6 +191,7 @@
                    'mkcell 'v
                    'setcell 'v
                    'vsreverse 'vs
+                   'printimpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

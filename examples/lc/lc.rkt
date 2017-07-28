@@ -45,10 +45,11 @@
                                    (mf (define car (lam (varl val varsnil) (car val)))
                                      (mf (define cdr (lam (varl val varsnil) (cdr val)))
                                        (mf (define null? (lam (varl val varsnil) (nullp val)))
-                                         modforms))))))))))))))
+                                         (mf (define print (lam (varl val varsnil) (printimpl val)))
+                                           modforms)))))))))))))))
               (emptyenv)
               mt)]
-  #:final [(ignore env_0 (ret v mt)) --> (pprint v)]
+  #:final [(ignore env_0 (ret v mt)) --> ignore]
   #:step
   ;; IDK what to do when the module body is empty... I don't yet have
   ;; a void value, but I guess that's what I need.
@@ -163,7 +164,7 @@
              #'mfnil
              (filter-not ignored-modform? (syntax->list #'(form ...)))))]
       [(app c-w-v (lam () exp) p-v)
-       (kernel->core #'exp)]
+       #`(app print (el #,(kernel->core #'exp) esnil))]
       [(app e1 e-rest ...)
        #`(app
           #,(kernel->core #'e1)
