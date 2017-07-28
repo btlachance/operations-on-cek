@@ -162,6 +162,8 @@ def extendrest(e, xs, x_rest, vs):
 def pprint(v):
   if isinstance(v, cl_clo):
     print v.l0.pprint(0)
+  elif isinstance(v, cl_voidv):
+    pass
   else:
     print v.pprint(0)
   return v

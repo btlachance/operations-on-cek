@@ -9,14 +9,14 @@
   (gtopform ::= e (define var e))
 
   (e ::= var l (app e es) (quote c) (if e e e) (let binding e) ignore
-     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e))
+     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid))
   (es ::= esnil (el e es))
   (binding ::= (bp))
   (bp ::= (p var e))
   (var ::= variable)
   (vars ::= varsnil (varl var vars))
   (l ::= (lam vars e) (lamrest vars var e))
-  (v ::= (clo l env) c (cons v v) undefined)
+  (v ::= (clo l env) c (cons v v) undefined voidv)
   (vs ::= vsnil (vl v vs))
   (c ::= nil true false integer string)
 
@@ -53,7 +53,8 @@
                (mf (define vector-ref (lam (varl vec (varl pos varsnil)) (vecrefimpl vec pos)))
                (mf (define vector-length (lam (varl vec varsnil) (veclengthimpl vec)))
                (mf (define current-command-line-arguments (lam varsnil (quote 0)))
-                 modforms))))))))))))))))))))))
+               (mf (define void (lamrest varsnil args (mkvoid)))
+                 modforms)))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -112,6 +113,7 @@
   [((nullp e_0) env k) --> (e_0 env (nullk k))]
   [((mkcons e_1 e_2) env k) --> (e_1 env (consr e_2 env k))]
   [((apply e_1 e_2) env k) --> (e_1 env (getargs e_2 env k))]
+  [((mkvoid) env k) --> (ignore env (ret voidv k))]
 
   [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
    #:where (clo (lam varsnil e) env) v]
