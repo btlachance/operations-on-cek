@@ -148,20 +148,18 @@
   (require syntax/parse)
   (define (ignored-modform? stx)
     (syntax-parse stx
-      #:datum-literals ([mb #%module-begin]
-                        [app #%app]
-                        [c-w-v call-with-values]
-                        define-syntaxes
-                        module)
-      [(module id lang
+      #:datum-literals (module define-syntaxes define-values
+                        #%require)
+      [(module id _
          _ ...)
-       (equal? 'configure-runtime (syntax-e #'id))]
+       (equal? (syntax-e #'id) 'configure-runtime)]
       [(define-syntaxes _ ...) #t]
       [(define-values (id) _)
        ;; These three identifiers are never used
        (memq (syntax-e #'id) (list 'open-output-file/truncate
                                    'call-with-output-file/truncate
                                    'fatal-error))]
+      [(#%require _) #t]
       [_ #f]))
 
   (define (kernel->core stx)
