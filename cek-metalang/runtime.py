@@ -1,3 +1,4 @@
+from rpython.rlib import jit
 class CEKError(Exception):
   def __init__(self, message):
     self.message = message
@@ -47,6 +48,10 @@ def subimpl(n1, n2):
   return BinaryPrim(n1, n2, '-', lambda n1, n2: Integer(guardint(n1).value - guardint(n2).value))
 def multimpl(n1, n2):
   return BinaryPrim(n1, n2, '*', lambda n1, n2: Integer(guardint(n1).value * guardint(n2).value))
+def ltimpl(n1, n2):
+  return BinaryPrim(n1, n2, '<', lambda n1, n2: cl_true() if guardint(n1).value < guardint(n2).value else cl_false())
+def eqlimpl(v1, v2):
+  return BinaryPrim(v1, v2, 'equal?', lambda v1, v2: cl_true() if v1.eq(v2) else cl_false())
 
 def mkbox(v):
   return Box(v)
@@ -204,7 +209,18 @@ def setcell(var, env, v):
   cell = env.lookup(var)
   return cell.set(v)
 
-from rpython.rlib import jit
+class String(cl_string):
+  def __init__(self, str):
+    self.str = str
+  def pprint(self, indent):
+    return ' ' * indent + "\"%s\"" % self.str
+  def eq(self, other):
+    return isinstance(other, String) and self.str == other.str
+  def ne(self, other):
+    return not self.eq(other)
+def mkstr(str):
+  return String(str)
+
 driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c'],
                        get_printable_location=lambda c: c.pprint(0))

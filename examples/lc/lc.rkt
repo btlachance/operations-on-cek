@@ -18,7 +18,7 @@
   (l ::= (lam vars e) (lamrest vars var e))
   (v ::= (clo l env) c (cons v v) undefined)
   (vs ::= vsnil (vl v vs))
-  (c ::= nil true false integer)
+  (c ::= nil true false integer string)
 
   (env ::= dummy)
 
@@ -46,7 +46,9 @@
                                      (mf (define cdr (lam (varl val varsnil) (cdr val)))
                                        (mf (define null? (lam (varl val varsnil) (nullp val)))
                                          (mf (define print (lam (varl val varsnil) (printimpl val)))
-                                           modforms)))))))))))))))
+                                           (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n)))
+                                             (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2)))
+                                               modforms)))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]

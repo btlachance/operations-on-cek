@@ -1,6 +1,6 @@
 #lang racket
 (require "rep.rkt")
-(provide variable integer)
+(provide variable integer string)
 
 (module variable-prim racket
   (require "ir.rkt" "compile.rkt" racket/syntax)
@@ -43,7 +43,7 @@
   (define ty 'integer)
   (define ((mk/tc-fun result-fun) var-name)
     (result-fun ty))
-  (define (compile-pat int source rest [... #f])
+  (define (compile-pat int source rest)
     (define tmp (format-symbol "~a_cmp" source))
     (define failure-msg (format "Expected ~a to equal ~a but it wasn't" source int))
     ;; There is an isinstance check in the equality test for integer
@@ -67,3 +67,32 @@
    integer-compile-pat
    integer-ty
    integer-ty))
+
+(module string-prim racket
+  (require "ir.rkt" "compile.rkt" racket/syntax)
+  (provide (prefix-out string- (all-defined-out)))
+  (define ty 'string)
+  (define ((mk/tc-fun result-fun) var-name)
+    (result-fun ty))
+  (define (compile-pat str source rest)
+    (define tmp (format-symbol "~a_cmp" source))
+    (define failure-msg (format "Expected ~a to equal ~a but it wasn't" source str))
+    (check-instance
+     source ty
+     (ir:let
+      (list (list tmp (ir:call-builtin 'mkstr (list str))))
+      (ir:if (ir:is-equal source tmp)
+             rest
+             (ir:match-failure failure-msg)))))
+  (define (compile-temp str dest rest)
+    (ir:let (list (list dest (ir:call-builtin 'mkstr (list str))))
+            rest)))
+(require 'string-prim)
+(define string
+  (prim-data
+   (string-mk/tc-fun tc-template-result)
+   (string-mk/tc-fun (lambda (ty) (tc-pattern-result ty '())))
+   string-compile-temp
+   string-compile-pat
+   string-ty
+   string-ty))

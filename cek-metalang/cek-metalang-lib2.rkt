@@ -93,7 +93,8 @@
     ;; like we do for other nonterminals
     (append (map (compose nt production-name) productions)
             (list (nt (prim-data-name prim:variable))
-                  (nt (prim-data-name prim:integer)))))
+                  (nt (prim-data-name prim:integer))
+                  (nt (prim-data-name prim:string)))))
   (define nonterminal-form? (form-in-nonterminals? nonterminals))
 
   (define-values (sort->name sort->field-names sort->type)
@@ -149,6 +150,11 @@
       [:exact-integer
        (prim (syntax-e this-syntax) prim:integer)]
       [_ #f]))
+  (define string-parse-fun
+    (syntax-parser
+      [:string
+       (prim (syntax-e this-syntax) prim:string)]
+      [_ #f]))
   (lang-info nonterminals
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
@@ -169,10 +175,13 @@
                    (list 'setcell (nt 'var) (nt 'env) (nt 'v))
                    (list 'vsreverse (nt 'vs))
                    (list 'printimpl (nt 'var))
+                   (list 'ltimpl (nt 'var) (nt 'var))
+                   (list 'eqlimpl (nt 'var) (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
-                   (parser integer-parse-fun integer-parse-fun))
+                   (parser integer-parse-fun integer-parse-fun)
+                   (parser string-parse-fun string-parse-fun))
              sort->name sort->field-names sort->type
              (hash 'lookup 'v
                    'extend 'env
@@ -192,6 +201,8 @@
                    'setcell 'v
                    'vsreverse 'vs
                    'printimpl 'e
+                   'ltimpl 'e
+                   'eqlimpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 
