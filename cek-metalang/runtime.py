@@ -227,10 +227,15 @@ class Vector(cl_v):
     self.vs = vs
   def ref(self, pos):
     current = self.vs
-    while pos > 0:
+    remaining = pos
+
+    while remaining > 0 and isinstance(current, cl_vl):
       current = current.vs1
-      pos = pos - 1
-    return current.v0
+      remaining = remaining - 1
+    if isinstance(current, cl_vl):
+      return current.v0
+    else:
+      raise CEKError("vector-ref: index %s is out of range" % pos)
   def length(self):
     result = 0
     current = self.vs
@@ -260,10 +265,11 @@ def vlisttovs(vlist):
 
 # no interning behavior yet
 class Symbol(cl_v):
+  _attrs_ = ['contents']
   def __init__(self, contents):
     self.contents = contents
   def eq(self, other):
-    return instanceof(other, Symbol) and self.contents == other.contents
+    return isinstance(other, Symbol) and self.contents == other.contents
   def ne(self, other):
     return not self.eq(other)
   def pprint(self, indent):
