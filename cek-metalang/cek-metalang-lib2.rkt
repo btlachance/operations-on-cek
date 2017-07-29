@@ -181,6 +181,8 @@
                    (list 'vectorimpl (nt 'var))
                    (list 'vecrefimpl (nt 'var) (nt 'var))
                    (list 'veclengthimpl (nt 'var))
+                   (list 'mksymbol (nt 'var))
+                   (list 'issymbolimpl (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -211,6 +213,8 @@
                    'vectorimpl 'e
                    'vecrefimpl 'e
                    'veclengthimpl 'e
+                   'mksymbol 'v
+                   'issymbolimpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

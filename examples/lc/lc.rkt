@@ -18,7 +18,7 @@
   (l ::= (lam vars e) (lamrest vars var e))
   (v ::= (clo l env) c (cons v v) undefined voidv)
   (vs ::= vsnil (vl v vs))
-  (c ::= nil true false integer string)
+  (c ::= nil true false integer string (sym var))
 
   (env ::= dummy)
 
@@ -54,7 +54,8 @@
                (mf (define vector-length (lam (varl vec varsnil) (veclengthimpl vec)))
                (mf (define current-command-line-arguments (lam varsnil (quote 0)))
                (mf (define void (lamrest varsnil args (mkvoid)))
-                 modforms)))))))))))))))))))))))
+               (mf (define symbol? (lam (varl s varsnil) (issymbolimpl s)))
+                 modforms))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -104,7 +105,10 @@
 
   [(var env_0 expk) --> (ignore env_0 (ret (lookup env_0 var) expk))]
   [(l env_0 expk) --> (ignore env_0 (ret (clo l env_0) expk))]
-  [((quote c) env_0 expk) --> (ignore env_0 (ret c expk))]
+  [((quote c) env_0 expk) --> (ignore env_0 (ret c expk))
+   #:unless (sym var) c]
+  [((quote (sym var)) env_0 expk) --> (ignore env_0 (ret v expk))
+   #:where v (mksymbol var)]
   [((app e_1 es) env expk) --> (e_1 env (args es env expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
   [((let ([p var e_0]) e_1) env expk) --> (e_0 env (bind var e_1 env expk))]
@@ -214,6 +218,7 @@
       [(quote #t) #'(quote true)]
       [(quote #f) #'(quote false)]
       [(quote ()) #'(quote nil)]
+      [(quote s:id) #'(quote (sym s))]
       [_ this-syntax]))
 
   (define (corify/lc-term->py stx)

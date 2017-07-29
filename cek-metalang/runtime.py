@@ -159,15 +159,6 @@ def extendrest(e, xs, x_rest, vs):
     restvs_reversed = restvs_reversed.vs1
   return ExtendedEnv(x_rest, rest_list, result)
 
-def pprint(v):
-  if isinstance(v, cl_clo):
-    print v.l0.pprint(0)
-  elif isinstance(v, cl_voidv):
-    pass
-  else:
-    print v.pprint(0)
-  return v
-
 def ret(v):
   raise CEKDone(v)
 
@@ -196,6 +187,14 @@ def vsreverse(vs):
 
 def printimpl(x):
   return UnaryPrim(x, 'print', lambda v: pprint(v))
+def pprint(v):
+  if isinstance(v, cl_clo):
+    print v.l0.pprint(0)
+  elif isinstance(v, cl_voidv):
+    pass
+  else:
+    print v.pprint(0)
+  return v
 
 class Cell(cl_v):
   def __init__(self, init):
@@ -258,6 +257,21 @@ def vlisttovs(vlist):
   if not isinstance(vlist, cl_nil):
     raise CEKError("apply only accepts proper lists")
   return vsreverse(result_reversed)
+
+# no interning behavior yet
+class Symbol(cl_v):
+  def __init__(self, contents):
+    self.contents = contents
+  def eq(self, other):
+    return instanceof(other, Symbol) and self.contents == other.contents
+  def ne(self, other):
+    return not self.eq(other)
+  def pprint(self, indent):
+    return ' '* indent + '\'%s' % self.contents
+def mksymbol(var):
+  return Symbol(var.literal)
+def issymbolimpl(s):
+  return UnaryPrim(s, "symbol?", lambda s: cl_true() if isinstance(s, Symbol) else cl_false())
 
 driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c'],
