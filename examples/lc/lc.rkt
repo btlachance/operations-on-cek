@@ -16,7 +16,7 @@
 
   (e ::= var l (app e es) (quote c) (if e e e) (letvalues valuesbinds e) (values var)
      ignore
-     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid))
+     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
   (bp ::= (p var e))
@@ -31,7 +31,8 @@
   (modk ::= (binddefs modforms modforms k))
   (expk ::= (fn vs es env k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
-        (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env e k))
+        (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env e k)
+        (cwvk var env k))
   #:control-string term
   #:environment env
   #:continuation k
@@ -50,6 +51,10 @@
                (mf (define car (lam (varl val varsnil) (car val)))
                (mf (define cdr (lam (varl val varsnil) (cdr val)))
                (mf (define null? (lam (varl val varsnil) (nullp val)))
+               (mf (define foldl (lam (varl fn (varl init (varl xs varsnil)))
+                                   (if (app null? (el xs esnil))
+                                       init
+                                       (app foldl (el fn (el (app fn (el (app car (el xs esnil)) (el init esnil))) (el (app cdr (el xs esnil)) esnil)))))))
                (mf (define print (lam (varl val varsnil) (printimpl val)))
                (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n)))
                (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2)))
@@ -61,7 +66,8 @@
                (mf (define void (lamrest varsnil args (mkvoid)))
                (mf (define symbol? (lam (varl s varsnil) (issymbolimpl s)))
                (mf (define values (lamrest varsnil args (values args)))
-                 modforms)))))))))))))))))))))))))
+               (mf (define call-with-values (lam (varl gen (varl recv varsnil)) (cwv gen recv)))
+                 modforms)))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -128,6 +134,7 @@
   [((mkvoid) env k) --> (ignore env (ret voidv k))]
   [((values var) env expk) --> (ignore env (ret vs expk))
    #:where vs (vlisttovs (lookup env var))]
+  [((cwv var_gen var_recv) env expk) --> ((app var_gen esnil) env (cwvk var_recv env expk))]
 
   [(ignore env_0 (ret v (fn vs es env expk))) --> (ignore env_0 (fn (vl v vs) es env expk))]
   [(ignore env_0 (fn vs (el e es) env expk)) --> (e env (fn vs es env expk))]
@@ -171,7 +178,12 @@
   [(ignore env_0 (ret v (applyk (clo (lam vars e) env) expk))) --> (e (extend env vars vs) expk)
    #:where vs (vlisttovs v)]
   [(ignore env_0 (ret v (applyk (clo (lamrest vars var_rest e) env) expk))) --> (e (extendrest env vars var_rest vs) expk)
-   #:where vs (vlisttovs v)])
+   #:where vs (vlisttovs v)]
+  [(ignore env_0 (ret v (cwvk var_recv env expk))) --> (ignore env_0 (fn (vl v (vl v_recv vsnil)) esnil env_0 expk))
+   #:where v_recv (lookup env var_recv)]
+  [(ignore env_0 (ret vs_vals (cwvk var_recv env expk))) --> (ignore env_0 (fn vs esnil env_0 expk))
+   #:where v_recv (lookup env var_recv)
+   #:where vs (vsreverse (vl v_recv vs_vals))])
 
 (module+ main
   (require syntax/parse)
@@ -202,8 +214,6 @@
                         [mb #%module-begin]
                         [app #%app]
                         [lam lambda]
-                        [c-w-v call-with-values]
-                        [p-v print-values]
                         quote
                         define-values
                         let-values
@@ -216,8 +226,12 @@
                #`(mf #,(kernel->core form) #,rest))
              #'mfnil
              (filter-not ignored-modform? (syntax->list #'(form ...)))))]
-      [(app c-w-v (lam () exp) p-v)
-       #`(app print (el #,(kernel->core #'exp) esnil))]
+      [(app (~datum call-with-values) (lam () exp) (~datum print-values))
+       #`(app call-with-values
+              (el #,(kernel->core #'(lambda () exp))
+                  (el #,(kernel->core #'(lambda rest
+                                          (#%app foldl (lambda (x rest) (#%app print x)) (#%app void) rest)))
+                      esnil)))]
       [(app e1 e-rest ...)
        #`(app
           #,(kernel->core #'e1)
@@ -225,6 +239,8 @@
              (lambda (arg args) #`(el #,(kernel->core arg) #,args))
              #'esnil
              (syntax->list #'(e-rest ...))))]
+      [(lam x:id e)
+       #`(lamrest varsnil x #,(kernel->core #'e))]
       [(lam (xs ...) e)
        #`(lam #,(ids->vars (attribute xs))
            #,(kernel->core #'e))]
