@@ -209,6 +209,14 @@ def mkcell(v):
 def setcell(var, env, v):
   cell = env.lookup(var)
   return cell.set(v)
+def setcells(vars, env, vs):
+  while isinstance(vars, cl_varl) and isinstance(vs, cl_vl):
+    setcell(vars.var0, env, vs.v0)
+    vars = vars.vars1
+    vs = vs.vs1
+  if not isinstance(vars, cl_varsnil) and not isinstance(vs, cl_vsnil):
+    raise CEKError("Number of variables and values did not agree")
+  return _voidv_sing
 
 class String(cl_string):
   def __init__(self, str):

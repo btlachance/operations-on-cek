@@ -14,8 +14,8 @@
   (vars ::= varsnil (varl var vars))
   (valuesbinds ::= valuesbindsnil (vbl valuesbind valuesbinds))
 
-  (e ::= var l (app e es) (quote c) (if e e e) (letvalues valuesbinds e) (values var)
-     ignore
+  (e ::= var l (app e es) (quote c) (if e e e) (letvalues valuesbinds e) (letrecvalues valuesbinds e)
+     (values var) ignore
      (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
@@ -32,6 +32,7 @@
   (expk ::= (fn vs es env k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env e k)
+        (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds e k) (setcellsk vars env expk)
         (cwvk var env k))
   #:control-string term
   #:environment env
@@ -126,6 +127,9 @@
   [((letvalues valuesbinds e_body) env expk)
    -->
    (ignore env (bindvaluesk env varsnil valuesbinds env e_body expk))]
+  [((letrecvalues valuesbinds e_body) env expk)
+   -->
+   (ignore env (bindrec valuesbinds (evalrec valuesbinds e_body expk)))]
   [((car e_0) env k) --> (e_0 env (cark k))]
   [((cdr e_0) env k) --> (e_0 env (cdrk k))]
   [((nullp e_0) env k) --> (e_0 env (nullk k))]
@@ -167,6 +171,26 @@
    -->
    (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 e_body expk))
    #:where env_acc1 (extend env_acc0 vars vs)]
+
+  [(ignore env (bindrec valuesbindsnil expk)) --> (ignore env expk)]
+  [(ignore env (bindrec (vbl (vb vars e) valuesbinds) expk))
+   -->
+   (ignore env (bindvarscells vars (bindrec valuesbinds expk)))]
+  [(ignore env (bindvarscells varsnil expk)) --> (ignore env expk)]
+  [(ignore env (bindvarscells (varl var vars) expk)) --> (ignore env_1 (bindvarscells vars expk))
+   #:where v (mkcell undefined)
+   #:where env_1 (extend1 env var v)]
+  [(ignore env (evalrec valuesbindsnil e expk)) --> (e env expk)]
+  [(ignore env (evalrec (vbl (vb vars e) valuesbinds) e_body expk))
+   -->
+   (e env (setcellsk vars env (evalrec valuesbinds e_body expk)))]
+  [(ignore env_0 (ret v (setcellsk (varl var varsnil) env expk))) --> (ignore env expk)
+   #:where v_ignore (setcell var env v)]
+  [(ignore env_0 (ret (vl v vsnil) (setcellsk (varl var varsnil) env expk))) --> (ignore env expk)
+   #:where v_ignore (setcell var env v)]
+  [(ignore env_0 (ret vs (setcellsk vars env expk))) --> (ignore env expk)
+   #:where v_ignore (setcells vars env vs)]
+
   [(ignore env_0 (ret (cons v_1 v_2) (cark expk))) --> (ignore env_0 (ret v_1 expk))]
   [(ignore env_0 (ret (cons v_1 v_2) (cdrk expk))) --> (ignore env_0 (ret v_2 expk))]
   [(ignore env_0 (ret nil (nullk expk))) --> (ignore env_0 (ret true expk))]
@@ -217,6 +241,7 @@
                         quote
                         define-values
                         let-values
+                        letrec-values
                         if)
       [(module id lang
          (mb form ...+))
@@ -249,9 +274,11 @@
            #,(kernel->core #'e))]
       [(define-values (id) e)
        #`(define id #,(kernel->core #'e))]
-      [(let-values ([(xs ...) e] ...)
+      [((~or (~and let-values (~bind [name 'letvalues]))
+             (~and letrec-values (~bind [name 'letrecvalues])))
+        ([(xs ...) e] ...)
          e-body)
-       #`(letvalues
+       #`(#,(attribute name)
           #,(foldr
              (lambda (ids e rest)
                #`(vbl
