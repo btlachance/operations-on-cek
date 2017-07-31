@@ -29,7 +29,7 @@
 
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms modforms k))
-  (expk ::= (args es env k) (fn v vs es env k) (sel e e env k) (ret result k)
+  (expk ::= (fn vs es env k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env e k))
   #:control-string term
@@ -115,7 +115,7 @@
    #:unless (sym var) c]
   [((quote (sym var)) env_0 expk) --> (ignore env_0 (ret v expk))
    #:where v (mksymbol var)]
-  [((app e_1 es) env expk) --> (e_1 env (args es env expk))]
+  [((app e_1 es) env expk) --> (e_1 env (fn vsnil es env expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
   [((letvalues valuesbinds e_body) env expk)
    -->
@@ -129,18 +129,16 @@
   [((values var) env expk) --> (ignore env (ret vs expk))
    #:where vs (vlisttovs (lookup env var))]
 
-  [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
-   #:where (clo (lam varsnil e) env) v]
-  [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
-   #:where (clo (lamrest varsnil var_rest e) env_clo) v
-   #:where env (extend1 env_clo var_rest nil)]
-  [(ignore env_0 (ret v (args (el e es) env expk))) --> (e env (fn v vsnil es env expk))]
-  [(ignore env_0 (ret v (fn v_op vs (el e es) env expk))) --> (e env (fn v_op (vl v vs) es env expk))]
-  [(ignore env_0 (ret v (fn (clo (lam vars e) env) vs_rev esnil env_1 expk))) --> (e (extend env vars vs) expk)
-   #:where vs (vsreverse (vl v vs_rev))]
-  [(ignore env_0 (ret v (fn (clo (lamrest vars var_rest e) env_clo) vs_rev esnil env_1 expk))) --> (e env expk)
-   #:where vs (vsreverse (vl v vs_rev))
-   #:where env (extendrest env_clo vars var_rest vs)]
+  [(ignore env_0 (ret v (fn vs es env expk))) --> (ignore env_0 (fn (vl v vs) es env expk))]
+  [(ignore env_0 (fn vs (el e es) env expk)) --> (e env (fn vs es env expk))]
+  [(ignore env_0 (fn vs esnil env_1 expk)) --> (e env expk)
+   #:where (vl v vs_args) (vsreverse vs)
+   #:where (clo (lam vars e) env_clo) v
+   #:where env (extend env_clo vars vs_args)]
+  [(ignore env_0 (fn vs esnil env_1 expk)) --> (e env expk)
+   #:where (vl v vs_args) (vsreverse vs)
+   #:where (clo (lamrest vars var_rest e) env_clo) v
+   #:where env (extendrest env_clo vars var_rest vs_args)]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
