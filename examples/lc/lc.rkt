@@ -8,25 +8,30 @@
   (modform ::= gtopform)
   (gtopform ::= e (define var e))
 
-  (e ::= var l (app e es) (quote c) (if e e e) (let binding e) ignore
-     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid))
+  (result ::= v vs)
   (es ::= esnil (el e es))
+  (vs ::= vsnil (vl v vs))
+  (vars ::= varsnil (varl var vars))
+  (valuesbinds ::= valuesbindsnil (vbl valuesbind valuesbinds))
+
+  (e ::= var l (app e es) (quote c) (if e e e) (letvalues valuesbinds e) (values var)
+     ignore
+     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid))
+  (valuesbind ::= (vb vars e))
   (binding ::= (bp))
   (bp ::= (p var e))
   (var ::= variable)
-  (vars ::= varsnil (varl var vars))
   (l ::= (lam vars e) (lamrest vars var e))
   (v ::= (clo l env) c (cons v v) undefined voidv)
-  (vs ::= vsnil (vl v vs))
   (c ::= nil true false integer string (sym var))
 
   (env ::= dummy)
 
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms modforms k))
-  (expk ::= (args es env k) (fn v vs es env k) (sel e e env k) (bind var e env k) (ret v k)
+  (expk ::= (args es env k) (fn v vs es env k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
-        (evaldefs modform modforms env k))
+        (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env e k))
   #:control-string term
   #:environment env
   #:continuation k
@@ -55,7 +60,8 @@
                (mf (define current-command-line-arguments (lam varsnil (quote 0)))
                (mf (define void (lamrest varsnil args (mkvoid)))
                (mf (define symbol? (lam (varl s varsnil) (issymbolimpl s)))
-                 modforms))))))))))))))))))))))))
+               (mf (define values (lamrest varsnil args (values args)))
+                 modforms)))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -111,13 +117,17 @@
    #:where v (mksymbol var)]
   [((app e_1 es) env expk) --> (e_1 env (args es env expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
-  [((let ([p var e_0]) e_1) env expk) --> (e_0 env (bind var e_1 env expk))]
+  [((letvalues valuesbinds e_body) env expk)
+   -->
+   (ignore env (bindvaluesk env varsnil valuesbinds env e_body expk))]
   [((car e_0) env k) --> (e_0 env (cark k))]
   [((cdr e_0) env k) --> (e_0 env (cdrk k))]
   [((nullp e_0) env k) --> (e_0 env (nullk k))]
   [((mkcons e_1 e_2) env k) --> (e_1 env (consr e_2 env k))]
   [((apply e_1 e_2) env k) --> (e_1 env (getargs e_2 env k))]
   [((mkvoid) env k) --> (ignore env (ret voidv k))]
+  [((values var) env expk) --> (ignore env (ret vs expk))
+   #:where vs (vlisttovs (lookup env var))]
 
   [(ignore env_0 (ret v (args esnil env_1 expk))) --> (e env expk)
    #:where (clo (lam varsnil e) env) v]
@@ -134,7 +144,24 @@
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
-  [(ignore env_0 (ret v (bind var e env expk))) --> (e (extend1 env var v) expk)]
+  [(ignore env (bindvaluesk env_arg varsnil valuesbindsnil env_acc e_body expk))
+   -->
+   (e_body env_acc expk)]
+  [(ignore env (bindvaluesk env_arg varsnil (vbl (vb vars e_vars) valuesbinds) env_acc e_body expk))
+   -->
+   (e_vars env_arg (bindvaluesk env_arg vars valuesbinds env_acc e_body expk))]
+  [(ignore env (ret v (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 e_body expk)))
+   -->
+   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 e_body expk))
+   #:where env_acc1 (extend1 env_acc0 var v)]
+  [(ignore env (ret (vl v vsnil) (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 e_body expk)))
+   -->
+   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 e_body expk))
+   #:where env_acc1 (extend1 env_acc0 var v)]
+  [(ignore env (ret vs (bindvaluesk env_arg vars valuesbinds env_acc0 e_body expk)))
+   -->
+   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 e_body expk))
+   #:where env_acc1 (extend env_acc0 vars vs)]
   [(ignore env_0 (ret (cons v_1 v_2) (cark expk))) --> (ignore env_0 (ret v_1 expk))]
   [(ignore env_0 (ret (cons v_1 v_2) (cdrk expk))) --> (ignore env_0 (ret v_2 expk))]
   [(ignore env_0 (ret nil (nullk expk))) --> (ignore env_0 (ret true expk))]
@@ -166,6 +193,11 @@
       [(#%require _) #t]
       [_ #f]))
 
+  (define (ids->vars ids)
+    (foldr (lambda (id rest) #`(varl #,id #,rest))
+           #'varsnil
+           ids))
+
   (define (kernel->core stx)
     (syntax-parse stx
       #:datum-literals (module
@@ -176,6 +208,7 @@
                         [p-v print-values]
                         quote
                         define-values
+                        let-values
                         if)
       [(module id lang
          (mb form ...+))
@@ -195,22 +228,25 @@
              #'esnil
              (syntax->list #'(e-rest ...))))]
       [(lam (xs ...) e)
-       #`(lam
-          #,(foldr
-             (lambda (id ids) #`(varl #,id #,ids))
-             #'varsnil
-             (syntax->list #'(xs ...)))
-          #,(kernel->core #'e))]
+       #`(lam #,(ids->vars (attribute xs))
+           #,(kernel->core #'e))]
       [(lam (xs ... . rest:id) e)
-       #`(lamrest
-          #,(foldr
-             (lambda (id ids) #`(varl #,id #,ids))
-             #'varsnil
-             (syntax->list #'(xs ...)))
-          rest
-          #,(kernel->core #'e))]
+       #`(lamrest #,(ids->vars (attribute xs)) rest
+           #,(kernel->core #'e))]
       [(define-values (id) e)
        #`(define id #,(kernel->core #'e))]
+      [(let-values ([(xs ...) e] ...)
+         e-body)
+       #`(letvalues
+          #,(foldr
+             (lambda (ids e rest)
+               #`(vbl
+                  (vb #,(ids->vars ids) #,(kernel->core e))
+                  #,rest))
+             #'valuesbindsnil
+             (attribute xs)
+             (attribute e))
+          #,(kernel->core #'e-body))]
       [(if e1 e2 e3)
        #`(if #,(kernel->core #'e1)
              #,(kernel->core #'e2)
