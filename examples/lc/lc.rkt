@@ -27,13 +27,14 @@
 
   (env ::= dummy)
 
+  (config ::= (conf term env k))
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms modforms k))
   (expk ::= (fn vs es env k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
         (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds es k) (setcellsk vars env expk)
-        (cwvk var env k) (expsk env es k))
+        (cwvk var env k) (expsk env es k) extensionk)
   #:control-string term
   #:environment env
   #:continuation k
@@ -52,23 +53,46 @@
                (mf (define car (lam (varl val varsnil) (car val) esnil))
                (mf (define cdr (lam (varl val varsnil) (cdr val) esnil))
                (mf (define null? (lam (varl val varsnil) (nullp val) esnil))
+               (mf (define null (quote nil))
                (mf (define foldl (lam (varl fn (varl init (varl xs varsnil)))
                                    (if (app null? (el xs esnil))
                                        init
                                        (app foldl (el fn (el (app fn (el (app car (el xs esnil)) (el init esnil))) (el (app cdr (el xs esnil)) esnil))))) esnil))
+               (mf (define foldr (lam (varl fn (varl init (varl xs varsnil)))
+                                   (if (app null? (el xs esnil))
+                                       init
+                                       (app fn (el (app car (el xs esnil)) (el (app foldr (el fn (el init (el (app cdr (el xs esnil)) esnil)))) esnil))))
+                                   esnil))
+               (mf (define list (lamrest varsnil args (app foldr (el cons (el null (el args esnil)))) esnil))
                (mf (define print (lam (varl val varsnil) (printimpl val) esnil))
+               (mf (define = (lam (varl m (varl n varsnil)) (numequalimpl m n) esnil))
                (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n) esnil))
                (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2) esnil))
                (mf (define apply (lam (varl fun (varl args varsnil)) (apply fun args) esnil))
                (mf (define vector (lamrest varsnil args (vectorimpl args) esnil))
                (mf (define vector-ref (lam (varl vec (varl pos varsnil)) (vecrefimpl vec pos) esnil))
                (mf (define vector-length (lam (varl vec varsnil) (veclengthimpl vec) esnil))
-               (mf (define current-command-line-arguments (lam varsnil (quote 0) esnil))
+               (mf (define current-command-line-arguments (lam varsnil (app vector esnil) esnil))
                (mf (define void (lamrest varsnil args (mkvoid) esnil))
                (mf (define symbol? (lam (varl s varsnil) (issymbolimpl s) esnil))
+               (mf (define newline (lam varsnil
+                                     (app fprintf (el (app current-output-port esnil) (el (quote "\n") esnil)))
+                                     esnil))
+               (mf (define time-apply (lam (varl proc (varl lst varsnil)) (timeapplyimpl proc lst) esnil))
+               (mf (define current-seconds (lam varsnil (currentsecondsimpl) esnil))
+               (mf (define current-error-port (lam varsnil (currenterrorportimpl) esnil))
+               (mf (define current-output-port (lam varsnil (currentoutputportimpl) esnil))
+               (mf (define fprintf (lamrest (varl out (varl form varsnil)) vals
+                                     (fprintfimpl out form vals)
+                                     esnil))
+               (mf (define not (lam (varl val varsnil)
+                                 (if val
+                                     (quote false)
+                                     (quote true))
+                                 esnil))
                (mf (define values (lamrest varsnil args (values args) esnil))
                (mf (define call-with-values (lam (varl gen (varl recv varsnil)) (cwv gen recv) esnil))
-                 modforms)))))))))))))))))))))))))))
+                 modforms))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -212,7 +236,10 @@
    #:where v_recv (lookup env var_recv)]
   [(ignore env_0 (ret vs_vals (cwvk var_recv env expk))) --> (ignore env_0 (fn vs esnil env_0 expk))
    #:where v_recv (lookup env var_recv)
-   #:where vs (vsreverse (vl v_recv vs_vals))])
+   #:where vs (vsreverse (vl v_recv vs_vals))]
+  [(ignore env_0 (ret result k)) --> (e env k)
+   #:where extensionk k
+   #:where (conf e env k) (docontinuation k result)])
 
 (module+ main
   (require syntax/parse)
@@ -226,9 +253,22 @@
       [(define-syntaxes _ ...) #t]
       [(define-values (id) _)
        ;; These three identifiers are never used
-       (memq (syntax-e #'id) (list 'open-output-file/truncate
-                                   'call-with-output-file/truncate
-                                   'fatal-error))]
+       (or (memq (syntax-e #'id) (list 'open-output-file/truncate
+                                       'call-with-output-file/truncate
+                                       'fatal-error))
+           (and (regexp-match? #rx"^.*-iters$" (symbol->string (syntax-e #'id)))
+                ;; XXX When I compile even a small input benchmark,
+                ;; e.g. fib, with --compile-term I produce waaaay too
+                ;; big of a main function (but by what metric---# of
+                ;; not-dead variables? error message just says graph
+                ;; is to complex). This causes translation to
+                ;; fail. So, for a short-term stop gap I'm filtering
+                ;; out the unnecessary -iters...
+                (not (memq (syntax-e #'id) (list 'fib-iters
+                                                 'ack-iters
+                                                 'tak-iters
+                                                 'cpstak-iters
+                                                 'warmup-iters)))))]
       [(#%require _) #t]
       [_ #f]))
 

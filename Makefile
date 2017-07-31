@@ -54,5 +54,15 @@ quicktest: build/lc-interp.py
 	  echo 'if __name__ == "__main__":';\
 	  echo '  main()'; } > "$$TMP";\
 	$(PYTHON) $$TMP
+quicktest-jit: build/lc-interp.py
+	cp examples/lc/targetlc.py build/lc-quicktest-jit.py
+	TMP=$$(mktemp build/runtest-XXXX).py;\
+	{ set -e;\
+	  cat $<;\
+	  racket examples/lc/lc.rkt --compile-term;\
+	  echo 'if __name__ == "__main__":';\
+	  echo '  main()'; } > "$$TMP";\
+	mv $$TMP build/lc.py
+	(cd build/; $(RPYTHON) -Ojit $(RPYTHONOPTS) lc-quicktest-jit.py)
 clean:
 	rm -rf build compiled

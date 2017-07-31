@@ -1,4 +1,6 @@
+import time
 from rpython.rlib import jit
+
 class CEKError(Exception):
   def __init__(self, message):
     self.message = message
@@ -52,6 +54,8 @@ def ltimpl(n1, n2):
   return BinaryPrim(n1, n2, '<', lambda n1, n2: cl_true() if guardint(n1).value < guardint(n2).value else cl_false())
 def eqlimpl(v1, v2):
   return BinaryPrim(v1, v2, 'equal?', lambda v1, v2: cl_true() if v1.eq(v2) else cl_false())
+def numequalimpl(v1, v2):
+  return BinaryPrim(v1, v2, '=', lambda v1, v2: cl_true() if v1.eq(v2) else cl_false())
 
 def mkbox(v):
   return Box(v)
@@ -71,6 +75,15 @@ def unboximpl(b):
   return UnaryPrim(b, 'unbox', lambda b: b.get())
 def setboximpl(b, v):
   return BinaryPrim(b, v, 'box-set!', lambda b, v: b.set(v))
+
+class NullaryPrim(cl_e):
+  def __init__(self, opname, op):
+    self.opname = opname
+    self.op = op
+  def interpret(self, env, k):
+    return _ignore_sing, env, cl_ret(self.op(), k)
+  def pprint(self, indent):
+    return ' ' * indent + '(p#%s)' % self.opname
 
 class UnaryPrim(cl_e):
   def __init__(self, arg, opname, op):
@@ -95,6 +108,22 @@ class BinaryPrim(cl_e):
     return _ignore_sing, env, cl_ret(self.op(v1, v2), k)
   def pprint(self, indent):
     return ' ' * indent + '(p#%s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0))
+
+class TernaryPrim(cl_e):
+  def __init__(self, arg1, arg2, arg3, opname, op):
+    self.arg1 = arg1
+    self.arg2 = arg2
+    self.arg3 = arg3
+    self.opname = opname
+    self.op = op
+  def interpret(self, env, k):
+    v1 = lookup(env, self.arg1)
+    v2 = lookup(env, self.arg2)
+    v3 = lookup(env, self.arg3)
+    return _ignore_sing, env, cl_ret(self.op(v1, v2, v3), k)
+  def pprint(self, indent):
+    return ' ' * indent + '(p#%s %s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0),
+                                               self.arg3.pprint(0))
 
 class Env(cl_env):
   def __init__(self):
@@ -159,6 +188,17 @@ def extendrest(e, xs, x_rest, vs):
     restvs_reversed = restvs_reversed.vs1
   return ExtendedEnv(x_rest, rest_list, result)
 
+def resulttovlist(result):
+  if isinstance(result, cl_v):
+    return cl_cons(result, _nil_sing)
+
+  vs_reversed = vsreverse(result)
+  resultlist = _nil_sing
+  while isinstance(vs_reversed, cl_vl):
+    resultlist = cl_cons(vs_reversed.v0, resultlist)
+    vs_reversed = vs_reversed.vs1
+  return resultlist
+
 def ret(v):
   raise CEKDone(v)
 
@@ -219,6 +259,7 @@ def setcells(vars, env, vs):
   return _voidv_sing
 
 class String(cl_string):
+  _attrs_ = ['str']
   def __init__(self, str):
     self.str = str
   def pprint(self, indent):
@@ -229,6 +270,10 @@ class String(cl_string):
     return not self.eq(other)
 def mkstr(str):
   return String(str)
+def guardstr(v):
+  if not isinstance(v, String):
+    raise CEKError("Expected a string")
+  return v
 
 class Vector(cl_v):
   def __init__(self, vs):
@@ -262,6 +307,15 @@ def vecrefimpl(vec, pos):
 def veclengthimpl(vec):
   return UnaryPrim(vec, 'vector-length', lambda v: mkint(guardvector(v).length()))
 
+def listtovs(lst):
+  lst.reverse()
+  result = _vsnil_sing
+  while not lst == []:
+    v = lst[0]
+    lst = lst[1:]
+    result = cl_vl(v, result)
+  return result
+
 def vlisttovs(vlist):
   result_reversed = _vsnil_sing
   while isinstance(vlist, cl_cons):
@@ -286,6 +340,82 @@ def mksymbol(var):
   return Symbol(var.literal)
 def issymbolimpl(s):
   return UnaryPrim(s, "symbol?", lambda s: cl_true() if isinstance(s, Symbol) else cl_false())
+
+from rpython.rlib import streamio as sio
+# Heavily inspired by Pycket's representations, not that it's anything
+# too special. I couldn't find too good of docs on sio so I checked
+# their implementation for reference.
+class FileOutputPort(cl_v):
+  def __init__(self, file):
+    self.file = file
+  def write(self, string):
+    self.file.write(string)
+def guardfileoutputport(v):
+  if not isinstance(v, FileOutputPort):
+    raise CEKError("Expected a FileOutputPort but got something else")
+  return v
+stdout = FileOutputPort(sio.fdopen_as_stream(1, "w", buffering = 1))
+def currentoutputportimpl():
+  return NullaryPrim('current-output-port', lambda: stdout)
+stderr = FileOutputPort(sio.fdopen_as_stream(2, "w", buffering = 1))
+def currenterrorportimpl():
+  return NullaryPrim('current-error-port', lambda: stderr)
+
+def fprintfimpl(out, form, vals):
+  return TernaryPrim(out, form, vals, "fprintf", fprintf)
+def fprintf(out, form, vals):
+  guardfileoutputport(out)
+  out.write(guardstr(form).str) # XXX need to actually implement formatting
+  while isinstance(vals, cl_cons):
+    out.write(vals.v0.pprint(0))
+    out.write("\n")
+    vals = vals.v1
+  return _voidv_sing
+
+def currentsecondsimpl():
+  return NullaryPrim('current-seconds', lambda: mkint(int(time.clock())))
+
+def apply(f, args, k):
+  vs = cl_vl(f, vlisttovs(args))
+  return _ignore_sing, emptyenv(), cl_fn(vsreverse(vs), _esnil_sing, emptyenv(), k)
+
+class TimeApply(cl_e):
+  def __init__(self, proc, lst):
+    self.proc = proc
+    self.lst = lst
+  def pprint(self, indent):
+    return ' ' * indent + '(p#time-apply %s %s)' % (self.proc.pprint(0), self.lst.pprint(0))
+
+  def interpret(self, env, k):
+    procv = env.lookup(self.proc)
+    lstv = env.lookup(self.lst)
+    return apply(procv, lstv, TimeApplyK(time.clock(), k))
+
+class ExtensionK(cl_extensionk):
+  def interpretspecial(self, result):
+    raise CEKError("Subclass responsibility")
+
+class TimeApplyK(ExtensionK):
+  def __init__(self, start, k):
+    self.start = start
+    self.k = k
+  def interpretspecial(self, result):
+    end = time.clock()
+    ms = mkint(int((end - self.start) * 1000))
+    resultlist = resulttovlist(result)
+
+    timing_results = listtovs([resultlist, ms, ms, mkint(0)])
+    return _ignore_sing, emptyenv(), cl_ret(timing_results, self.k)
+  def pprint(self, indent):
+    return ' ' * indent + '(timeapplyk %s %s)' % (self.start, self.k.pprint(0))
+
+def docontinuation(extensionk, result):
+  assert isinstance(extensionk, ExtensionK)
+  c, e, k = extensionk.interpretspecial(result)
+  return cl_conf(c, e, k)
+
+def timeapplyimpl(proc, init):
+  return TimeApply(proc, init)
 
 driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c'],

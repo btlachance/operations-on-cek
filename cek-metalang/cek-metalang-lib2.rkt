@@ -178,12 +178,19 @@
                    (list 'printimpl (nt 'var))
                    (list 'ltimpl (nt 'var) (nt 'var))
                    (list 'eqlimpl (nt 'var) (nt 'var))
+                   (list 'numequalimpl (nt 'var) (nt 'var))
                    (list 'vlisttovs (nt 'v))
                    (list 'vectorimpl (nt 'var))
                    (list 'vecrefimpl (nt 'var) (nt 'var))
                    (list 'veclengthimpl (nt 'var))
                    (list 'mksymbol (nt 'var))
                    (list 'issymbolimpl (nt 'var))
+                   (list 'fprintfimpl (nt 'var) (nt 'var) (nt 'var))
+                   (list 'currenterrorportimpl)
+                   (list 'currentoutputportimpl)
+                   (list 'currentsecondsimpl)
+                   (list 'timeapplyimpl (nt 'var) (nt 'var))
+                   (list 'docontinuation (nt 'k) (nt 'result))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -211,12 +218,19 @@
                    'printimpl 'e
                    'ltimpl 'e
                    'eqlimpl 'e
+                   'numequalimpl 'e
                    'vlisttovs 'vs
                    'vectorimpl 'e
                    'vecrefimpl 'e
                    'veclengthimpl 'e
                    'mksymbol 'v
                    'issymbolimpl 'e
+                   'fprintfimpl 'e
+                   'currenterrorportimpl 'e
+                   'currentoutputportimpl 'e
+                   'currentsecondsimpl 'e
+                   'timeapplyimpl 'e
+                   'docontinuation 'config
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 
