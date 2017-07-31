@@ -14,14 +14,14 @@
   (vars ::= varsnil (varl var vars))
   (valuesbinds ::= valuesbindsnil (vbl valuesbind valuesbinds))
 
-  (e ::= var l (app e es) (quote c) (if e e e) (letvalues valuesbinds e) (letrecvalues valuesbinds e)
+  (e ::= var l (app e es) (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
      (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
   (bp ::= (p var e))
   (var ::= variable)
-  (l ::= (lam vars e) (lamrest vars var e))
+  (l ::= (lam vars e es) (lamrest vars var e es))
   (v ::= (clo l env) c (cons v v) undefined voidv)
   (c ::= nil true false integer string (sym var))
 
@@ -31,43 +31,43 @@
   (modk ::= (binddefs modforms modforms k))
   (expk ::= (fn vs es env k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
-        (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env e k)
-        (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds e k) (setcellsk vars env expk)
-        (cwvk var env k))
+        (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
+        (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds es k) (setcellsk vars env expk)
+        (cwvk var env k) (expsk env es k))
   #:control-string term
   #:environment env
   #:continuation k
   #:initial [(modbegin modforms) -->
              ((modbegin
-               (mf (define zero? (lam (varl n varsnil) (zeropimpl n)))
-               (mf (define add1 (lam (varl n varsnil) (succimpl n)))
-               (mf (define sub1 (lam (varl n varsnil) (predimpl n)))
-               (mf (define + (lam (varl m (varl n varsnil)) (addimpl m n)))
-               (mf (define - (lam (varl m (varl n varsnil)) (subimpl m n)))
-               (mf (define * (lam (varl m (varl n varsnil)) (multimpl m n)))
-               (mf (define box (lam (varl b varsnil) (boximpl b)))
-               (mf (define unbox  (lam (varl b varsnil) (unboximpl b)))
-               (mf (define set-box! (lam (varl b (varl val varsnil)) (setboximpl b val)))
-               (mf (define cons (lam (varl val1 (varl val2 varsnil)) (mkcons val1 val2)))
-               (mf (define car (lam (varl val varsnil) (car val)))
-               (mf (define cdr (lam (varl val varsnil) (cdr val)))
-               (mf (define null? (lam (varl val varsnil) (nullp val)))
+               (mf (define zero? (lam (varl n varsnil) (zeropimpl n) esnil))
+               (mf (define add1 (lam (varl n varsnil) (succimpl n) esnil))
+               (mf (define sub1 (lam (varl n varsnil) (predimpl n) esnil))
+               (mf (define + (lam (varl m (varl n varsnil)) (addimpl m n) esnil))
+               (mf (define - (lam (varl m (varl n varsnil)) (subimpl m n) esnil))
+               (mf (define * (lam (varl m (varl n varsnil)) (multimpl m n) esnil))
+               (mf (define box (lam (varl b varsnil) (boximpl b) esnil))
+               (mf (define unbox  (lam (varl b varsnil) (unboximpl b) esnil))
+               (mf (define set-box! (lam (varl b (varl val varsnil)) (setboximpl b val) esnil))
+               (mf (define cons (lam (varl val1 (varl val2 varsnil)) (mkcons val1 val2) esnil))
+               (mf (define car (lam (varl val varsnil) (car val) esnil))
+               (mf (define cdr (lam (varl val varsnil) (cdr val) esnil))
+               (mf (define null? (lam (varl val varsnil) (nullp val) esnil))
                (mf (define foldl (lam (varl fn (varl init (varl xs varsnil)))
                                    (if (app null? (el xs esnil))
                                        init
-                                       (app foldl (el fn (el (app fn (el (app car (el xs esnil)) (el init esnil))) (el (app cdr (el xs esnil)) esnil)))))))
-               (mf (define print (lam (varl val varsnil) (printimpl val)))
-               (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n)))
-               (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2)))
-               (mf (define apply (lam (varl fun (varl args varsnil)) (apply fun args)))
-               (mf (define vector (lamrest varsnil args (vectorimpl args)))
-               (mf (define vector-ref (lam (varl vec (varl pos varsnil)) (vecrefimpl vec pos)))
-               (mf (define vector-length (lam (varl vec varsnil) (veclengthimpl vec)))
-               (mf (define current-command-line-arguments (lam varsnil (quote 0)))
-               (mf (define void (lamrest varsnil args (mkvoid)))
-               (mf (define symbol? (lam (varl s varsnil) (issymbolimpl s)))
-               (mf (define values (lamrest varsnil args (values args)))
-               (mf (define call-with-values (lam (varl gen (varl recv varsnil)) (cwv gen recv)))
+                                       (app foldl (el fn (el (app fn (el (app car (el xs esnil)) (el init esnil))) (el (app cdr (el xs esnil)) esnil))))) esnil))
+               (mf (define print (lam (varl val varsnil) (printimpl val) esnil))
+               (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n) esnil))
+               (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2) esnil))
+               (mf (define apply (lam (varl fun (varl args varsnil)) (apply fun args) esnil))
+               (mf (define vector (lamrest varsnil args (vectorimpl args) esnil))
+               (mf (define vector-ref (lam (varl vec (varl pos varsnil)) (vecrefimpl vec pos) esnil))
+               (mf (define vector-length (lam (varl vec varsnil) (veclengthimpl vec) esnil))
+               (mf (define current-command-line-arguments (lam varsnil (quote 0) esnil))
+               (mf (define void (lamrest varsnil args (mkvoid) esnil))
+               (mf (define symbol? (lam (varl s varsnil) (issymbolimpl s) esnil))
+               (mf (define values (lamrest varsnil args (values args) esnil))
+               (mf (define call-with-values (lam (varl gen (varl recv varsnil)) (cwv gen recv) esnil))
                  modforms)))))))))))))))))))))))))))
               (emptyenv)
               mt)]
@@ -124,12 +124,12 @@
    #:where v (mksymbol var)]
   [((app e_1 es) env expk) --> (e_1 env (fn vsnil es env expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
-  [((letvalues valuesbinds e_body) env expk)
+  [((letvalues valuesbinds e_body0 es_body) env expk)
    -->
-   (ignore env (bindvaluesk env varsnil valuesbinds env e_body expk))]
-  [((letrecvalues valuesbinds e_body) env expk)
+   (ignore env (bindvaluesk env varsnil valuesbinds env (el e_body0 es_body) expk))]
+  [((letrecvalues valuesbinds e_body0 es_body) env expk)
    -->
-   (ignore env (bindrec valuesbinds (evalrec valuesbinds e_body expk)))]
+   (ignore env (bindrec valuesbinds (evalrec valuesbinds (el e_body0 es_body) expk)))]
   [((car e_0) env k) --> (e_0 env (cark k))]
   [((cdr e_0) env k) --> (e_0 env (cdrk k))]
   [((nullp e_0) env k) --> (e_0 env (nullk k))]
@@ -142,34 +142,38 @@
 
   [(ignore env_0 (ret v (fn vs es env expk))) --> (ignore env_0 (fn (vl v vs) es env expk))]
   [(ignore env_0 (fn vs (el e es) env expk)) --> (e env (fn vs es env expk))]
-  [(ignore env_0 (fn vs esnil env_1 expk)) --> (e env expk)
+  [(ignore env_0 (fn vs esnil env_1 expk)) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (vl v vs_args) (vsreverse vs)
-   #:where (clo (lam vars e) env_clo) v
+   #:where (clo (lam vars e es) env_clo) v
    #:where env (extend env_clo vars vs_args)]
-  [(ignore env_0 (fn vs esnil env_1 expk)) --> (e env expk)
+  [(ignore env_0 (fn vs esnil env_1 expk)) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (vl v vs_args) (vsreverse vs)
-   #:where (clo (lamrest vars var_rest e) env_clo) v
+   #:where (clo (lamrest vars var_rest e es) env_clo) v
    #:where env (extendrest env_clo vars var_rest vs_args)]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
-  [(ignore env (bindvaluesk env_arg varsnil valuesbindsnil env_acc e_body expk))
+  [(ignore env_0 (expsk env (el e esnil) expk)) --> (e env expk)]
+  [(ignore env_0 (expsk env (el e (el e_next es)) expk)) --> (e env (expsk env (el e_next es) expk))]
+  [(ignore env_0 (ret result (expsk env es expk))) --> (ignore env_0 (expsk env es expk))]
+
+  [(ignore env (bindvaluesk env_arg varsnil valuesbindsnil env_acc es expk))
    -->
-   (e_body env_acc expk)]
-  [(ignore env (bindvaluesk env_arg varsnil (vbl (vb vars e_vars) valuesbinds) env_acc e_body expk))
+   (ignore env (expsk env_acc es expk))]
+  [(ignore env (bindvaluesk env_arg varsnil (vbl (vb vars e_vars) valuesbinds) env_acc es expk))
    -->
-   (e_vars env_arg (bindvaluesk env_arg vars valuesbinds env_acc e_body expk))]
-  [(ignore env (ret v (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 e_body expk)))
+   (e_vars env_arg (bindvaluesk env_arg vars valuesbinds env_acc es expk))]
+  [(ignore env (ret v (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 es expk)))
    -->
-   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 e_body expk))
+   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
    #:where env_acc1 (extend1 env_acc0 var v)]
-  [(ignore env (ret (vl v vsnil) (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 e_body expk)))
+  [(ignore env (ret (vl v vsnil) (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 es expk)))
    -->
-   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 e_body expk))
+   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
    #:where env_acc1 (extend1 env_acc0 var v)]
-  [(ignore env (ret vs (bindvaluesk env_arg vars valuesbinds env_acc0 e_body expk)))
+  [(ignore env (ret vs (bindvaluesk env_arg vars valuesbinds env_acc0 es expk)))
    -->
-   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 e_body expk))
+   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
    #:where env_acc1 (extend env_acc0 vars vs)]
 
   [(ignore env (bindrec valuesbindsnil expk)) --> (ignore env expk)]
@@ -180,10 +184,10 @@
   [(ignore env (bindvarscells (varl var vars) expk)) --> (ignore env_1 (bindvarscells vars expk))
    #:where v (mkcell undefined)
    #:where env_1 (extend1 env var v)]
-  [(ignore env (evalrec valuesbindsnil e expk)) --> (e env expk)]
-  [(ignore env (evalrec (vbl (vb vars e) valuesbinds) e_body expk))
+  [(ignore env (evalrec valuesbindsnil es expk)) --> (ignore env (expsk env es expk))]
+  [(ignore env (evalrec (vbl (vb vars e) valuesbinds) es expk))
    -->
-   (e env (setcellsk vars env (evalrec valuesbinds e_body expk)))]
+   (e env (setcellsk vars env (evalrec valuesbinds es expk)))]
   [(ignore env_0 (ret v (setcellsk (varl var varsnil) env expk))) --> (ignore env expk)
    #:where v_ignore (setcell var env v)]
   [(ignore env_0 (ret (vl v vsnil) (setcellsk (varl var varsnil) env expk))) --> (ignore env expk)
@@ -199,9 +203,9 @@
   [(ignore env_0 (ret v (consr e env expk))) --> (e env (pair v expk))]
   [(ignore env_0 (ret v_right (pair v_left expk))) --> (ignore env_0 (ret (cons v_left v_right) expk))]
   [(ignore env_0 (ret v (getargs e_args env expk))) --> (e_args env (applyk v expk))]
-  [(ignore env_0 (ret v (applyk (clo (lam vars e) env) expk))) --> (e (extend env vars vs) expk)
+  [(ignore env_0 (ret v (applyk (clo (lam vars e es) env) expk))) --> (ignore env_0 (expsk (extend env vars vs) (el e es) expk))
    #:where vs (vlisttovs v)]
-  [(ignore env_0 (ret v (applyk (clo (lamrest vars var_rest e) env) expk))) --> (e (extendrest env vars var_rest vs) expk)
+  [(ignore env_0 (ret v (applyk (clo (lamrest vars var_rest e es) env) expk))) --> (ignore env_0 (expsk (extendrest env vars var_rest vs) (el e es) expk))
    #:where vs (vlisttovs v)]
   [(ignore env_0 (ret v (cwvk var_recv env expk))) --> (ignore env_0 (fn (vl v (vl v_recv vsnil)) esnil env_0 expk))
    #:where v_recv (lookup env var_recv)]
@@ -231,6 +235,10 @@
     (foldr (lambda (id rest) #`(varl #,id #,rest))
            #'varsnil
            ids))
+  (define (es->el es)
+    (foldr (lambda (e es-rest) #`(el #,(kernel->core e) #,es-rest))
+           #'esnil
+           es))
 
   (define (kernel->core stx)
     (syntax-parse stx
@@ -260,24 +268,23 @@
       [(app e1 e-rest ...)
        #`(app
           #,(kernel->core #'e1)
-          #,(foldr
-             (lambda (arg args) #`(el #,(kernel->core arg) #,args))
-             #'esnil
-             (syntax->list #'(e-rest ...))))]
-      [(lam x:id e)
-       #`(lamrest varsnil x #,(kernel->core #'e))]
-      [(lam (xs ...) e)
+          #,(es->el (attribute e-rest)))]
+      [(lam x:id e es ...)
+       #`(lamrest varsnil x #,(kernel->core #'e) #,(es->el (attribute es)))]
+      [(lam (xs ...) e es ...)
        #`(lam #,(ids->vars (attribute xs))
-           #,(kernel->core #'e))]
-      [(lam (xs ... . rest:id) e)
+           #,(kernel->core #'e)
+           #,(es->el (attribute es)))]
+      [(lam (xs ... . rest:id) e es ...)
        #`(lamrest #,(ids->vars (attribute xs)) rest
-           #,(kernel->core #'e))]
+           #,(kernel->core #'e)
+           #,(es->el (attribute es)))]
       [(define-values (id) e)
        #`(define id #,(kernel->core #'e))]
       [((~or (~and let-values (~bind [name 'letvalues]))
              (~and letrec-values (~bind [name 'letrecvalues])))
         ([(xs ...) e] ...)
-         e-body)
+        e-body0 e-body ...)
        #`(#,(attribute name)
           #,(foldr
              (lambda (ids e rest)
@@ -287,7 +294,8 @@
              #'valuesbindsnil
              (attribute xs)
              (attribute e))
-          #,(kernel->core #'e-body))]
+          #,(kernel->core #'e-body0)
+          #,(es->el (attribute e-body)))]
       [(if e1 e2 e3)
        #`(if #,(kernel->core #'e1)
              #,(kernel->core #'e2)
