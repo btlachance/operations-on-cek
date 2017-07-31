@@ -16,13 +16,13 @@
 
   (e ::= var l (app e es) (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
-     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var))
+     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var) (begin e es))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
   (bp ::= (p var e))
   (var ::= variable)
   (l ::= (lam vars e es) (lamrest vars var e es))
-  (v ::= (clo l env) c (cons v v) undefined voidv)
+  (v ::= (clo l env) c (cons v v) undefinedv voidv)
   (c ::= nil true false integer string (sym var))
 
   (env ::= dummy)
@@ -83,7 +83,7 @@
    -->
    (modform env_1 (binddefs (mf gtopform modforms_bound) modforms_unbound k))
    #:where (define var e_0) gtopform
-   #:where v (mkcell undefined)
+   #:where v (mkcell undefinedv)
    #:where env_1 (extend1 env_0 var v)]
   [(e_0 env (binddefs modforms_bound (mf modform modforms_unbound) k))
    -->
@@ -92,7 +92,7 @@
    -->
    (gtopform env_1 (evaldefs gtopform modforms_bound env_1 k))
    #:where (define var e_0) gtopform
-   #:where v (mkcell undefined)
+   #:where v (mkcell undefinedv)
    #:where env_1 (extend1 env_0 var v)]
   [(e_0 env (binddefs modforms_bound mfnil k))
    -->
@@ -139,6 +139,7 @@
   [((values var) env expk) --> (ignore env (ret vs expk))
    #:where vs (vlisttovs (lookup env var))]
   [((cwv var_gen var_recv) env expk) --> ((app var_gen esnil) env (cwvk var_recv env expk))]
+  [((begin e_0 es) env expk) --> (ignore env (expsk env (el e_0 es) expk))]
 
   [(ignore env_0 (ret v (fn vs es env expk))) --> (ignore env_0 (fn (vl v vs) es env expk))]
   [(ignore env_0 (fn vs (el e es) env expk)) --> (e env (fn vs es env expk))]
@@ -182,7 +183,7 @@
    (ignore env (bindvarscells vars (bindrec valuesbinds expk)))]
   [(ignore env (bindvarscells varsnil expk)) --> (ignore env expk)]
   [(ignore env (bindvarscells (varl var vars) expk)) --> (ignore env_1 (bindvarscells vars expk))
-   #:where v (mkcell undefined)
+   #:where v (mkcell undefinedv)
    #:where env_1 (extend1 env var v)]
   [(ignore env (evalrec valuesbindsnil es expk)) --> (ignore env (expsk env es expk))]
   [(ignore env (evalrec (vbl (vb vars e) valuesbinds) es expk))
@@ -250,6 +251,7 @@
                         define-values
                         let-values
                         letrec-values
+                        begin
                         if)
       [(module id lang
          (mb form ...+))
@@ -296,6 +298,8 @@
              (attribute e))
           #,(kernel->core #'e-body0)
           #,(es->el (attribute e-body)))]
+      [(begin e es ...)
+       #`(begin #,(kernel->core #'e) #,(es->el (attribute es)))]
       [(if e1 e2 e3)
        #`(if #,(kernel->core #'e1)
              #,(kernel->core #'e2)

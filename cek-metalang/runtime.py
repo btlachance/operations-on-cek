@@ -129,7 +129,7 @@ def lookup(e, x):
   result = e.lookup(x)
   if isinstance(result, Cell):
     result = result.get()
-    if isinstance(result, cl_undefined):
+    if isinstance(result, cl_undefinedv):
       raise CEKError("%s: undefined; cannot use before initialization" % x.pprint(0))
   return result
 def extend(e, xs, vs):
