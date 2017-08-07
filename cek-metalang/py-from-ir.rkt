@@ -50,7 +50,7 @@
                       ;; singletons
           (~a
            ""
-           (format "_~a_sing = ~a()" name (class-name->py name))
+           (format "val_~a_sing = ~a()" name (class-name->py name))
            #:separator "\n")
           ""))]))
 
@@ -242,7 +242,7 @@
 ;; ir->py/handle-match-failure : ir -> string
 (define (ir->py/handle-match-failure ir #:indent [prefix ""])
   (format
-   "~atry:\n~a\n~aexcept CEKMatchFailure as matchf:\n~a  pass"
+   "~atry:\n~a\n~aexcept r.CEKMatchFailure as matchf:\n~a  pass"
    prefix
    (ir->py ir #:indent (string-append prefix "  "))
    prefix
@@ -270,9 +270,9 @@
     [(ir:if-match-fails cmd then)
      (~a (format "~atry:" prefix)
          (ir->py cmd #:indent (string-append prefix "  "))
-         (format "~aexcept CEKMatchFailure as matchf:" prefix)
+         (format "~aexcept r.CEKMatchFailure as matchf:" prefix)
          (ir->py then #:indent (string-append prefix "  "))
-         (format "~aexcept CEKUnlessFailure:" prefix)
+         (format "~aexcept r.CEKUnlessFailure:" prefix)
          (format "~a  pass" prefix)
          #:separator "\n")]
     [(ir:let (list (list lhss rhss) ...) rest)
@@ -297,11 +297,11 @@
     [(ir:return results)
      (format "~areturn ~a" prefix (apply ~a results #:separator ", "))]
     [(ir:error message)
-     (format "~araise CEKError(~s)" prefix message)]
+     (format "~araise r.CEKError(~s)" prefix message)]
     [(ir:match-failure message)
-     (format "~araise CEKMatchFailure(~s)" prefix message)]
+     (format "~araise r.CEKMatchFailure(~s)" prefix message)]
     [(ir:unless-failure)
-     (format "~araise CEKUnlessFailure()" prefix)]))
+     (format "~araise r.CEKUnlessFailure()" prefix)]))
 
 (module+ test
   (check-equal? (ir->py (ir:if (ir:is-instance 'tofu 'food) (ir:error "then") (ir:error "else")))
@@ -384,7 +384,7 @@
     [(ir:project _ field-name arg)
      (format "~a.~a" arg field-name)]
     [(ir:call-builtin name args)
-     (format "~a(~a)"
+     (format "r.~a(~a)"
              name
              (apply ~s #:separator ", " args))]
     [name (symbol->string name)]))

@@ -1,4 +1,5 @@
 import time
+import machine as m
 from rpython.rlib import jit
 
 class CEKError(Exception):
@@ -17,7 +18,7 @@ class CEKDone(Exception):
 
 def mkvariable(name):
   return PrimVariable(name)
-class PrimVariable(cl_variable):
+class PrimVariable(m.cl_variable):
   def __init__(self, name):
     self.literal = name
   def pprint(self, indent):
@@ -25,7 +26,7 @@ class PrimVariable(cl_variable):
 
 def mkint(n):
   return Integer(n)
-class Integer(cl_integer):
+class Integer(m.cl_integer):
   def __init__(self, n):
     self.value = n
   def eq(self, other):
@@ -39,7 +40,7 @@ def guardint(v):
     raise CEKError("Expected an integer")
   return v
 def zeropimpl(n):
-  return UnaryPrim(n, 'zerop', lambda n: cl_true() if guardint(n).value == 0 else cl_false())
+  return UnaryPrim(n, 'zerop', lambda n: m.cl_true() if guardint(n).value == 0 else m.cl_false())
 def succimpl(n):
   return UnaryPrim(n, 'succ', lambda n: Integer(guardint(n).value + 1))
 def predimpl(n):
@@ -51,15 +52,15 @@ def subimpl(n1, n2):
 def multimpl(n1, n2):
   return BinaryPrim(n1, n2, '*', lambda n1, n2: Integer(guardint(n1).value * guardint(n2).value))
 def ltimpl(n1, n2):
-  return BinaryPrim(n1, n2, '<', lambda n1, n2: cl_true() if guardint(n1).value < guardint(n2).value else cl_false())
+  return BinaryPrim(n1, n2, '<', lambda n1, n2: m.cl_true() if guardint(n1).value < guardint(n2).value else m.cl_false())
 def eqlimpl(v1, v2):
-  return BinaryPrim(v1, v2, 'equal?', lambda v1, v2: cl_true() if v1.eq(v2) else cl_false())
+  return BinaryPrim(v1, v2, 'equal?', lambda v1, v2: m.cl_true() if v1.eq(v2) else m.cl_false())
 def numequalimpl(v1, v2):
-  return BinaryPrim(v1, v2, '=', lambda v1, v2: cl_true() if v1.eq(v2) else cl_false())
+  return BinaryPrim(v1, v2, '=', lambda v1, v2: m.cl_true() if v1.eq(v2) else m.cl_false())
 
 def mkbox(v):
   return Box(v)
-class Box(cl_v):
+class Box(m.cl_v):
   def __init__(self, v):
     self.v = v
   def set(self, new_v):
@@ -76,27 +77,27 @@ def unboximpl(b):
 def setboximpl(b, v):
   return BinaryPrim(b, v, 'box-set!', lambda b, v: b.set(v))
 
-class NullaryPrim(cl_e):
+class NullaryPrim(m.cl_e):
   def __init__(self, opname, op):
     self.opname = opname
     self.op = op
   def interpret(self, env, k):
-    return _ignore_sing, env, cl_ret(self.op(), k)
+    return m.val_ignore_sing, env, m.cl_ret(self.op(), k)
   def pprint(self, indent):
     return ' ' * indent + '(p#%s)' % self.opname
 
-class UnaryPrim(cl_e):
+class UnaryPrim(m.cl_e):
   def __init__(self, arg, opname, op):
     self.arg = arg
     self.opname = opname
     self.op = op
   def interpret(self, env, k):
     v = lookup(env, self.arg)
-    return _ignore_sing, env, cl_ret(self.op(v), k)
+    return m.val_ignore_sing, env, m.cl_ret(self.op(v), k)
   def pprint(self, indent):
     return ' ' * indent + '(p#%s %s)' % (self.opname, self.arg.pprint(0))
 
-class BinaryPrim(cl_e):
+class BinaryPrim(m.cl_e):
   def __init__(self, arg1, arg2, opname, op):
     self.arg1 = arg1
     self.arg2 = arg2
@@ -105,11 +106,11 @@ class BinaryPrim(cl_e):
   def interpret(self, env, k):
     v1 = lookup(env, self.arg1)
     v2 = lookup(env, self.arg2)
-    return _ignore_sing, env, cl_ret(self.op(v1, v2), k)
+    return m.val_ignore_sing, env, m.cl_ret(self.op(v1, v2), k)
   def pprint(self, indent):
     return ' ' * indent + '(p#%s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0))
 
-class TernaryPrim(cl_e):
+class TernaryPrim(m.cl_e):
   def __init__(self, arg1, arg2, arg3, opname, op):
     self.arg1 = arg1
     self.arg2 = arg2
@@ -120,12 +121,12 @@ class TernaryPrim(cl_e):
     v1 = lookup(env, self.arg1)
     v2 = lookup(env, self.arg2)
     v3 = lookup(env, self.arg3)
-    return _ignore_sing, env, cl_ret(self.op(v1, v2, v3), k)
+    return m.val_ignore_sing, env, m.cl_ret(self.op(v1, v2, v3), k)
   def pprint(self, indent):
     return ' ' * indent + '(p#%s %s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0),
                                                self.arg3.pprint(0))
 
-class Env(cl_env):
+class Env(m.cl_env):
   def __init__(self):
     pass
   def lookup(self, x):
@@ -158,44 +159,44 @@ def lookup(e, x):
   result = e.lookup(x)
   if isinstance(result, Cell):
     result = result.get()
-    if isinstance(result, cl_undefinedv):
+    if isinstance(result, m.cl_undefinedv):
       raise CEKError("%s: undefined; cannot use before initialization" % x.pprint(0))
   return result
 def extend(e, xs, vs):
   result = e
-  while isinstance(xs, cl_varl) and isinstance(vs, cl_vl):
+  while isinstance(xs, m.cl_varl) and isinstance(vs, m.cl_vl):
     x, xs = xs.var0, xs.vars1
     v, vs = vs.v0, vs.vs1
     result = ExtendedEnv(x, v, result)
-  if isinstance(xs, cl_varl) or isinstance(vs, cl_vl):
+  if isinstance(xs, m.cl_varl) or isinstance(vs, m.cl_vl):
     raise CEKError("Function called with the wrong number of arguments")
   return result
 def extend1(e, x, v):
   return ExtendedEnv(x, v, e)
 def extendrest(e, xs, x_rest, vs):
   result = e
-  while isinstance(xs, cl_varl) and isinstance(vs, cl_vl):
+  while isinstance(xs, m.cl_varl) and isinstance(vs, m.cl_vl):
     x, xs = xs.var0, xs.vars1
     v, vs = vs.v0, vs.vs1
     result = ExtendedEnv(x, v, result)
-  if isinstance(xs, cl_varl):
+  if isinstance(xs, m.cl_varl):
     raise CEKError("Function called with too few arguments")
 
   restvs_reversed = vsreverse(vs)
-  rest_list = _nil_sing
-  while isinstance(restvs_reversed, cl_vl):
-    rest_list = cl_cons(restvs_reversed.v0, rest_list)
+  rest_list = m.val_nil_sing
+  while isinstance(restvs_reversed, m.cl_vl):
+    rest_list = m.cl_cons(restvs_reversed.v0, rest_list)
     restvs_reversed = restvs_reversed.vs1
   return ExtendedEnv(x_rest, rest_list, result)
 
 def resulttovlist(result):
-  if isinstance(result, cl_v):
-    return cl_cons(result, _nil_sing)
+  if isinstance(result, m.cl_v):
+    return m.cl_cons(result, m.val_nil_sing)
 
   vs_reversed = vsreverse(result)
-  resultlist = _nil_sing
-  while isinstance(vs_reversed, cl_vl):
-    resultlist = cl_cons(vs_reversed.v0, resultlist)
+  resultlist = m.val_nil_sing
+  while isinstance(vs_reversed, m.cl_vl):
+    resultlist = m.cl_cons(vs_reversed.v0, resultlist)
     vs_reversed = vs_reversed.vs1
   return resultlist
 
@@ -203,40 +204,40 @@ def ret(v):
   raise CEKDone(v)
 
 def modformsreverse(mfs):
-  result = _mfnil_sing
+  result = m.val_mfnil_sing
 
-  while isinstance(mfs, cl_mf):
-    result = cl_mf(mfs.modform0, result)
+  while isinstance(mfs, m.cl_mf):
+    result = m.cl_mf(mfs.modform0, result)
     mfs = mfs.modforms1
   return result
 
 def varsreverse(vars):
-  result = _varsnil_sing
+  result = m.val_varsnil_sing
 
-  while isinstance(vars, cl_varl):
-    result = cl_varl(vars.var0, result)
+  while isinstance(vars, m.cl_varl):
+    result = m.cl_varl(vars.var0, result)
     vars = vars.vars1
   return result
 
 def vsreverse(vs):
-  result = _vsnil_sing
-  while isinstance(vs, cl_vl):
-    result = cl_vl(vs.v0, result)
+  result = m.val_vsnil_sing
+  while isinstance(vs, m.cl_vl):
+    result = m.cl_vl(vs.v0, result)
     vs = vs.vs1
   return result
 
 def printimpl(x):
   return UnaryPrim(x, 'print', lambda v: pprint(v))
 def pprint(v):
-  if isinstance(v, cl_clo):
+  if isinstance(v, m.cl_clo):
     print v.l0.pprint(0)
-  elif isinstance(v, cl_voidv):
+  elif isinstance(v, m.cl_voidv):
     pass
   else:
     print v.pprint(0)
   return v
 
-class Cell(cl_v):
+class Cell(m.cl_v):
   def __init__(self, init):
     self.val = init
   def set(self, v):
@@ -250,15 +251,15 @@ def setcell(var, env, v):
   cell = env.lookup(var)
   return cell.set(v)
 def setcells(vars, env, vs):
-  while isinstance(vars, cl_varl) and isinstance(vs, cl_vl):
+  while isinstance(vars, m.cl_varl) and isinstance(vs, m.cl_vl):
     setcell(vars.var0, env, vs.v0)
     vars = vars.vars1
     vs = vs.vs1
-  if not isinstance(vars, cl_varsnil) and not isinstance(vs, cl_vsnil):
+  if not isinstance(vars, m.cl_varsnil) and not isinstance(vs, m.cl_vsnil):
     raise CEKError("Number of variables and values did not agree")
-  return _voidv_sing
+  return m.val_voidv_sing
 
-class String(cl_string):
+class String(m.cl_string):
   _attrs_ = ['str']
   def __init__(self, str):
     self.str = str
@@ -275,24 +276,24 @@ def guardstr(v):
     raise CEKError("Expected a string")
   return v
 
-class Vector(cl_v):
+class Vector(m.cl_v):
   def __init__(self, vs):
     self.vs = vs
   def ref(self, pos):
     current = self.vs
     remaining = pos
 
-    while remaining > 0 and isinstance(current, cl_vl):
+    while remaining > 0 and isinstance(current, m.cl_vl):
       current = current.vs1
       remaining = remaining - 1
-    if isinstance(current, cl_vl):
+    if isinstance(current, m.cl_vl):
       return current.v0
     else:
       raise CEKError("vector-ref: index %s is out of range" % pos)
   def length(self):
     result = 0
     current = self.vs
-    while isinstance(current, cl_vl):
+    while isinstance(current, m.cl_vl):
       current = current.vs1
       result = result + 1
     return result
@@ -309,24 +310,24 @@ def veclengthimpl(vec):
 
 def listtovs(lst):
   lst.reverse()
-  result = _vsnil_sing
+  result = m.val_vsnil_sing
   while not lst == []:
     v = lst[0]
     lst = lst[1:]
-    result = cl_vl(v, result)
+    result = m.cl_vl(v, result)
   return result
 
 def vlisttovs(vlist):
-  result_reversed = _vsnil_sing
-  while isinstance(vlist, cl_cons):
-    result_reversed = cl_vl(vlist.v0, result_reversed)
+  result_reversed = m.val_vsnil_sing
+  while isinstance(vlist, m.cl_cons):
+    result_reversed = m.cl_vl(vlist.v0, result_reversed)
     vlist = vlist.v1
-  if not isinstance(vlist, cl_nil):
+  if not isinstance(vlist, m.cl_nil):
     raise CEKError("apply only accepts proper lists")
   return vsreverse(result_reversed)
 
 # no interning behavior yet
-class Symbol(cl_v):
+class Symbol(m.cl_v):
   _attrs_ = ['contents']
   def __init__(self, contents):
     self.contents = contents
@@ -339,13 +340,13 @@ class Symbol(cl_v):
 def mksymbol(var):
   return Symbol(var.literal)
 def issymbolimpl(s):
-  return UnaryPrim(s, "symbol?", lambda s: cl_true() if isinstance(s, Symbol) else cl_false())
+  return UnaryPrim(s, "symbol?", lambda s: m.cl_true() if isinstance(s, Symbol) else m.cl_false())
 
 from rpython.rlib import streamio as sio
 # Heavily inspired by Pycket's representations, not that it's anything
 # too special. I couldn't find too good of docs on sio so I checked
 # their implementation for reference.
-class FileOutputPort(cl_v):
+class FileOutputPort(m.cl_v):
   def __init__(self, file):
     self.file = file
   def write(self, string):
@@ -366,20 +367,20 @@ def fprintfimpl(out, form, vals):
 def fprintf(out, form, vals):
   guardfileoutputport(out)
   out.write(guardstr(form).str) # XXX need to actually implement formatting
-  while isinstance(vals, cl_cons):
+  while isinstance(vals, m.cl_cons):
     out.write(vals.v0.pprint(0))
     out.write("\n")
     vals = vals.v1
-  return _voidv_sing
+  return m.val_voidv_sing
 
 def currentsecondsimpl():
   return NullaryPrim('current-seconds', lambda: mkint(int(time.clock())))
 
 def apply(f, args, k):
-  vs = cl_vl(f, vlisttovs(args))
-  return _ignore_sing, emptyenv(), cl_fn(vsreverse(vs), _esnil_sing, emptyenv(), k)
+  vs = m.cl_vl(f, vlisttovs(args))
+  return m.val_ignore_sing, emptyenv(), m.cl_fn(vsreverse(vs), m.val_esnil_sing, emptyenv(), k)
 
-class TimeApply(cl_e):
+class TimeApply(m.cl_e):
   def __init__(self, proc, lst):
     self.proc = proc
     self.lst = lst
@@ -391,7 +392,7 @@ class TimeApply(cl_e):
     lstv = env.lookup(self.lst)
     return apply(procv, lstv, TimeApplyK(time.clock(), k))
 
-class ExtensionK(cl_extensionk):
+class ExtensionK(m.cl_extensionk):
   def interpretspecial(self, result):
     raise CEKError("Subclass responsibility")
 
@@ -405,14 +406,14 @@ class TimeApplyK(ExtensionK):
     resultlist = resulttovlist(result)
 
     timing_results = listtovs([resultlist, ms, ms, mkint(0)])
-    return _ignore_sing, emptyenv(), cl_ret(timing_results, self.k)
+    return m.val_ignore_sing, emptyenv(), m.cl_ret(timing_results, self.k)
   def pprint(self, indent):
     return ' ' * indent + '(timeapplyk %s %s)' % (self.start, self.k.pprint(0))
 
 def docontinuation(extensionk, result):
   assert isinstance(extensionk, ExtensionK)
   c, e, k = extensionk.interpretspecial(result)
-  return cl_conf(c, e, k)
+  return m.cl_conf(c, e, k)
 
 def timeapplyimpl(proc, init):
   return TimeApply(proc, init)
@@ -421,13 +422,13 @@ driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c'],
                        get_printable_location=lambda c: c.pprint(0))
 def run(p):
-  c, e, k = init(p)
+  c, e, k = m.init(p)
   while True:
     driver.jit_merge_point(c = c, e = e, k = k)
     # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
     try:
       c, e, k = c.interpret(e, k)
-      if isinstance(c, cl_app):
+      if isinstance(c, m.cl_app):
         driver.can_enter_jit(c = c, e = e, k = k)
     except CEKDone as d:
       return d.result

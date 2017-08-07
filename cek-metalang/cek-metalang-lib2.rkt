@@ -500,6 +500,7 @@
        [(ir:method-def (list p) (list body))
         (string-join
          (list
+          "import runtime as r"
           (format "def init(~a):" p)
           (ir->py body #:indent "  "))
          "\n")])))
@@ -511,11 +512,14 @@
     (tc-temps/expecteds (list ast) (list (syntax-e c-id)) '())
     (define ir (compile-temp
                 ast 'program_ast
-                (ir:let (list (list 'result (ir:call-builtin 'run (list 'program_ast))))
-                        (ir:return (list 'result)))))
+                (ir:return (list 'program_ast))))
     (string-join
      (list
-      "def main():"
+      "import runtime as r"
+      "from machine import *"
+      "def main(runner):"
+      "  return runner(mkprogram())"
+      "def mkprogram():"
       (ir->py ir #:indent "  "))
      "\n"))
   (values print-interpreter term->program))
