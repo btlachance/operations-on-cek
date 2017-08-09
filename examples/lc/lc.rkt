@@ -16,7 +16,8 @@
 
   (e ::= var l (app e es) (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
-     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var) (begin e es))
+     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var) (begin e es)
+     (ret result))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
   (bp ::= (p var e))
@@ -30,7 +31,7 @@
   (config ::= (conf term env k))
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms modforms k))
-  (expk ::= (fn vs es env k) (sel e e env k) (ret result k)
+  (expk ::= (fn vs es env k) (sel e e env k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
         (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds es k) (setcellsk vars env expk)
@@ -95,7 +96,7 @@
                  modforms))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
-  #:final [(ignore env_0 (ret v mt)) --> ignore]
+  #:final [((ret v) env_0 mt) --> ignore]
   #:step
   ;; IDK what to do when the module body is empty... I don't yet have
   ;; a void value, but I guess that's what I need.
@@ -125,26 +126,26 @@
   [((define var e_0) env (evaldefs modform modforms env_0 k))
    -->
    (e_0 env_0 (evaldefs modform modforms env_0 k))]
-  [(ignore env (ret v (evaldefs (define var e_0) (mf modform modforms) env_0 k)))
+  [((ret v) env (evaldefs (define var e_0) (mf modform modforms) env_0 k))
    -->
    (modform env_0 (evaldefs modform modforms env_0 k))
    #:where v_ignore (setcell var env_0 v)]
-  [(ignore env (ret v (evaldefs (define var e_0) mfnil env_0 k)))
+  [((ret v) env (evaldefs (define var e_0) mfnil env_0 k))
    -->
-   (ignore env (ret v k))]
+   ((mkret v) env k)]
 
-  [(ignore env (ret v (evaldefs e_0 (mf modform modforms) env_0 k)))
+  [((ret v) env (evaldefs e_0 (mf modform modforms) env_0 k))
    -->
    (modform env_0 (evaldefs modform modforms env_0 k))]
-  [(ignore env (ret v (evaldefs e_0 mfnil env_0 k)))
+  [((ret v) env (evaldefs e_0 mfnil env_0 k))
    -->
-   (ignore env (ret v k))]
+   ((mkret v) env k)]
 
-  [(var env_0 expk) --> (ignore env_0 (ret (lookup env_0 var) expk))]
-  [(l env_0 expk) --> (ignore env_0 (ret (clo l env_0) expk))]
-  [((quote c) env_0 expk) --> (ignore env_0 (ret c expk))
+  [(var env_0 expk) --> ((mkret (lookup env_0 var)) env_0 expk)]
+  [(l env_0 expk) --> ((mkret (clo l env_0)) env_0  expk)]
+  [((quote c) env_0 expk) --> ((mkret c) env_0 expk)
    #:unless (sym var) c]
-  [((quote (sym var)) env_0 expk) --> (ignore env_0 (ret v expk))
+  [((quote (sym var)) env_0 expk) --> ((mkret v) env_0 expk)
    #:where v (mksymbol var)]
   [((app e_1 es) env expk) --> (e_1 env (fn vsnil es env expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
@@ -159,13 +160,13 @@
   [((nullp e_0) env k) --> (e_0 env (nullk k))]
   [((mkcons e_1 e_2) env k) --> (e_1 env (consr e_2 env k))]
   [((apply e_1 e_2) env k) --> (e_1 env (getargs e_2 env k))]
-  [((mkvoid) env k) --> (ignore env (ret voidv k))]
-  [((values var) env expk) --> (ignore env (ret vs expk))
+  [((mkvoid) env k) --> ((mkret voidv) env k)]
+  [((values var) env expk) --> ((mkret vs) env expk)
    #:where vs (vlisttovs (lookup env var))]
   [((cwv var_gen var_recv) env expk) --> ((app var_gen esnil) env (cwvk var_recv env expk))]
   [((begin e_0 es) env expk) --> (ignore env (expsk env (el e_0 es) expk))]
 
-  [(ignore env_0 (ret v (fn vs es env expk))) --> (ignore env_0 (fn (vl v vs) es env expk))]
+  [((ret v) env_0 (fn vs es env expk)) --> (ignore env_0 (fn (vl v vs) es env expk))]
   [(ignore env_0 (fn vs (el e es) env expk)) --> (e env (fn vs es env expk))]
   [(ignore env_0 (fn vs esnil env_1 expk)) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (vl v vs_args) (vsreverse vs)
@@ -175,12 +176,12 @@
    #:where (vl v vs_args) (vsreverse vs)
    #:where (clo (lamrest vars var_rest e es) env_clo) v
    #:where env (extendrest env_clo vars var_rest vs_args)]
-  [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
-  [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
+  [((ret false) env_0 (sel e_then e_else env expk)) --> (e_else env expk)]
+  [((ret v) env_0 (sel e_then e_else env expk)) --> (e_then env expk)
    #:unless false v]
   [(ignore env_0 (expsk env (el e esnil) expk)) --> (e env expk)]
   [(ignore env_0 (expsk env (el e (el e_next es)) expk)) --> (e env (expsk env (el e_next es) expk))]
-  [(ignore env_0 (ret result (expsk env es expk))) --> (ignore env_0 (expsk env es expk))]
+  [((ret result) env_0 (expsk env es expk)) --> (ignore env_0 (expsk env es expk))]
 
   [(ignore env (bindvaluesk env_arg varsnil valuesbindsnil env_acc es expk))
    -->
@@ -188,15 +189,15 @@
   [(ignore env (bindvaluesk env_arg varsnil (vbl (vb vars e_vars) valuesbinds) env_acc es expk))
    -->
    (e_vars env_arg (bindvaluesk env_arg vars valuesbinds env_acc es expk))]
-  [(ignore env (ret v (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 es expk)))
+  [((ret v) env (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 es expk))
    -->
    (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
    #:where env_acc1 (extend1 env_acc0 var v)]
-  [(ignore env (ret (vl v vsnil) (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 es expk)))
+  [((ret (vl v vsnil)) env (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 es expk))
    -->
    (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
    #:where env_acc1 (extend1 env_acc0 var v)]
-  [(ignore env (ret vs (bindvaluesk env_arg vars valuesbinds env_acc0 es expk)))
+  [((ret vs) env (bindvaluesk env_arg vars valuesbinds env_acc0 es expk))
    -->
    (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
    #:where env_acc1 (extend env_acc0 vars vs)]
@@ -213,33 +214,34 @@
   [(ignore env (evalrec (vbl (vb vars e) valuesbinds) es expk))
    -->
    (e env (setcellsk vars env (evalrec valuesbinds es expk)))]
-  [(ignore env_0 (ret v (setcellsk (varl var varsnil) env expk))) --> (ignore env expk)
+  [((ret v) env_0 (setcellsk (varl var varsnil) env expk)) --> (ignore env expk)
    #:where v_ignore (setcell var env v)]
-  [(ignore env_0 (ret (vl v vsnil) (setcellsk (varl var varsnil) env expk))) --> (ignore env expk)
+  [((ret (vl v vsnil)) env_0 (setcellsk (varl var varsnil) env expk)) --> (ignore env expk)
    #:where v_ignore (setcell var env v)]
-  [(ignore env_0 (ret vs (setcellsk vars env expk))) --> (ignore env expk)
+  [((ret vs) env_0 (setcellsk vars env expk)) --> (ignore env expk)
    #:where v_ignore (setcells vars env vs)]
 
-  [(ignore env_0 (ret (cons v_1 v_2) (cark expk))) --> (ignore env_0 (ret v_1 expk))]
-  [(ignore env_0 (ret (cons v_1 v_2) (cdrk expk))) --> (ignore env_0 (ret v_2 expk))]
-  [(ignore env_0 (ret nil (nullk expk))) --> (ignore env_0 (ret true expk))]
-  [(ignore env_0 (ret v (nullk expk))) --> (ignore env_0 (ret false expk))
+  [((ret (cons v_1 v_2)) env_0 (cark expk)) --> ((mkret v_1) env_0 expk)]
+  [((ret (cons v_1 v_2)) env_0 (cdrk expk)) --> ((mkret v_2) env_0 expk)]
+  [((ret nil) env_0 (nullk expk)) --> ((mkret true) env_0 expk)]
+  [((ret v) env_0 (nullk expk)) --> ((mkret false) env_0 expk)
    #:unless nil v]
-  [(ignore env_0 (ret v (consr e env expk))) --> (e env (pair v expk))]
-  [(ignore env_0 (ret v_right (pair v_left expk))) --> (ignore env_0 (ret (cons v_left v_right) expk))]
-  [(ignore env_0 (ret v (getargs e_args env expk))) --> (e_args env (applyk v expk))]
-  [(ignore env_0 (ret v (applyk (clo (lam vars e es) env) expk))) --> (ignore env_0 (expsk (extend env vars vs) (el e es) expk))
+  [((ret v) env_0 (consr e env expk)) --> (e env (pair v expk))]
+  [((ret v_right) env_0 (pair v_left expk)) --> ((mkret (cons v_left v_right)) env_0 expk)]
+  [((ret v) env_0 (getargs e_args env expk)) --> (e_args env (applyk v expk))]
+  [((ret v) env_0 (applyk (clo (lam vars e es) env) expk)) --> (ignore env_0 (expsk (extend env vars vs) (el e es) expk))
    #:where vs (vlisttovs v)]
-  [(ignore env_0 (ret v (applyk (clo (lamrest vars var_rest e es) env) expk))) --> (ignore env_0 (expsk (extendrest env vars var_rest vs) (el e es) expk))
+  [((ret v) env_0 (applyk (clo (lamrest vars var_rest e es) env) expk)) --> (ignore env_0 (expsk (extendrest env vars var_rest vs) (el e es) expk))
    #:where vs (vlisttovs v)]
-  [(ignore env_0 (ret v (cwvk var_recv env expk))) --> (ignore env_0 (fn (vl v (vl v_recv vsnil)) esnil env_0 expk))
+  [((ret v) env_0 (cwvk var_recv env expk)) --> (ignore env_0 (fn (vl v (vl v_recv vsnil)) esnil env_0 expk))
    #:where v_recv (lookup env var_recv)]
-  [(ignore env_0 (ret vs_vals (cwvk var_recv env expk))) --> (ignore env_0 (fn vs esnil env_0 expk))
+  [((ret vs_vals) env_0 (cwvk var_recv env expk)) --> (ignore env_0 (fn vs esnil env_0 expk))
    #:where v_recv (lookup env var_recv)
    #:where vs (vsreverse (vl v_recv vs_vals))]
-  [(ignore env_0 (ret result k)) --> (e env k)
-   #:where extensionk k
-   #:where (conf e env k) (docontinuation k result)])
+  ;; [((ret result) env_0 k_0) --> (e env k)
+  ;;  #:where extensionk k_0
+  ;;  #:where (conf e env k) (docontinuation k_0 result)]
+  )
 
 (module+ main
   (require syntax/parse)

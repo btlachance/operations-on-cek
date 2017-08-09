@@ -192,6 +192,7 @@
                    (list 'currentsecondsimpl)
                    (list 'timeapplyimpl (nt 'var) (nt 'var))
                    (list 'docontinuation (nt 'k) (nt 'result))
+                   (list 'mkret (nt 'result))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -232,6 +233,7 @@
                    'currentsecondsimpl 'e
                    'timeapplyimpl 'e
                    'docontinuation 'config
+                   'mkret 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

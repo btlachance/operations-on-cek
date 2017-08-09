@@ -82,7 +82,7 @@ class NullaryPrim(m.cl_e):
     self.opname = opname
     self.op = op
   def interpret(self, env, k):
-    return m.val_ignore_sing, env, m.cl_ret(self.op(), k)
+    return mkret(self.op()), env, k
   def pprint(self, indent):
     return ' ' * indent + '(p#%s)' % self.opname
 
@@ -93,7 +93,7 @@ class UnaryPrim(m.cl_e):
     self.op = op
   def interpret(self, env, k):
     v = lookup(env, self.arg)
-    return m.val_ignore_sing, env, m.cl_ret(self.op(v), k)
+    return mkret(self.op(v)), env, k
   def pprint(self, indent):
     return ' ' * indent + '(p#%s %s)' % (self.opname, self.arg.pprint(0))
 
@@ -106,7 +106,7 @@ class BinaryPrim(m.cl_e):
   def interpret(self, env, k):
     v1 = lookup(env, self.arg1)
     v2 = lookup(env, self.arg2)
-    return m.val_ignore_sing, env, m.cl_ret(self.op(v1, v2), k)
+    return mkret(self.op(v1, v2)), env, k
   def pprint(self, indent):
     return ' ' * indent + '(p#%s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0))
 
@@ -121,7 +121,7 @@ class TernaryPrim(m.cl_e):
     v1 = lookup(env, self.arg1)
     v2 = lookup(env, self.arg2)
     v3 = lookup(env, self.arg3)
-    return m.val_ignore_sing, env, m.cl_ret(self.op(v1, v2, v3), k)
+    return mkret(self.op(v1, v2, v3)), env, k
   def pprint(self, indent):
     return ' ' * indent + '(p#%s %s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0),
                                                self.arg3.pprint(0))
@@ -397,17 +397,17 @@ class ExtensionK(m.cl_extensionk):
   def interpretspecial(self, result):
     raise CEKError("Subclass responsibility")
 
-class TimeApplyK(ExtensionK):
+class TimeApplyK(m.cl_expk):
   def __init__(self, start, k):
     self.start = start
     self.k = k
-  def interpretspecial(self, result):
+  def interpret(self, result, env):
     end = time.clock()
     ms = mkint(int((end - self.start) * 1000))
     resultlist = resulttovlist(result)
 
     timing_results = listtovs([resultlist, ms, ms, mkint(0)])
-    return m.val_ignore_sing, emptyenv(), m.cl_ret(timing_results, self.k)
+    return mkret(timing_results), emptyenv(), self.k
   def pprint(self, indent):
     return ' ' * indent + '(timeapplyk %s %s)' % (self.start, self.k.pprint(0))
 
@@ -418,6 +418,11 @@ def docontinuation(extensionk, result):
 
 def timeapplyimpl(proc, init):
   return TimeApply(proc, init)
+
+sing_ret = m.cl_ret(m.val_undefinedv_sing)
+def mkret(v):
+  sing_ret.result0 = v
+  return sing_ret
 
 driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c'],
