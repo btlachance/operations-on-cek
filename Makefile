@@ -12,18 +12,22 @@ all: build/cek-metalang.html test
 build/%.html: scribblings/%.scrbl
 	scribble --dest build/ --dest-name $(@F) $<
 
-# e.g. build/interpreter-lc/machine.py is produced running examples/lc/spec.rkt
-build/interpreter-%/machine.py: examples/%/spec.rkt $(METALANGDEPS)
-	mkdir -p $(@D) && cp -R interpreter/* $(@D)
-	racket $< --print-interp > $@
+build/interpreter-%: examples/%/spec.rkt $(wildcard interpreter/*.py) $(METALANGDEPS)
+	mkdir -p $@
+	cp -R interpreter/* $@
+	racket $< --print-interp > $@/machine.py
+	racket $< --print-parser > $@/parser.py
 
-build/cek-lc-%-c: examples/lc/spec.rkt build/interpreter-lc/machine.py examples/lc/lc-%.rkt
-	raco expand examples/lc/lc-$*.rkt | racket $< --compile-term > build/interpreter-lc/program.py
+build/cek-lc-c: build/interpreter-lc/
 	(cd build/interpreter-lc/; $(RPYTHON) -Ojit targetcek.py && cp cek-c ../$(@F))
 
-runlc-%: examples/lc/spec.rkt build/interpreter-lc/machine.py examples/lc/lc-%.rkt
-	raco expand examples/lc/lc-$*.rkt | racket $< --compile-term > build/interpreter-lc/program.py
-	@$(PYTHON) build/interpreter-lc/main.py
+build/cek-lc-nojit-c: build/interpreter-lc/
+	(cd build/interpreter-lc/; $(RPYTHON) targetcek.py && cp cek-c ../$(@F))
+
+runlc-%: build/cek-lc-c
+	raco expand examples/lc/lc-$*.rkt |\
+		racket examples/lc/lc.rkt --compile-term |\
+		$<
 
 unittest:
 	raco test cek-metalang/

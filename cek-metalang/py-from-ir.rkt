@@ -1,6 +1,6 @@
 #lang racket
-(require "ir.rkt")
-(provide class-def->py ir->py)
+(require "ir.rkt" racket/syntax)
+(provide class-def->py ir->py mk/print-parser)
 
 ;; TODO Python identifiers are less liberal than Racket identifiers,
 ;; so we need to make sure we don't emit ill-formed Python. Either
@@ -28,7 +28,7 @@
      (define header (format "class ~a(~a):"
                             (class-name->py name)
                             (if (equal? 'top super-name)
-                                "object"
+                                "CEKTop"
                                 (class-name->py super-name))))
      (define attrs (field-defs->attrs fdefs #:indent "  "))
      (define constructor (field-defs->constructor-py name fdefs #:indent "  "))
@@ -406,3 +406,97 @@
                 "emptyenv()")
   (check-equal? (simple-ir->py (ir:call-builtin 'extend '(e1 x v)))
                 "extend(e1, x, v)"))
+
+;; a case is one of
+;; - (normal-def symbol natural)
+;; - (singleton-def symbol)
+;; - (metafunction symbol (U natural 'int 'string))
+(struct normal-def (name argcount) #:transparent)
+(struct singleton-def (name) #:transparent)
+(struct metafunction (name argcount) #:transparent)
+
+(define (format-case c)
+  (define (indent str) (format "    ~a" str))
+  (match c
+    [(normal-def name argcount)
+     (define tmps (build-list argcount (lambda (n) (format-symbol "tmp~a" n))))
+     (define tmps-sep (apply ~a #:separator "," tmps))
+     (string-join
+      (list
+       (indent (format "if make_info[~s].value_string() == ~s:" "class-name" (~a name)))
+       (indent (format "  [~a] = [parse(x) for x in make_info[~s].value_array()]" tmps-sep "args"))
+       (indent (format "  return m.cl_~a(~a)" name tmps-sep)))
+      "\n")]
+    [(singleton-def name)
+     (string-join
+      (list
+       (indent (format "if singleton_info == \"val_~a_sing\":" name))
+       (indent (format "  return m.val_~a_sing" name)))
+      "\n")]
+    [(metafunction name (? exact-integer? argcount))
+     (define tmps (build-list argcount (lambda (n) (format-symbol "tmp~a" n))))
+     (define tmps-sep (apply ~a #:separator "," tmps))
+     (string-join
+      `(,(indent (format "if builtin_info[~s].value_string() == ~s:" "fn-name" (~a name)))
+        ,(indent (format "  [~a] = [parse(x) for x in builtin_info[~s].value_array()]" tmps-sep "args"))
+        ,(indent (format "  return r.~a(~a)" name tmps-sep)))
+      "\n")]
+    [(metafunction name (? symbol? type))
+     (string-join
+      `(,(indent (format "if builtin_info[~s].value_string() == ~s:" "fn-name" (~a name)))
+        ,(indent (format "  [tmp0] = builtin_info[~s].value_array()" "args"))
+        ,(indent (format "  if not tmp0.is_~a:" type))
+        ,(indent (format "    raise ParseError(\"~a expects a ~a; got %s\" % tmp0.tostring())" name type))
+        ,(indent (format "  return r.~a(tmp0.value_~a())" name type)))
+      "\n")]))
+
+;; ir->case ; (U ir:class-def sort) -> case
+(define (ir->case ir)
+  (match ir
+    [(list name args ...)
+     (metafunction name (length args))]
+    [(ir:class-def name _ fdefs _)
+     (if (singleton-class? ir)
+         (singleton-def name)
+         (normal-def name (length fdefs)))]))
+
+;; mk/print-parser : (listof ir:class-def) (listof sort) -> (-> void)
+(define ((mk/print-parser defs metafunctions))
+  (define-values (sing-defs other-defs) (partition singleton-class? defs))
+  (define sing-cases (map ir->case sing-defs))
+  (define other-cases (map ir->case other-defs))
+  (define metafunction-cases
+    (append
+     ;; XXX Dirty dirty hacks because prim parsers generate IR that
+     ;; call these functions
+     (list (metafunction 'mkvariable 'string)
+           (metafunction 'mkint 'int)
+           (metafunction 'mkstr 'string))
+     (map ir->case metafunctions)))
+
+  (pretty-display
+   (string-join
+    `("import runtime as r"
+      "import machine as m"
+      "class ParseError(Exception):"
+      "  def __init__(self, str):"
+      "    self.str = str"
+      "def parse(json):"
+      "  obj = json.value_object()"
+      ,@(for/list ([type '("singleton" "make" "call-builtin")]
+                   [infoname '("singleton" "make" "builtin")]
+                   [cases (list sing-cases other-cases metafunction-cases)])
+          (string-append
+           (format "  if ~s in obj:\n" type)
+           (if (equal? type "singleton")
+               (format "    ~a_info = obj[~s].value_string()\n" infoname type)
+               (format "    ~a_info = obj[~s].value_object()\n" infoname type))
+           (foldl (lambda (c rest) (format "~a\n~a" (format-case c) rest))
+                  (string-join
+                   (list
+                    "    else:"
+                    (format "      raise ParseError(\"Unexpected ~a JSON: %s\" % json.tostring())" type))
+                   "\n")
+                  cases)))
+      "  raise ParseError(\"Unexpected JSON: %s\" % json.tostring())")
+    "\n")))

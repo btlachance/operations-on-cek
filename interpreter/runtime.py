@@ -140,13 +140,13 @@ class EmptyEnv(Env):
     return ' ' * indent + 'emptyenv'
 class ExtendedEnv(Env):
   def __init__(self, x, v, e):
+    assert isinstance(x, PrimVariable)
     self.x = x
     self.v = v
     self.e = e
   def lookup(self, y):
-    if (isinstance(self.x, PrimVariable) and
-        isinstance(y, PrimVariable) and
-        self.x.literal == y.literal):
+    assert isinstance(y, PrimVariable)
+    if self.x.literal == y.literal:
       return self.v
     else:
       return self.e.lookup(y)
@@ -338,6 +338,7 @@ class Symbol(m.cl_v):
   def pprint(self, indent):
     return ' '* indent + '\'%s' % self.contents
 def mksymbol(var):
+  assert isinstance(var, PrimVariable)
   return Symbol(var.literal)
 def issymbolimpl(s):
   return UnaryPrim(s, "symbol?", lambda s: m.cl_true() if isinstance(s, Symbol) else m.cl_false())

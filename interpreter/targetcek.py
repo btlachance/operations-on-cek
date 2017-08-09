@@ -1,7 +1,7 @@
 from main import main
 
 def entry_point(argv):
-  main()
+  main(argv)
   return 0
 
 def target(driver, args):

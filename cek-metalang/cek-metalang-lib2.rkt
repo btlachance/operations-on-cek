@@ -11,6 +11,7 @@
  "compile.rkt"
  "ir.rkt"
  "py-from-ir.rkt"
+ "term-ir-to-json.rkt"
  (prefix-in prim: "prims.rkt")
  (for-template racket/base))
 (provide -production -step -final -initial compile-cek)
@@ -493,6 +494,12 @@
           [_
            (check-for-super-method class-name parent-class-name)])))))
   (define (print-interpreter)
+    (pretty-display
+     (string-join
+      '("import runtime as r"
+        "class CEKTop(object):"
+        "  _attrs_ = []")
+      "\n"))
     (for ([def (in-sequences nt-class-defs other-class-defs)])
       (pretty-display (class-def->py def)))
     (pretty-display
@@ -500,27 +507,19 @@
        [(ir:method-def (list p) (list body))
         (string-join
          (list
-          "import runtime as r"
           (format "def init(~a):" p)
           (ir->py body #:indent "  "))
          "\n")])))
 
   (match-define (parser simple-parse-template _)
     (lang-parser terminals '() compounds '() prim-parsers))
-  (define (term->program stx)
+  (define (term->json stx)
     (define ast (simple-parse-template stx))
     (tc-temps/expecteds (list ast) (list (syntax-e c-id)) '())
     (define ir (compile-temp
                 ast 'program_ast
                 (ir:return (list 'program_ast))))
-    (string-join
-     (list
-      "import runtime as r"
-      "from machine import *"
-      "def main(runner):"
-      "  return runner(mkprogram())"
-      "def mkprogram():"
-      (ir->py ir #:indent "  "))
-     "\n"))
-  (values print-interpreter term->program))
-
+    (term-ir->json ir))
+  (values print-interpreter
+          (mk/print-parser other-class-defs metafunctions)
+          term->json))

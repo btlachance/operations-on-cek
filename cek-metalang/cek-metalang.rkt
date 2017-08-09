@@ -23,13 +23,14 @@
        #:final f:-final
        #:step
        s:-step ...)
-     (with-syntax ([term->py (format-id #'name "~a-term->py" #'name)]
+     (with-syntax ([term->json (format-id #'name "~a-term->json" #'name)]
                    [print-interp (format-id #'name "print-~a-interp" #'name)]
+                   [print-parser (format-id #'name "print-~a-parser" #'name)]
                    [(productions ...) (attribute grammar.data)]
                    [(steps ...) (attribute s.data)]
                    [initial (attribute i.data)]
                    [final (attribute f.data)])
-       #`(define-values (print-interp term->py)
+       #`(define-values (print-interp print-parser term->json)
            (compile-cek
             #'name
             (list productions ...)

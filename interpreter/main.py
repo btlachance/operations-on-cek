@@ -1,8 +1,12 @@
-import runtime as r
-import program as p
+import parser
+from runtime import run
+from pycket import pycket_json
+from rpython.rlib import streamio as sio
 
-def main():
-  p.main(r.run)
+def main(argv):
+  stdin = sio.fdopen_as_stream(0, "r")
+  ast = parser.parse(get_json_string(stdin.readall()))
+  return run(ast)
 
-if __name__ == "__main__":
-  main()
+def get_json_string(s):
+  return pycket_json.loads(s)

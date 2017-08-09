@@ -350,16 +350,20 @@
       [(quote s:id) #'(quote (sym s))]
       [_ this-syntax]))
 
-  (define (corify/lc-term->py stx)
+  (define (corify/lc-term->json stx)
     #;(pretty-print (syntax->datum stx) (current-error-port))
     #;(pretty-print (syntax->datum (kernel->core stx)) (current-error-port))
-    (lc-term->py (kernel->core stx)))
+    (lc-term->json (kernel->core stx)))
 
   (command-line
    #:program "lc"
    #:once-any
    ["--print-interp" "Print the Python definition of the interpreter"
                      (print-lc-interp)]
-   ["--compile-term" ("Read a lc term from stdin and print a function"
-                      "main that runs the term's Python definition")
-                     (pretty-display (corify/lc-term->py (read-syntax)))]))
+   ["--print-parser" ("Print the Python-based parser that consumes"
+                      "JSON representations of lc terms and produces"
+                      "AST nodes")
+                     (print-lc-parser)]
+   ["--compile-term" ("Read a lc term from stdin and print the JSON"
+                      "representation of that term to stdout.")
+                     (pretty-display (corify/lc-term->json (read-syntax)))]))

@@ -56,6 +56,7 @@
 
 ;; an ir:class-def is (ir:class-def name super-class (U #f (listof ir:field-def)) (U 'super ir:method-def))
 (struct ir:class-def (name super-name fields method) #:transparent)
+(define singleton-class? (compose not ir:class-def-fields))
 
 ;; an ir:field-def is (ir:field-def name name)
 (struct ir:field-def (fieldname classname) #:transparent)
