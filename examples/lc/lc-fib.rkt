@@ -1,8 +1,6 @@
 #lang racket
 (define (fib n)
-  (if (zero? n)
-      0
-      (if (zero? (- n 1))
-          1
-          (+ (fib (- n 1)) (fib (- n 2))))))
-(fib 30)
+  (if (< n 2)
+      n
+      (+ (fib (- n 1)) (fib (- n 2)))))
+(time-apply fib (cons 35 '()))
