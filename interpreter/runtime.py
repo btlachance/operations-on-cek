@@ -145,8 +145,7 @@ class ExtendedEnv(Env):
     self.v = v
     self.e = e
   def lookup(self, y):
-    assert isinstance(y, PrimVariable)
-    if self.x.literal == y.literal:
+    if self.x.literal == y:
       return self.v
     else:
       return self.e.lookup(y)
@@ -156,7 +155,8 @@ class ExtendedEnv(Env):
 def emptyenv():
   return EmptyEnv()
 def lookup(e, x):
-  result = e.lookup(x)
+  assert isinstance(x, PrimVariable)
+  result = e.lookup(x.literal)
   if isinstance(result, Cell):
     result = result.get()
     if isinstance(result, m.cl_undefinedv):
@@ -251,7 +251,11 @@ class Cell(m.cl_v):
 def mkcell(v):
   return Cell(v)
 def setcell(var, env, v):
-  cell = env.lookup(var)
+  # We can't use the lookup function because it handles cell
+  # unwrapping; we have to instead call the environment's lookup
+  # method
+  assert isinstance(var, PrimVariable)
+  cell = env.lookup(var.literal)
   return cell.set(v)
 def setcells(vars, env, vs):
   while isinstance(vars, m.cl_varl) and isinstance(vs, m.cl_vl):
@@ -392,8 +396,8 @@ class TimeApply(m.cl_e):
     return ' ' * indent + '(p#time-apply %s %s)' % (self.proc.pprint(0), self.lst.pprint(0))
 
   def interpret(self, env, k):
-    procv = env.lookup(self.proc)
-    lstv = env.lookup(self.lst)
+    procv = lookup(env, self.proc)
+    lstv = lookup(env, self.lst)
     return apply(procv, lstv, TimeApplyK(time.clock(), k))
 
 class ExtensionK(m.cl_extensionk):
