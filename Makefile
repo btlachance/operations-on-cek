@@ -12,19 +12,14 @@ all: build/cek-metalang.html test
 build/%.html: scribblings/%.scrbl
 	scribble --dest build/ --dest-name $(@F) $<
 
-build/interpreter-%: examples/%/spec.rkt $(wildcard interpreter/*.py) $(METALANGDEPS)
-	mkdir -p $@
-	cp -R interpreter/* $@
-	racket $< --print-interp > $@/machine.py
-	racket $< --print-parser > $@/parser.py
+build/interpreter-%/cek-c : examples/%/spec.rkt $(wildcard interpreter/*.py) $(METALANGDEPS)
+	mkdir -p $(@D)
+	cp -R interpreter/* $(@D)
+	racket $< --print-interp > $(@D)/machine.py
+	racket $< --print-parser > $(@D)/parser.py
+	$(RPYTHON) -Ojit $(@D)/targetcek.py && mv cek-c $@
 
-build/cek-lc-c: build/interpreter-lc/
-	(cd build/interpreter-lc/; $(RPYTHON) -Ojit targetcek.py && cp cek-c ../$(@F))
-
-build/cek-lc-nojit-c: build/interpreter-lc/
-	(cd build/interpreter-lc/; $(RPYTHON) targetcek.py && cp cek-c ../$(@F))
-
-runlc-%: build/cek-lc-c
+runlc-%: build/interpreter-lc/cek-c
 	raco expand examples/lc/lc-$*.rkt |\
 		racket examples/lc/lc.rkt --compile-term |\
 		$<
