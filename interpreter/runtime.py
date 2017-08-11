@@ -162,6 +162,8 @@ def lookup(e, x):
     if isinstance(result, m.cl_undefinedv):
       raise CEKError("%s: undefined; cannot use before initialization" % x.pprint(0))
   return result
+
+@jit.unroll_safe
 def extend(e, xs, vs):
   result = e
   while isinstance(xs, m.cl_varl) and isinstance(vs, m.cl_vl):
@@ -219,6 +221,7 @@ def varsreverse(vars):
     vars = vars.vars1
   return result
 
+@jit.unroll_safe
 def vsreverse(vs):
   result = m.val_vsnil_sing
   while isinstance(vs, m.cl_vl):
