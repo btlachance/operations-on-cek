@@ -145,7 +145,7 @@ class ExtendedEnv(Env):
     self.v = v
     self.e = e
   def lookup(self, y):
-    if self.x.literal == y:
+    if self.x.literal == y.literal:
       return self.v
     else:
       return self.e.lookup(y)
@@ -156,7 +156,8 @@ def emptyenv():
   return EmptyEnv()
 def lookup(e, x):
   assert isinstance(x, PrimVariable)
-  result = e.lookup(x.literal)
+  jit.promote(x)
+  result = e.lookup(x)
   if isinstance(result, Cell):
     result = result.get()
     if isinstance(result, m.cl_undefinedv):
@@ -255,7 +256,7 @@ def setcell(var, env, v):
   # unwrapping; we have to instead call the environment's lookup
   # method
   assert isinstance(var, PrimVariable)
-  cell = env.lookup(var.literal)
+  cell = env.lookup(var)
   return cell.set(v)
 def setcells(vars, env, vs):
   while isinstance(vars, m.cl_varl) and isinstance(vs, m.cl_vl):
