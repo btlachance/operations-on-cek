@@ -140,7 +140,6 @@ class EmptyEnv(Env):
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
 class ExtendedEnv(Env):
-  _immutable_fields_ = ['x', 'v', 'e']
   def __init__(self, x, v, e):
     assert isinstance(x, PrimVariable)
     self.x = x
