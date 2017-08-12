@@ -19,6 +19,7 @@ class CEKDone(Exception):
 def mkvariable(name):
   return PrimVariable(name)
 class PrimVariable(m.cl_variable):
+  _immutable_fields_ = ['literal']
   def __init__(self, name):
     self.literal = name
   def pprint(self, indent):
@@ -139,12 +140,14 @@ class EmptyEnv(Env):
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
 class ExtendedEnv(Env):
+  _immutable_fields_ = ['x', 'v', 'e']
   def __init__(self, x, v, e):
     assert isinstance(x, PrimVariable)
     self.x = x
     self.v = v
     self.e = e
   def lookup(self, y):
+    jit.promote(self.x)
     if self.x.literal == y.literal:
       return self.v
     else:
