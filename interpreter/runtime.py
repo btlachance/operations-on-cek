@@ -150,6 +150,8 @@ class ExtendedEnv(Env):
     if self.x.literal == y.literal:
       return self.v
     else:
+      if not jit.isvirtual(self.e):
+        jit.promote(self.e)
       return self.e.lookup(y)
   def pprint(self, indent):
     return ' ' * indent + '([%s -> %s], %s)' % (self.x.pprint(0), self.v.pprint(0), self.e.pprint(0))
