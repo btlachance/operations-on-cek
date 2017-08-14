@@ -256,22 +256,9 @@
       [(define-syntaxes _ ...) #t]
       [(define-values (id) _)
        ;; These three identifiers are never used
-       (or (memq (syntax-e #'id) (list 'open-output-file/truncate
-                                       'call-with-output-file/truncate
-                                       'fatal-error))
-           (and (regexp-match? #rx"^.*-iters$" (symbol->string (syntax-e #'id)))
-                ;; XXX When I compile even a small input benchmark,
-                ;; e.g. fib, with --compile-term I produce waaaay too
-                ;; big of a main function (but by what metric---# of
-                ;; not-dead variables? error message just says graph
-                ;; is to complex). This causes translation to
-                ;; fail. So, for a short-term stop gap I'm filtering
-                ;; out the unnecessary -iters...
-                (not (memq (syntax-e #'id) (list 'fib-iters
-                                                 'ack-iters
-                                                 'tak-iters
-                                                 'cpstak-iters
-                                                 'warmup-iters)))))]
+       (memq (syntax-e #'id) (list 'open-output-file/truncate
+                                   'call-with-output-file/truncate
+                                   'fatal-error))]
       [(#%require _) #t]
       [_ #f]))
 
