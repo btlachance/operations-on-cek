@@ -99,28 +99,31 @@
   #:step
   ;; IDK what to do when the module body is empty... I don't yet have
   ;; a void value, but I guess that's what I need.
-  [((modbegin (mf modform_0 modforms_0)) env k) -->
-   (modform_1 env (binddefs mfnil modforms_1 k))
-   #:where (mf modform_1 modforms_1) (modformsreverse (mf modform_0 modforms_0))]
+  [((modbegin modforms) env k)
+   -->
+   (ignore env (binddefs modforms modforms k))
+   #:where (mf modform_1 modforms_1) modforms]
 
-  [(gtopform env_0 (binddefs modforms_bound (mf modform modforms_unbound) k))
+  [(ignore env (binddefs (mf modform modforms) modforms_toeval k))
    -->
-   (modform env_1 (binddefs (mf gtopform modforms_bound) modforms_unbound k))
+   (modform env (binddefs modforms modforms_toeval k))]
+  [(ignore env (binddefs mfnil (mf modform_toeval modforms_toeval) k))
+   -->
+   (modform_toeval env (evaldefs modform_toeval modforms_toeval env k))]
+  [(ignore env (binddefs mfnil mfnil k))
+   ;; This rule shouldn't happen since modbegin checks that the module
+   ;; body is nonempty
+   -->
+   (ignore env k)]
+
+  [(gtopform env (binddefs modforms_tobind modforms_toeval k))
+   -->
+   (ignore (extend1 env var v) (binddefs modforms_tobind modforms_toeval k))
    #:where (define var e_0) gtopform
-   #:where v (mkcell undefinedv)
-   #:where env_1 (extend1 env_0 var v)]
-  [(e_0 env (binddefs modforms_bound (mf modform modforms_unbound) k))
+   #:where v (mkcell undefinedv)]
+  [(e_0 env (binddefs modforms_tobind modforms_toeval k))
    -->
-   (modform env (binddefs (mf e_0 modforms_bound) modforms_unbound k))]
-  [(gtopform env_0 (binddefs modforms_bound mfnil k))
-   -->
-   (gtopform env_1 (evaldefs gtopform modforms_bound env_1 k))
-   #:where (define var e_0) gtopform
-   #:where v (mkcell undefinedv)
-   #:where env_1 (extend1 env_0 var v)]
-  [(e_0 env (binddefs modforms_bound mfnil k))
-   -->
-   (e_0 env (evaldefs e_0 modforms_bound env k))]
+   (ignore env (binddefs modforms_tobind modforms_toeval k))]
 
   [((define var e_0) env (evaldefs modform modforms env_0 k))
    -->
