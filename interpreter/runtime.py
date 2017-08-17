@@ -140,6 +140,7 @@ class EmptyEnv(Env):
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
 class ExtendedEnv(Env):
+  _immutable_fields_ = ['x', 'v', 'e']
   def __init__(self, x, v, e):
     assert isinstance(x, PrimVariable)
     self.x = x
@@ -160,7 +161,6 @@ def emptyenv():
   return EmptyEnv()
 def lookup(e, x):
   assert isinstance(x, PrimVariable)
-  jit.promote(x)
   result = e.lookup(x)
   if isinstance(result, Cell):
     result = result.get()
@@ -178,6 +178,7 @@ def extend(e, xs, vs):
   if isinstance(xs, m.cl_varl) or isinstance(vs, m.cl_vl):
     raise CEKError("Function called with the wrong number of arguments")
   return result
+
 def extend1(e, x, v):
   return ExtendedEnv(x, v, e)
 def extendrest(e, xs, x_rest, vs):
@@ -185,7 +186,7 @@ def extendrest(e, xs, x_rest, vs):
   while isinstance(xs, m.cl_varl) and isinstance(vs, m.cl_vl):
     x, xs = xs.var0, xs.vars1
     v, vs = vs.v0, vs.vs1
-    result = ExtendedEnv(x, v, result)
+    result = extend1(result, x, v)
   if isinstance(xs, m.cl_varl):
     raise CEKError("Function called with too few arguments")
 
@@ -194,7 +195,7 @@ def extendrest(e, xs, x_rest, vs):
   while isinstance(restvs_reversed, m.cl_vl):
     rest_list = m.cl_cons(restvs_reversed.v0, rest_list)
     restvs_reversed = restvs_reversed.vs1
-  return ExtendedEnv(x_rest, rest_list, result)
+  return extend1(result, x_rest, rest_list)
 
 def resulttovlist(result):
   if isinstance(result, m.cl_v):

@@ -29,7 +29,7 @@
 
   (config ::= (conf term env k))
   (k ::= modk expk mt)
-  (modk ::= (binddefs modforms modforms k))
+  (modk ::= (binddefs modforms vars vs modforms k))
   (expk ::= (fn vs es env k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
@@ -101,29 +101,32 @@
   ;; a void value, but I guess that's what I need.
   [((modbegin modforms) env k)
    -->
-   (ignore env (binddefs modforms modforms k))
+   (ignore env (binddefs modforms varsnil vsnil modforms k))
    #:where (mf modform_1 modforms_1) modforms]
 
-  [(ignore env (binddefs (mf modform modforms) modforms_toeval k))
+  [(ignore env (binddefs (mf modform modforms) vars vs modforms_toeval k))
    -->
-   (modform env (binddefs modforms modforms_toeval k))]
-  [(ignore env (binddefs mfnil (mf modform_toeval modforms_toeval) k))
+   (modform env (binddefs modforms vars vs modforms_toeval k))]
+  [(ignore env_0 (binddefs mfnil vars_rev vs_rev (mf modform_toeval modforms_toeval) k))
    -->
-   (modform_toeval env (evaldefs modform_toeval modforms_toeval env k))]
-  [(ignore env (binddefs mfnil mfnil k))
+   (modform_toeval env_1 (evaldefs modform_toeval modforms_toeval env_1 k))
+   #:where vars (varsreverse vars_rev)
+   #:where vs (vsreverse vs_rev)
+   #:where env_1 (extend env_0 vars vs)]
+  [(ignore env (binddefs mfnil varsnil vsnil mfnil k))
    ;; This rule shouldn't happen since modbegin checks that the module
    ;; body is nonempty
    -->
    (ignore env k)]
 
-  [(gtopform env (binddefs modforms_tobind modforms_toeval k))
+  [(gtopform env (binddefs modforms_tobind vars vs modforms_toeval k))
    -->
-   (ignore (extend1 env var v) (binddefs modforms_tobind modforms_toeval k))
+   (ignore env (binddefs modforms_tobind (varl var vars) (vl v vs) modforms_toeval k))
    #:where (define var e_0) gtopform
    #:where v (mkcell undefinedv)]
-  [(e_0 env (binddefs modforms_tobind modforms_toeval k))
+  [(e_0 env (binddefs modforms_tobind vars vs modforms_toeval k))
    -->
-   (ignore env (binddefs modforms_tobind modforms_toeval k))]
+   (ignore env (binddefs modforms_tobind vars vs modforms_toeval k))]
 
   [((define var e_0) env (evaldefs modform modforms env_0 k))
    -->
