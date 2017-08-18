@@ -173,7 +173,11 @@
       [(list (ir:field-def names _) ...)
        (define (format-attr-name s) (format "'~a'" s))
        (apply ~a #:separator ", " (map format-attr-name names))]))
-  (format "~a_attrs_ = [~a]" prefix attrs-rhs))
+  (string-join
+   (list
+    (format "~a_attrs_ = [~a]" prefix attrs-rhs)
+    (format "~a_immutable_fields_ = [~a]" prefix attrs-rhs))
+   "\n"))
 
 ;; method-def->py : name (U 'super ir:method-def) -> string
 (define (method-def->py class-name mdef #:indent [prefix ""] #:super [super-name 'top])
