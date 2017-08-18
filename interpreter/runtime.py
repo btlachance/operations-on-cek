@@ -255,6 +255,7 @@ class Cell(m.cl_v):
     self.val = v
     return v
   def get(self):
+    jit.promote(self.val)
     return self.val
 def mkcell(v):
   return Cell(v)
