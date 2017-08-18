@@ -28,6 +28,7 @@ class PrimVariable(m.cl_variable):
 def mkint(n):
   return Integer(n)
 class Integer(m.cl_integer):
+  _immutable_fields_ = ['value']
   def __init__(self, n):
     self.value = n
   def eq(self, other):
@@ -99,6 +100,7 @@ class UnaryPrim(m.cl_e):
     return ' ' * indent + '(p#%s %s)' % (self.opname, self.arg.pprint(0))
 
 class BinaryPrim(m.cl_e):
+  _immutable_fields_ = ['arg1', 'arg2', 'opname', 'op']
   def __init__(self, arg1, arg2, opname, op):
     self.arg1 = arg1
     self.arg2 = arg2
