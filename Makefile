@@ -3,7 +3,7 @@ RPYTHON=$(PYTHON) ~/projects/pypy/rpython/bin/rpython
 RPYTHONOPTS=
 _=$(shell mkdir -p build)
 METALANGDEPS=$(wildcard cek-metalang/*.rkt)
-RTDEPS=cek-metalang/runtime.py
+RTDEPS=$(wildcard interpreter/*.py)
 .PHONY: all unittest inttest test clean quicktest
 .PRECIOUS: build/interpreter-%/machine.py
 
@@ -12,7 +12,7 @@ all: build/cek-metalang.html test
 build/%.html: scribblings/%.scrbl
 	scribble --dest build/ --dest-name $(@F) $<
 
-build/interpreter-%/cek-c : examples/%/spec.rkt $(wildcard interpreter/*.py) $(METALANGDEPS)
+build/interpreter-%/cek-c : examples/%/spec.rkt $(RTDEPS)  $(METALANGDEPS)
 	mkdir -p $(@D)
 	cp -R interpreter/* $(@D)
 	racket $< --print-interp > $(@D)/machine.py
