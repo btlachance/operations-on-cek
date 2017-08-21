@@ -249,13 +249,13 @@ def pprint(v):
   return v
 
 class Cell(m.cl_v):
+  _immutable_fields_ = ['val']
   def __init__(self, init):
     self.val = init
   def set(self, v):
     self.val = v
     return v
   def get(self):
-    jit.promote(self.val)
     return self.val
 def mkcell(v):
   return Cell(v)
