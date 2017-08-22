@@ -130,34 +130,42 @@ class TernaryPrim(m.cl_e):
                                                self.arg3.pprint(0))
 
 class Env(m.cl_env):
+  _immutable_fields_ = ['promote']
   def __init__(self):
-    pass
+    self.promote = False
   def lookup(self, x):
     raise Exception("subclass responsibility")
 class EmptyEnv(Env):
+  _immutable_fields_ = ['promote']
   def __init__(self):
+    self.promote = False
     pass
   def lookup(self, y):
     raise CEKError("Variable %s not found" % y)
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
 class ExtendedEnv(Env):
-  _immutable_fields_ = ['x', 'v', 'e']
+  _immutable_fields_ = ['x', 'v', 'e', 'promote']
   def __init__(self, x, v, e):
     assert isinstance(x, PrimVariable)
+    assert isinstance(e, Env)
     self.x = x
     self.v = v
     self.e = e
+    self.promote = not tracing()
   def lookup(self, y):
     jit.promote(self.x)
     if self.x.literal == y.literal:
       return self.v
     else:
-      if not jit.isvirtual(self.e):
+      if self.e.promote:
         jit.promote(self.e)
       return self.e.lookup(y)
   def pprint(self, indent):
     return ' ' * indent + '([%s -> %s], %s)' % (self.x.pprint(0), self.v.pprint(0), self.e.pprint(0))
+
+def tracing():
+  return jit.current_trace_length() >= 0
 
 def emptyenv():
   return EmptyEnv()
