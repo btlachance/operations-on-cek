@@ -1,6 +1,21 @@
 from main import main
+from rpython.rlib import jit
+from runtime import driver
 
 def entry_point(argv):
+  # Thanks, pyrolog
+  for i in range(len(argv)):
+    if argv[i] == "--jit":
+      if len(argv) == i + 1:
+        print "missing argument after --jit"
+        return 2
+      jitarg = argv[i + 1]
+      del argv[i:i+2]
+      jit.set_user_param(driver, jitarg)
+      break
+  if len(argv) > 1:
+    print "too many arguments"
+
   main(argv)
   return 0
 

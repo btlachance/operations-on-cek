@@ -193,6 +193,7 @@
                    (list 'timeapplyimpl (nt 'var) (nt 'var))
                    (list 'docontinuation (nt 'k) (nt 'result))
                    (list 'varsreverse (nt 'vars))
+                   (list 'exitimpl (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -234,6 +235,7 @@
                    'timeapplyimpl 'e
                    'docontinuation 'config
                    'varsreverse 'vars
+                   'exitimpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

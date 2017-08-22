@@ -1,7 +1,15 @@
 import parser
 from runtime import run
+from rpython.rlib.objectmodel import we_are_translated
 
 def main(argv):
+  if we_are_translated():
+    return main_translated(argv)
+  else:
+    import sys
+    sys.exit(main_untranslated(argv))
+
+def main_translated(argv):
   from rpython.rlib import streamio as sio
   from pycket import pycket_json
 
@@ -11,6 +19,7 @@ def main(argv):
   return run(ast)
 
 def main_untranslated(argv):
+  import sys
   import json
   import pycket_json_adapter as pja
 
@@ -20,4 +29,4 @@ def main_untranslated(argv):
 
 if __name__ == "__main__":
   import sys
-  main_untranslated(sys.argv)
+  main(sys.argv)

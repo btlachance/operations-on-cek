@@ -245,8 +245,7 @@ def vsreverse(vs):
     vs = vs.vs1
   return result
 
-def printimpl(x):
-  return UnaryPrim(x, 'print', lambda v: pprint(v))
+def printimpl(x): return UnaryPrim(x, 'print', lambda v: pprint(v))
 def pprint(v):
   if isinstance(v, m.cl_clo):
     print v.l0.pprint(0)
@@ -255,6 +254,13 @@ def pprint(v):
   else:
     print v.pprint(0)
   return v
+
+def exitimpl(x): return UnaryPrim(x, 'exit', exit)
+def exit(v):
+  if isinstance(v, Integer) and 1 <= v.value <= 255:
+    ret(v)
+  else:
+    ret(Integer(0))
 
 class Cell(m.cl_v):
   _immutable_fields_ = ['val']
@@ -376,6 +382,8 @@ class FileOutputPort(m.cl_v):
     self.file = file
   def write(self, string):
     self.file.write(string)
+  def flush(self):
+    self.file.flush()
 def guardfileoutputport(v):
   if not isinstance(v, FileOutputPort):
     raise CEKError("Expected a FileOutputPort but got something else")
@@ -444,21 +452,29 @@ def timeapplyimpl(proc, init):
   return TimeApply(proc, init)
 
 driver = jit.JitDriver(reds = ['e', 'k'],
-                       greens = ['c'],
-                       get_printable_location=lambda c: c.pprint(0))
+                       greens = ['c', 'prev_c'],
+                       get_printable_location=lambda c, prev_c: c.pprint(0))
 def run(p):
   c, e, k = m.init(p)
+  prev_c = c
   while True:
-    driver.jit_merge_point(c = c, e = e, k = k)
+    driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
+    prev_c = c if isinstance(c, m.cl_app) else prev_c
+    # prev_c = c
     # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
     try:
       c, e, k = c.interpret(e, k)
       if isinstance(c, m.cl_app):
-        driver.can_enter_jit(c = c, e = e, k = k)
+        driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)
     except CEKDone as d:
-      return d.result
+      result = d.result
+      if isinstance(result, Integer):
+        return result.value
+      return 0
     except CEKError as err:
       print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
       print err.__str__()
       print c.pprint(0)
-      return None
+      return 1
+    finally:
+      stdout.flush()

@@ -64,6 +64,13 @@
                                        (app fn (el (app car (el xs esnil)) (el (app foldr (el fn (el init (el (app cdr (el xs esnil)) esnil)))) esnil))))
                                    esnil))
                (mf (define list (lamrest varsnil args (app foldr (el cons (el null (el args esnil)))) esnil))
+               (mf (define append (lamrest varsnil ls
+                                    (app foldl (el (lam (varl l0 (varl rest varsnil))
+                                                     (app foldr (el cons (el l0 (el rest esnil))))
+                                                     esnil)
+                                                   (el null
+                                                       (el ls esnil))))
+                                    esnil))
                (mf (define print (lam (varl val varsnil) (printimpl val) esnil))
                (mf (define = (lam (varl m (varl n varsnil)) (numequalimpl m n) esnil))
                (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n) esnil))
@@ -92,7 +99,16 @@
                                  esnil))
                (mf (define values (lamrest varsnil args (values args) esnil))
                (mf (define call-with-values (lam (varl gen (varl recv varsnil)) (cwv gen recv) esnil))
-                 modforms))))))))))))))))))))))))))))))))))))))
+               (mf (define exit (lamrest varsnil args
+                                  (letvalues (vbl (vb (varl exitv varsnil)
+                                                      (if (app null? (el args esnil))
+                                                          (quote true)
+                                                          (app car (el args esnil))))
+                                                  valuesbindsnil)
+                                             (exitimpl exitv)
+                                             esnil)
+                                  esnil))
+                 modforms))))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -135,6 +151,8 @@
    -->
    (modform env_0 (evaldefs modform modforms env_0 k))
    #:where v_ignore (setcell var env_0 v)]
+
+  ;; XXX Why not create an environment like env that bind var to v?
   [(ignore env (ret v (evaldefs (define var e_0) mfnil env_0 k)))
    -->
    (ignore env (ret v k))]

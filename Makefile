@@ -5,18 +5,21 @@ _=$(shell mkdir -p build)
 METALANGDEPS=$(wildcard cek-metalang/*.rkt)
 RTDEPS=$(wildcard interpreter/*.py)
 .PHONY: all unittest inttest test clean quicktest
-.PRECIOUS: build/interpreter-%/machine.py
+.PRECIOUS: build/interpreter-%/main.py
 
 all: build/cek-metalang.html test
 
 build/%.html: scribblings/%.scrbl
 	scribble --dest build/ --dest-name $(@F) $<
 
-build/interpreter-%/cek-c : examples/%/spec.rkt $(RTDEPS)  $(METALANGDEPS)
+
+build/interpreter-%/main.py : examples/%/spec.rkt $(RTDEPS) $(METALANGDEPS)
 	mkdir -p $(@D)
 	cp -R interpreter/* $(@D)
 	racket $< --print-interp > $(@D)/machine.py
 	racket $< --print-parser > $(@D)/parser.py
+
+build/interpreter-%/cek-c : build/interpreter-%/main.py
 	$(RPYTHON) -Ojit $(@D)/targetcek.py && mv cek-c $@
 
 runlc-%: build/interpreter-lc/cek-c
