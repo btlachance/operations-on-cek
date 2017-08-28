@@ -16,8 +16,7 @@ def entry_point(argv):
   if len(argv) > 1:
     print "too many arguments"
 
-  main(argv)
-  return 0
+  return main(argv)
 
 def target(driver, args):
   driver.exe_name = 'cek-%(backend)s'
