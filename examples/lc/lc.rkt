@@ -79,6 +79,9 @@
                (mf (define apply (lam (varl fun (varl args varsnil)) (apply fun args) esnil))
                (mf (define vector (lamrest varsnil args (vectorimpl args) esnil))
                (mf (define vector-ref (lam (varl vec (varl pos varsnil)) (vecrefimpl vec pos) esnil))
+               (mf (define vector-set! (lam (varl vec (varl pos (varl new-v varsnil)))
+                                         (vecsetimpl vec pos new-v)
+                                         esnil))
                (mf (define vector-length (lam (varl vec varsnil) (veclengthimpl vec) esnil))
                (mf (define current-command-line-arguments (lam varsnil (app vector esnil) esnil))
                (mf (define void (lamrest varsnil args (mkvoid) esnil))
@@ -109,7 +112,7 @@
                                              (exitimpl exitv)
                                              esnil)
                                   esnil))
-                 modforms)))))))))))))))))))))))))))))))))))))))))
+                 modforms))))))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]

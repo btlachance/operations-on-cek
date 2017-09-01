@@ -74,6 +74,10 @@ class Number(m.cl_number):
 
 def mkint(n):
   return Integer(n)
+def guardint(v):
+  if not isinstance(v, Integer):
+    raise CEKError("Expected an integer")
+  return v
 class Integer(Number):
   _immutable_fields_ = ['value']
   def __init__(self, n):
@@ -413,25 +417,26 @@ def guardstr(v):
 
 class Vector(m.cl_v):
   def __init__(self, vs):
-    self.vs = vs
-  def ref(self, pos):
-    current = self.vs
-    remaining = pos
+    self.vs = []
+    self.len = 0
 
-    while remaining > 0 and isinstance(current, m.cl_vl):
-      current = current.vs1
-      remaining = remaining - 1
-    if isinstance(current, m.cl_vl):
-      return current.v0
-    else:
-      raise CEKError("vector-ref: index %s is out of range" % pos)
+    while isinstance(vs, m.cl_vl):
+      self.vs.insert(self.len, vs.v0)
+      vs = vs.vs1
+      self.len = self.len + 1
+
+  def _checkrange(self, name, pos):
+    if pos < 0 or pos >= self.len:
+      raise CEKError("%s: index %s is out of range" % (name, pos))
+  def ref(self, pos):
+    self._checkrange("vector-ref", pos)
+    return self.vs[pos]
+  def set(self, pos, v):
+    self._checkrange("vector-set!", pos)
+    self.vs[pos] = v
+    return m.val_voidv_sing
   def length(self):
-    result = 0
-    current = self.vs
-    while isinstance(current, m.cl_vl):
-      current = current.vs1
-      result = result + 1
-    return result
+    return self.len
 def guardvector(v):
   if not isinstance(v, Vector):
     raise CEKError("Expected a vector")
@@ -440,6 +445,8 @@ def vectorimpl(vlist):
   return UnaryPrim(vlist, 'vector', lambda vlist: Vector(vlisttovs(vlist)))
 def vecrefimpl(vec, pos):
   return BinaryPrim(vec, pos, 'vector-ref', lambda v, p: guardvector(v).ref(guardint(p).value))
+def vecsetimpl(vec, pos, v):
+  return TernaryPrim(vec, pos, v, 'vector-set!', lambda vec, p, v: guardvector(vec).set(guardint(p).value, v))
 def veclengthimpl(vec):
   return UnaryPrim(vec, 'vector-length', lambda v: mkint(guardvector(v).length()))
 

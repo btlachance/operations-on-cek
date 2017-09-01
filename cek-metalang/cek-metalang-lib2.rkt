@@ -187,6 +187,7 @@
                    (list 'vlisttovs (nt 'v))
                    (list 'vectorimpl (nt 'var))
                    (list 'vecrefimpl (nt 'var) (nt 'var))
+                   (list 'vecsetimpl (nt 'var) (nt 'var) (nt 'var))
                    (list 'veclengthimpl (nt 'var))
                    (list 'mksymbol (nt 'var))
                    (list 'issymbolimpl (nt 'var))
@@ -230,6 +231,7 @@
                    'vlisttovs 'vs
                    'vectorimpl 'e
                    'vecrefimpl 'e
+                   'vecsetimpl 'e
                    'veclengthimpl 'e
                    'mksymbol 'v
                    'issymbolimpl 'e
