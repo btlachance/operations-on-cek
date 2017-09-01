@@ -414,7 +414,7 @@
 ;; a case is one of
 ;; - (normal-def symbol natural)
 ;; - (singleton-def symbol)
-;; - (metafunction symbol (U natural 'int 'string))
+;; - (metafunction symbol (U natural 'num 'int 'string))
 (struct normal-def (name argcount) #:transparent)
 (struct singleton-def (name) #:transparent)
 (struct metafunction (name argcount) #:transparent)
@@ -449,9 +449,18 @@
      (string-join
       `(,(indent (format "if builtin_info[~s].value_string() == ~s:" "fn-name" (~a name)))
         ,(indent (format "  [tmp0] = builtin_info[~s].value_array()" "args"))
-        ,(indent (format "  if not tmp0.is_~a:" type))
-        ,(indent (format "    raise ParseError(\"~a expects a ~a; got %s\" % tmp0.tostring())" name type))
-        ,(indent (format "  return r.~a(tmp0.value_~a())" name type)))
+        ,@(if (equal? type 'num)
+              (list
+               (indent (format "  if tmp0.is_int:"))
+               (indent (format "    return r.~a(tmp0.value_int())" name))
+               (indent (format "  elif tmp0.is_float:"))
+               (indent (format "    return r.~a(tmp0.value_float())" name))
+               (indent (format "  else:"))
+               (indent (format "    raise ParseError(\"~a expects either an int or a float; got %s\" % tmp0.tostring())" name)))
+              (list
+               (indent (format "  if not tmp0.is_~a:" type))
+               (indent (format "    raise ParseError(\"~a expects a ~a; got %s\" % tmp0.tostring())" name type))
+               (indent (format "  return r.~a(tmp0.value_~a())" name type)))))
       "\n")]))
 
 ;; ir->case ; (U ir:class-def sort) -> case
@@ -474,7 +483,7 @@
      ;; XXX Dirty dirty hacks because prim parsers generate IR that
      ;; call these functions
      (list (metafunction 'mkvariable 'string)
-           (metafunction 'mkint 'int)
+           (metafunction 'mknum 'num)
            (metafunction 'mkstr 'string))
      (map ir->case metafunctions)))
 

@@ -24,7 +24,8 @@
     (match p
       [(? symbol? s) (hash-ref env s)]
       [(? string? str) str]
-      [(? exact-integer? n) n]))
+      [(? exact-integer? n) n]
+      [(? real? n) n]))
   (match ir
     [(? singleton-name? sing) (hash 'singleton (~a sing))]
     [(? symbol? s) (hash-ref env s)]

@@ -25,36 +25,139 @@ class PrimVariable(m.cl_variable):
   def pprint(self, indent):
     return self.literal
 
-def mkint(n):
-  return Integer(n)
-class Integer(m.cl_integer):
-  _immutable_fields_ = ['value']
-  def __init__(self, n):
-    self.value = n
+def mknum(n):
+  if isinstance(n, float):
+    return mkfloat(n)
+  else:
+    return mkint(n)
+def guardnum(v):
+  if not isinstance(v, Number):
+    raise CEKError("Expected a number")
+  return v
+class Number(m.cl_number):
+  def _value(self):
+    raise CEKError("subclass responsibility")
   def eq(self, other):
-    return isinstance(other, Integer) and self.value == other.value
+     if isinstance(other, Number):
+       return self._value() == other._value()
+     else:
+       return False
   def ne(self, other):
     return not self.eq(other)
   def pprint(self, indent):
-    return ' ' * indent + '%s' % self.value
-def guardint(v):
-  if not isinstance(v, Integer):
-    raise CEKError("Expected an integer")
-  return v
+    return ' ' * indent + '%s' % self._value()
+  def is_zero(self):
+    return m.cl_true() if self._value() == 0 else m.cl_false()
+  def add(self, v):
+    raise CEKError("subclass responsibility")
+  def addint(self, i):
+    raise CEKError("subclass responsibility")
+  def sub(self, v):
+    raise CEKError("subclass responsibility")
+  def subint(self, i):
+    raise CEKError("subclass responibility")
+  def mult(self, v):
+    raise CEKError("subclass responsibility")
+  def multint(self, i):
+    raise CEKError("subclass responibility")
+  def div(self, v):
+    dividend = self._value()
+    divisor = v._value()
+    quotient = dividend / divisor
+
+    if isinstance(self, Integer) and isinstance(v, Integer):
+      return mknum(quotient)
+    else:
+      return mkfloat(quotient)
+  def lt(self, v):
+    return m.cl_true() if self._value() < v._value() else m.cl_false()
+
+def mkint(n):
+  return Integer(n)
+class Integer(Number):
+  _immutable_fields_ = ['value']
+  def __init__(self, n):
+    self.value = n
+  def _value(self):
+    return self.value
+  def eq(self, other):
+    if isinstance(other, Integer):
+      return self.value == other.value
+    else:
+      return super(Number, self).eq(other)
+  def add(self, v):
+    if isinstance(v, Integer):
+      return mkint(self.value + v.value)
+    else:
+      return v.addint(self.value)
+  def addint(self, i):
+    return mkint(self.value + i)
+  def sub(self, v):
+    if isinstance(v, Integer):
+      return mkint(self.value + v.value)
+    else:
+      return v.subint(self.value)
+  def subint(self, i):
+    return mkint(self.value - i)
+  def mult(self, v):
+    if isinstance(v, Integer):
+      return mkint(self.value * v.value)
+    else:
+      return v.multint(self.value)
+  def multint(self, i):
+    return mkint(self.value * i)
+
+def mkfloat(n):
+  return Float(n)
+class Float(Number):
+  _immutable_fields_ = ['value']
+  def __init__(self, n):
+    self.value = n
+  def _value(self):
+    return self.value
+  def eq(self, other):
+    if isinstance(other, Float):
+      return self.value == other.value
+    else:
+      return super(Number, self).eq(other)
+  def add(self, v):
+    if isinstance(v, Float):
+      return mkfloat(self.value + v.value)
+    else:
+      return mkfloat(self.value + v._value())
+  def addint(self, i):
+    return mkfloat(self.value + i)
+  def sub(self, v):
+    if isinstance(v, Float):
+      return mkfloat(self.value - v.value)
+    else:
+      return mkfloat(self.value - v._value())
+  def subint(self, i):
+    return mkfloat(self.value - i)
+  def mult(self, v):
+    if isinstance(v, Float):
+      return mkfloat(self.value * v.value)
+    else:
+      return mkfloat(self.value * v._value())
+  def multint(self, i):
+    return mkfloat(self.value * i)
+
 def zeropimpl(n):
-  return UnaryPrim(n, 'zerop', lambda n: m.cl_true() if guardint(n).value == 0 else m.cl_false())
+  return UnaryPrim(n, 'zerop', lambda n: guardnum(n).is_zero())
 def succimpl(n):
-  return UnaryPrim(n, 'succ', lambda n: Integer(guardint(n).value + 1))
+  return UnaryPrim(n, 'succ', lambda n: guardnum(n).addint(1))
 def predimpl(n):
-  return UnaryPrim(n, 'pred', lambda n: Integer(guardint(n).value - 1))
+  return UnaryPrim(n, 'pred', lambda n: guardnum(n).addint(-1))
 def addimpl(n1, n2):
-  return BinaryPrim(n1, n2, '+', lambda n1, n2: Integer(guardint(n1).value + guardint(n2).value))
+  return BinaryPrim(n1, n2, '+', lambda n1, n2: guardnum(n1).add(guardnum(n2)))
 def subimpl(n1, n2):
-  return BinaryPrim(n1, n2, '-', lambda n1, n2: Integer(guardint(n1).value - guardint(n2).value))
+  return BinaryPrim(n1, n2, '-', lambda n1, n2: guardnum(n1).sub(guardnum(n2)))
 def multimpl(n1, n2):
-  return BinaryPrim(n1, n2, '*', lambda n1, n2: Integer(guardint(n1).value * guardint(n2).value))
+  return BinaryPrim(n1, n2, '*', lambda n1, n2: guardnum(n1).mult(guardnum(n2)))
 def ltimpl(n1, n2):
-  return BinaryPrim(n1, n2, '<', lambda n1, n2: m.cl_true() if guardint(n1).value < guardint(n2).value else m.cl_false())
+  return BinaryPrim(n1, n2, '<', lambda n1, n2: guardnum(n1).lt(guardnum(n2)))
+def divimpl(n1, n2):
+  return BinaryPrim(n1, n2, '/', lambda n1, n2: guardnum(n1).div(guardnum(n2)))
 def eqlimpl(v1, v2):
   return BinaryPrim(v1, v2, 'equal?', lambda v1, v2: m.cl_true() if v1.eq(v2) else m.cl_false())
 def numequalimpl(v1, v2):
@@ -247,12 +350,14 @@ def vsreverse(vs):
 
 def printimpl(x): return UnaryPrim(x, 'print', lambda v: pprint(v))
 def pprint(v):
+  output = stdout
   if isinstance(v, m.cl_clo):
-    print v.l0.pprint(0)
+    str = v.l0.pprint(0)
   elif isinstance(v, m.cl_voidv):
-    pass
+    str = ""
   else:
-    print v.pprint(0)
+    str = v.pprint(0)
+  fprintf(output, mkstr(str), m.val_nil_sing)
   return v
 
 def exitimpl(x): return UnaryPrim(x, 'exit', exit)

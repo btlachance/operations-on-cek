@@ -1,6 +1,6 @@
 class Adapter(object):
   def __init__(self, value):
-    self.is_array = self.is_object = self.is_string = self.is_int = False
+    self.is_array = self.is_object = self.is_string = self.is_int = self.is_float = False
 
     if isinstance(value, list):
       self.is_array = True
@@ -10,6 +10,8 @@ class Adapter(object):
       self.is_string = True
     elif isinstance(value, int) or isinstance(value, long):
       self.is_int = True
+    elif isinstance(value, float):
+      self.is_float = True
     else:
       raise TypeError("Unrecognized value: %s" % value)
     self.value = value
@@ -31,6 +33,11 @@ class Adapter(object):
 
   def value_int(self):
     if self.is_int:
+      return self.value
+    raise TypeError
+
+  def value_float(self):
+    if self.is_float:
       return self.value
     raise TypeError
 

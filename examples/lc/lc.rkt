@@ -23,7 +23,7 @@
   (var ::= variable)
   (l ::= (lam vars e es) (lamrest vars var e es))
   (v ::= (clo l env) c (cons v v) undefinedv voidv)
-  (c ::= nil true false integer string (sym var))
+  (c ::= nil true false number string (sym var))
 
   (env ::= dummy)
 
@@ -46,6 +46,7 @@
                (mf (define + (lam (varl m (varl n varsnil)) (addimpl m n) esnil))
                (mf (define - (lam (varl m (varl n varsnil)) (subimpl m n) esnil))
                (mf (define * (lam (varl m (varl n varsnil)) (multimpl m n) esnil))
+               (mf (define / (lam (varl m (varl n varsnil)) (divimpl m n) esnil))
                (mf (define box (lam (varl b varsnil) (boximpl b) esnil))
                (mf (define unbox  (lam (varl b varsnil) (unboximpl b) esnil))
                (mf (define set-box! (lam (varl b (varl val varsnil)) (setboximpl b val) esnil))
@@ -108,7 +109,7 @@
                                              (exitimpl exitv)
                                              esnil)
                                   esnil))
-                 modforms))))))))))))))))))))))))))))))))))))))))
+                 modforms)))))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]

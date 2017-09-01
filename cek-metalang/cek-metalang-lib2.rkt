@@ -94,7 +94,7 @@
     ;; like we do for other nonterminals
     (append (map (compose nt production-name) productions)
             (list (nt (prim-data-name prim:variable))
-                  (nt (prim-data-name prim:integer))
+                  (nt (prim-data-name prim:number))
                   (nt (prim-data-name prim:string)))))
   (define nonterminal-form? (form-in-nonterminals? nonterminals))
 
@@ -146,10 +146,13 @@
       [:id
        (prim (syntax-e this-syntax) prim:variable)]
       [_ #f]))
-  (define integer-parse-fun
+  (define number-parse-fun
     (syntax-parser
       [:exact-integer
-       (prim (syntax-e this-syntax) prim:integer)]
+       (prim (syntax-e this-syntax) prim:number)]
+      [:number
+       #:when (real? (syntax-e this-syntax))
+       (prim (syntax-e this-syntax) prim:number)]
       [_ #f]))
   (define string-parse-fun
     (syntax-parser
@@ -168,6 +171,7 @@
                    (list 'addimpl (nt 'var) (nt 'var))
                    (list 'subimpl (nt 'var) (nt 'var))
                    (list 'multimpl (nt 'var) (nt 'var))
+                   (list 'divimpl (nt 'var) (nt 'var))
                    (list 'boximpl (nt 'var))
                    (list 'unboximpl (nt 'var))
                    (list 'setboximpl (nt 'var) (nt 'var))
@@ -197,7 +201,7 @@
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
-                   (parser integer-parse-fun integer-parse-fun)
+                   (parser number-parse-fun number-parse-fun)
                    (parser string-parse-fun string-parse-fun))
              sort->name sort->field-names sort->type
              (hash 'lookup 'v
@@ -210,6 +214,7 @@
                    'addimpl 'e
                    'subimpl 'e
                    'multimpl 'e
+                   'divimpl 'e
                    'boximpl 'e
                    'unboximpl 'e
                    'setboximpl 'e

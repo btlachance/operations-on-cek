@@ -1,6 +1,6 @@
 #lang racket
 (require "rep.rkt")
-(provide variable integer string)
+(provide variable number string)
 
 (module variable-prim racket
   (require "ir.rkt" "compile.rkt" racket/syntax)
@@ -37,36 +37,36 @@
    variable-ty
    variable-ty))
 
-(module integer-prim racket
+(module number-prim racket
   (require "ir.rkt" "compile.rkt" racket/syntax)
-  (provide (prefix-out integer- (all-defined-out)))
-  (define ty 'integer)
+  (provide (prefix-out number- (all-defined-out)))
+  (define ty 'number)
   (define ((mk/tc-fun result-fun) var-name)
     (result-fun ty))
-  (define (compile-pat int source rest)
+  (define (compile-pat num source rest)
     (define tmp (format-symbol "~a_cmp" source))
-    (define failure-msg (format "Expected ~a to equal ~a but it wasn't" source int))
-    ;; There is an isinstance check in the equality test for integer
+    (define failure-msg (format "Expected ~a to equal ~a but it wasn't" source num))
+    ;; There is an isinstance check in the equality test for number
     ;; prims; for consistency's sake we'll also check its type via IR.
     (check-instance
      source ty
      (ir:let
-      (list (list tmp (ir:call-builtin 'mkint (list int))))
+      (list (list tmp (ir:call-builtin 'mknum (list num))))
       (ir:if (ir:is-equal source tmp)
              rest
              (ir:match-failure failure-msg)))))
-  (define (compile-temp int dest rest)
-    (ir:let (list (list dest (ir:call-builtin 'mkint (list int))))
+  (define (compile-temp num dest rest)
+    (ir:let (list (list dest (ir:call-builtin 'mknum (list num))))
             rest)))
-(require 'integer-prim)
-(define integer
+(require 'number-prim)
+(define number
   (prim-data
-   (integer-mk/tc-fun tc-template-result)
-   (integer-mk/tc-fun (lambda (ty) (tc-pattern-result ty '())))
-   integer-compile-temp
-   integer-compile-pat
-   integer-ty
-   integer-ty))
+   (number-mk/tc-fun tc-template-result)
+   (number-mk/tc-fun (lambda (ty) (tc-pattern-result ty '())))
+   number-compile-temp
+   number-compile-pat
+   number-ty
+   number-ty))
 
 (module string-prim racket
   (require "ir.rkt" "compile.rkt" racket/syntax)
