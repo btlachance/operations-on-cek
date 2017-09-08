@@ -182,6 +182,9 @@
                    (list 'vsreverse (nt 'vs))
                    (list 'printimpl (nt 'var))
                    (list 'ltimpl (nt 'var) (nt 'var))
+                   (list 'gtimpl (nt 'var) (nt 'var))
+                   (list 'lteqimpl (nt 'var) (nt 'var))
+                   (list 'gteqimpl (nt 'var) (nt 'var))
                    (list 'eqlimpl (nt 'var) (nt 'var))
                    (list 'numequalimpl (nt 'var) (nt 'var))
                    (list 'vlisttovs (nt 'v))
@@ -189,6 +192,7 @@
                    (list 'vecrefimpl (nt 'var) (nt 'var))
                    (list 'vecsetimpl (nt 'var) (nt 'var) (nt 'var))
                    (list 'veclengthimpl (nt 'var))
+                   (list 'makevectorimpl (nt 'var) (nt 'var))
                    (list 'mksymbol (nt 'var))
                    (list 'issymbolimpl (nt 'var))
                    (list 'fprintfimpl (nt 'var) (nt 'var) (nt 'var))
@@ -199,6 +203,7 @@
                    (list 'docontinuation (nt 'k) (nt 'result))
                    (list 'varsreverse (nt 'vars))
                    (list 'exitimpl (nt 'var))
+                   (list 'exacttoinexactimpl (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -226,6 +231,9 @@
                    'vsreverse 'vs
                    'printimpl 'e
                    'ltimpl 'e
+                   'gtimpl 'e
+                   'lteqimpl 'e
+                   'gteqimpl 'e
                    'eqlimpl 'e
                    'numequalimpl 'e
                    'vlisttovs 'vs
@@ -233,6 +241,7 @@
                    'vecrefimpl 'e
                    'vecsetimpl 'e
                    'veclengthimpl 'e
+                   'makevectorimpl 'e
                    'mksymbol 'v
                    'issymbolimpl 'e
                    'fprintfimpl 'e
@@ -243,6 +252,7 @@
                    'docontinuation 'config
                    'varsreverse 'vars
                    'exitimpl 'e
+                   'exacttoinexactimpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

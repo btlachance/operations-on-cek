@@ -43,6 +43,11 @@
   (define ty 'number)
   (define ((mk/tc-fun result-fun) var-name)
     (result-fun ty))
+  (define (compile-num-form num)
+    (match num
+      [(? symbol? s) s]
+      [(? exact-integer? n) (ir:call-builtin 'mkint (list n))]
+      [(? real? r) (ir:call-builtin 'mkfloat (list r))]))
   (define (compile-pat num source rest)
     (define tmp (format-symbol "~a_cmp" source))
     (define failure-msg (format "Expected ~a to equal ~a but it wasn't" source num))
@@ -51,12 +56,12 @@
     (check-instance
      source ty
      (ir:let
-      (list (list tmp (ir:call-builtin 'mknum (list num))))
+      (list (list tmp (compile-num-form num)))
       (ir:if (ir:is-equal source tmp)
              rest
              (ir:match-failure failure-msg)))))
   (define (compile-temp num dest rest)
-    (ir:let (list (list dest (ir:call-builtin 'mknum (list num))))
+    (ir:let (list (list dest (compile-num-form num)))
             rest)))
 (require 'number-prim)
 (define number

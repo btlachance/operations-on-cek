@@ -25,11 +25,6 @@ class PrimVariable(m.cl_variable):
   def pprint(self, indent):
     return self.literal
 
-def mknum(n):
-  if isinstance(n, float):
-    return mkfloat(n)
-  else:
-    return mkint(n)
 def guardnum(v):
   if not isinstance(v, Number):
     raise CEKError("Expected a number")
@@ -38,10 +33,7 @@ class Number(m.cl_number):
   def _value(self):
     raise CEKError("subclass responsibility")
   def eq(self, other):
-     if isinstance(other, Number):
-       return self._value() == other._value()
-     else:
-       return False
+    raise CEKError("subclass responsibility")
   def ne(self, other):
     return not self.eq(other)
   def pprint(self, indent):
@@ -64,31 +56,36 @@ class Number(m.cl_number):
     dividend = self._value()
     divisor = v._value()
     quotient = dividend / divisor
-
-    if isinstance(self, Integer) and isinstance(v, Integer):
-      return mknum(quotient)
-    else:
-      return mkfloat(quotient)
+    return mkfloat(quotient) # ugh
   def lt(self, v):
     return m.cl_true() if self._value() < v._value() else m.cl_false()
+  def gt(self, v):
+    return m.cl_true() if self._value() > v._value() else m.cl_false()
+  def lteq(self, v):
+    return m.cl_true() if self._value() <= v._value() else m.cl_false()
+  def gteq(self, v):
+    return m.cl_true() if self._value() >= v._value() else m.cl_false()
 
 def mkint(n):
   return Integer(n)
 def guardint(v):
   if not isinstance(v, Integer):
-    raise CEKError("Expected an integer")
+    raise CEKError("Expected an exact integer")
   return v
 class Integer(Number):
   _immutable_fields_ = ['value']
   def __init__(self, n):
+    assert isinstance(n, int) or isinstance(n, long)
     self.value = n
   def _value(self):
     return self.value
   def eq(self, other):
     if isinstance(other, Integer):
       return self.value == other.value
+    elif isinstance(other, Float):
+      return self.value == other.value
     else:
-      return super(Number, self).eq(other)
+      return False
   def add(self, v):
     if isinstance(v, Integer):
       return mkint(self.value + v.value)
@@ -110,20 +107,25 @@ class Integer(Number):
       return v.multint(self.value)
   def multint(self, i):
     return mkint(self.value * i)
+  def toinexact(self):
+    return mkfloat(float(self.value))
 
 def mkfloat(n):
   return Float(n)
 class Float(Number):
   _immutable_fields_ = ['value']
   def __init__(self, n):
+    assert isinstance(n, float)
     self.value = n
   def _value(self):
     return self.value
   def eq(self, other):
     if isinstance(other, Float):
       return self.value == other.value
+    elif isinstance(other, Integer):
+      return self.value == other.value
     else:
-      return super(Number, self).eq(other)
+      return False
   def add(self, v):
     if isinstance(v, Float):
       return mkfloat(self.value + v.value)
@@ -160,15 +162,27 @@ def multimpl(n1, n2):
   return BinaryPrim(n1, n2, '*', lambda n1, n2: guardnum(n1).mult(guardnum(n2)))
 def ltimpl(n1, n2):
   return BinaryPrim(n1, n2, '<', lambda n1, n2: guardnum(n1).lt(guardnum(n2)))
+def gtimpl(n1, n2):
+  return BinaryPrim(n1, n2, '>', lambda n1, n2: guardnum(n1).gt(guardnum(n2)))
+def lteqimpl(n1, n2):
+  return BinaryPrim(n1, n2, '<=', lambda n1, n2: guardnum(n1).lteq(guardnum(n2)))
+def gteqimpl(n1, n2):
+  return BinaryPrim(n1, n2, '>=', lambda n1, n2: guardnum(n1).gteq(guardnum(n2)))
 def divimpl(n1, n2):
   return BinaryPrim(n1, n2, '/', lambda n1, n2: guardnum(n1).div(guardnum(n2)))
 def eqlimpl(v1, v2):
   return BinaryPrim(v1, v2, 'equal?', lambda v1, v2: m.cl_true() if v1.eq(v2) else m.cl_false())
 def numequalimpl(v1, v2):
   return BinaryPrim(v1, v2, '=', lambda v1, v2: m.cl_true() if v1.eq(v2) else m.cl_false())
+def exacttoinexactimpl(v):
+  return UnaryPrim(v, 'exact->inexact', lambda v: guardint(v).toinexact())
 
 def mkbox(v):
   return Box(v)
+def guardbox(v):
+  if not isinstance(v, Box):
+    raise CEKError("Expected a box")
+  return v
 class Box(m.cl_v):
   def __init__(self, v):
     self.v = v
@@ -182,9 +196,9 @@ class Box(m.cl_v):
 def boximpl(v):
   return UnaryPrim(v, 'box', lambda v: mkbox(v))
 def unboximpl(b):
-  return UnaryPrim(b, 'unbox', lambda b: b.get())
+  return UnaryPrim(b, 'unbox', lambda b: guardbox(b).get())
 def setboximpl(b, v):
-  return BinaryPrim(b, v, 'box-set!', lambda b, v: b.set(v))
+  return BinaryPrim(b, v, 'box-set!', lambda b, v: guardbox(b).set(v))
 
 class NullaryPrim(m.cl_e):
   def __init__(self, opname, op):
@@ -380,6 +394,14 @@ class Cell(m.cl_v):
     return v
   def get(self):
     return self.val
+  def pprint(self, indent):
+    v = self.val
+    if isinstance(v, m.cl_clo):
+      valstr = v.l0.pprint(0)
+    else:
+      valstr = v.pprint(0)
+
+    return ' ' * indent + valstr
 def mkcell(v):
   return Cell(v)
 def setcell(var, env, v):
@@ -388,6 +410,7 @@ def setcell(var, env, v):
   # method
   assert isinstance(var, PrimVariable)
   cell = env.lookup(var)
+  assert isinstance(cell, Cell)
   return cell.set(v)
 def setcells(vars, env, vs):
   while isinstance(vars, m.cl_varl) and isinstance(vs, m.cl_vl):
@@ -418,25 +441,25 @@ def guardstr(v):
 class Vector(m.cl_v):
   def __init__(self, vs):
     self.vs = []
-    self.len = 0
 
     while isinstance(vs, m.cl_vl):
-      self.vs.insert(self.len, vs.v0)
-      vs = vs.vs1
-      self.len = self.len + 1
+      self.vs.append(vs.v0)
 
   def _checkrange(self, name, pos):
-    if pos < 0 or pos >= self.len:
-      raise CEKError("%s: index %s is out of range" % (name, pos))
+    if pos < 0 or pos >= self.length():
+      raise CEKError("%s: index %s is out of range; max index: %s" % (name, pos, self.length() - 1))
   def ref(self, pos):
     self._checkrange("vector-ref", pos)
     return self.vs[pos]
   def set(self, pos, v):
+    print "setting pos %s (length %s)" % (pos, self.length())
     self._checkrange("vector-set!", pos)
     self.vs[pos] = v
     return m.val_voidv_sing
   def length(self):
-    return self.len
+    return len(self.vs)
+  def pprint(self, indent):
+    return ' ' * indent + '(vector %s)' % [v.pprint(0) for v in self.vs]
 def guardvector(v):
   if not isinstance(v, Vector):
     raise CEKError("Expected a vector")
@@ -449,6 +472,13 @@ def vecsetimpl(vec, pos, v):
   return TernaryPrim(vec, pos, v, 'vector-set!', lambda vec, p, v: guardvector(vec).set(guardint(p).value, v))
 def veclengthimpl(vec):
   return UnaryPrim(vec, 'vector-length', lambda v: mkint(guardvector(v).length()))
+def makevectorimpl(size, v):
+  return BinaryPrim(size, v, 'make-vector', makevector)
+def makevector(size_num, v):
+  size = guardint(size_num).value
+  if size < 0:
+    raise CEKError("make-vector: expected an exact nonnegative integer")
+  return Vector(listtovs(size * [v]))
 
 def listtovs(lst):
   lst.reverse()
