@@ -37,7 +37,12 @@ class Number(m.cl_number):
   def ne(self, other):
     return not self.eq(other)
   def pprint(self, indent):
-    return ' ' * indent + '%s' % self._value()
+    if isinstance(self, Integer):
+      valstr = '%s' % self._value()
+    else:
+      valstr = '%s' % self._value()
+
+    return ' ' * indent + valstr
   def is_zero(self):
     return m.cl_true() if self._value() == 0 else m.cl_false()
   def add(self, v):
@@ -92,6 +97,7 @@ class Integer(Number):
     else:
       return v.addint(self.value)
   def addint(self, i):
+    assert isinstance(i, int) or isinstance(i, long)
     return mkint(self.value + i)
   def sub(self, v):
     if isinstance(v, Integer):
@@ -99,6 +105,7 @@ class Integer(Number):
     else:
       return v.subint(self.value)
   def subint(self, i):
+    assert isinstance(i, int) or isinstance(i, long)
     return mkint(self.value - i)
   def mult(self, v):
     if isinstance(v, Integer):
@@ -106,6 +113,7 @@ class Integer(Number):
     else:
       return v.multint(self.value)
   def multint(self, i):
+    assert isinstance(i, int) or isinstance(i, long)
     return mkint(self.value * i)
   def toinexact(self):
     return mkfloat(float(self.value))
@@ -132,6 +140,7 @@ class Float(Number):
     else:
       return mkfloat(self.value + v._value())
   def addint(self, i):
+    assert isinstance(i, int) or isinstance(i, long)
     return mkfloat(self.value + i)
   def sub(self, v):
     if isinstance(v, Float):
@@ -139,6 +148,7 @@ class Float(Number):
     else:
       return mkfloat(self.value - v._value())
   def subint(self, i):
+    assert isinstance(i, int) or isinstance(i, long)
     return mkfloat(self.value - i)
   def mult(self, v):
     if isinstance(v, Float):
@@ -146,6 +156,7 @@ class Float(Number):
     else:
       return mkfloat(self.value * v._value())
   def multint(self, i):
+    assert isinstance(i, int) or isinstance(i, long)
     return mkfloat(self.value * i)
 
 def zeropimpl(n):
@@ -176,6 +187,10 @@ def numequalimpl(v1, v2):
   return BinaryPrim(v1, v2, '=', lambda v1, v2: m.cl_true() if v1.eq(v2) else m.cl_false())
 def exacttoinexactimpl(v):
   return UnaryPrim(v, 'exact->inexact', lambda v: guardint(v).toinexact())
+def exactintegerp(v):
+  return UnaryPrim(v, 'exact-integer?', lambda v: m.cl_true() if isinstance(v, Integer) else m.cl_false())
+def inexactp(v):
+  return UnaryPrim(v, 'inexact?', lambda n: m.cl_true() if isinstance(guardnum(n), Float) else m.cl_false())
 
 def mkbox(v):
   return Box(v)

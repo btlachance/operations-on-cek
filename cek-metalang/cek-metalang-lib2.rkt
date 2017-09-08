@@ -204,6 +204,8 @@
                    (list 'varsreverse (nt 'vars))
                    (list 'exitimpl (nt 'var))
                    (list 'exacttoinexactimpl (nt 'var))
+                   (list 'exactintegerp (nt 'var))
+                   (list 'inexactp (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -253,6 +255,8 @@
                    'varsreverse 'vars
                    'exitimpl 'e
                    'exacttoinexactimpl 'e
+                   'exactintegerp 'e
+                   'inexactp 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

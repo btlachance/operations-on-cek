@@ -125,7 +125,9 @@
                                              esnil)
                                   esnil))
                (mf (define exact->inexact (lam (varl m varsnil) (exacttoinexactimpl m) esnil))
-                 modforms)))))))))))))))))))))))))))))))))))))))))))))))
+               (mf (define exact-integer? (lam (varl val varsnil) (exactintegerp val) esnil))
+               (mf (define inexact? (lam (varl val varsnil) (inexactp val) esnil))
+                 modforms)))))))))))))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
