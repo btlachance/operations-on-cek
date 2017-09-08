@@ -101,12 +101,12 @@ class Integer(Number):
     return mkint(self.value + i)
   def sub(self, v):
     if isinstance(v, Integer):
-      return mkint(self.value + v.value)
+      return mkint(self.value - v.value)
     else:
       return v.subint(self.value)
   def subint(self, i):
     assert isinstance(i, int) or isinstance(i, long)
-    return mkint(self.value - i)
+    return mkint(i - self.value)
   def mult(self, v):
     if isinstance(v, Integer):
       return mkint(self.value * v.value)
@@ -149,7 +149,7 @@ class Float(Number):
       return mkfloat(self.value - v._value())
   def subint(self, i):
     assert isinstance(i, int) or isinstance(i, long)
-    return mkfloat(self.value - i)
+    return mkfloat(i - self.value)
   def mult(self, v):
     if isinstance(v, Float):
       return mkfloat(self.value * v.value)
