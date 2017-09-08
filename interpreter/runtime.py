@@ -459,6 +459,8 @@ class Vector(m.cl_v):
 
     while isinstance(vs, m.cl_vl):
       self.vs.append(vs.v0)
+      vs = vs.vs1
+    assert isinstance(vs, m.cl_vsnil)
 
   def _checkrange(self, name, pos):
     if pos < 0 or pos >= self.length():
@@ -467,14 +469,13 @@ class Vector(m.cl_v):
     self._checkrange("vector-ref", pos)
     return self.vs[pos]
   def set(self, pos, v):
-    print "setting pos %s (length %s)" % (pos, self.length())
     self._checkrange("vector-set!", pos)
     self.vs[pos] = v
     return m.val_voidv_sing
   def length(self):
     return len(self.vs)
   def pprint(self, indent):
-    return ' ' * indent + '(vector %s)' % [v.pprint(0) for v in self.vs]
+    return ' ' * indent + '#(%s)' % " ".join([v.pprint(0) for v in self.vs])
 def guardvector(v):
   if not isinstance(v, Vector):
     raise CEKError("Expected a vector")
