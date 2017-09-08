@@ -381,7 +381,7 @@ def vsreverse(vs):
     vs = vs.vs1
   return result
 
-def printimpl(x): return UnaryPrim(x, 'print', lambda v: pprint(v))
+def printimpl(x): return UnaryPrim(x, 'print', lambda v: pprint(v) and m.val_voidv_sing)
 def pprint(v):
   output = stdout
   if isinstance(v, m.cl_clo):
