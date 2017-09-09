@@ -303,10 +303,22 @@ class ExtendedEnv(Env):
 def tracing():
   return jit.current_trace_length() >= 0
 
+class OfftraceVarsAccessedInfo(object):
+  def __init__(self):
+    self.info = {}
+  def log_lookup(self, x):
+    name = x.literal
+    if not jit.we_are_jitted():
+      if not name in self.info:
+        self.info[name] = 0
+      self.info[name] += 1
+offtrace_vars_info = OfftraceVarsAccessedInfo()
+
 def emptyenv():
   return EmptyEnv()
 def lookup(e, x):
   assert isinstance(x, PrimVariable)
+  offtrace_vars_info.log_lookup(x)
   result = e.lookup(x)
   if isinstance(result, Cell):
     result = result.get()
@@ -615,24 +627,27 @@ driver = jit.JitDriver(reds = ['e', 'k'],
 def run(p):
   c, e, k = m.init(p)
   prev_c = c
-  while True:
-    driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
-    prev_c = c if isinstance(c, m.cl_app) else prev_c
-    # prev_c = c
-    # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
-    try:
-      c, e, k = c.interpret(e, k)
-      if isinstance(c, m.cl_app):
-        driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)
-    except CEKDone as d:
-      result = d.result
-      if isinstance(result, Integer):
-        return result.value
-      return 0
-    except CEKError as err:
-      print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
-      print err.__str__()
-      print c.pprint(0)
-      return 1
-    finally:
-      stdout.flush()
+  try:
+    while True:
+      driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
+      prev_c = c if isinstance(c, m.cl_app) else prev_c
+      # prev_c = c
+      # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
+      try:
+        c, e, k = c.interpret(e, k)
+        if isinstance(c, m.cl_app):
+          driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)
+      except CEKDone as d:
+        result = d.result
+        if isinstance(result, Integer):
+          return result.value
+        return 0
+      except CEKError as err:
+        print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
+        print err.__str__()
+        print c.pprint(0)
+        return 1
+  finally:
+    formatted = ', '.join(['%s=%s' % item for item in offtrace_vars_info.info.items()])
+    print 'offtrace lookup info: %s' % formatted
+    stdout.flush()
