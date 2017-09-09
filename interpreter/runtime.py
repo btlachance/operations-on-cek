@@ -303,6 +303,40 @@ class ExtendedEnv(Env):
 def tracing():
   return jit.current_trace_length() >= 0
 
+class MultiExtendedEnv(Env):
+  def __init__(self, xs, vs, e):
+    assert isinstance(e, Env)
+    self.promote = not tracing()
+    self.e = e
+    self.bindings, self.values = make_env_structure(xs, vs)
+
+  @jit.elidable
+  def _getindex(self, name):
+    return self.bindings.get(name, -1)
+
+  def lookup(self, y):
+    if self.promote:
+      jit.promote(self.bindings)
+    index = self._getindex(y.literal)
+    if index != -1:
+      return self.values[index]
+    if self.e.promote:
+      jit.promote(self.e)
+    return self.e.lookup(y)
+@jit.unroll_safe
+def make_env_structure(xs, vs):
+  bindings = {}
+  values = []
+  while isinstance(xs, m.cl_varl) and isinstance(vs, m.cl_vl):
+    x, xs = xs.var0, xs.vars1
+    v, vs = vs.v0, vs.vs1
+    assert isinstance(x, PrimVariable)
+    bindings[x.literal] = len(values)
+    values.append(v)
+  if isinstance(xs, m.cl_varl) or isinstance(vs, m.cl_vl):
+    raise CEKError("Function called with the wrong number of arguments")
+  return bindings, values
+
 class OfftraceVarsAccessedInfo(object):
   def __init__(self):
     self.info = {}
@@ -319,6 +353,7 @@ def emptyenv():
 def lookup(e, x):
   assert isinstance(x, PrimVariable)
   offtrace_vars_info.log_lookup(x)
+  jit.promote_string(x.literal)
   result = e.lookup(x)
   if isinstance(result, Cell):
     result = result.get()
@@ -326,17 +361,8 @@ def lookup(e, x):
       raise CEKError("%s: undefined; cannot use before initialization" % x.pprint(0))
   return result
 
-@jit.unroll_safe
 def extend(e, xs, vs):
-  result = e
-  while isinstance(xs, m.cl_varl) and isinstance(vs, m.cl_vl):
-    x, xs = xs.var0, xs.vars1
-    v, vs = vs.v0, vs.vs1
-    result = ExtendedEnv(x, v, result)
-  if isinstance(xs, m.cl_varl) or isinstance(vs, m.cl_vl):
-    raise CEKError("Function called with the wrong number of arguments")
-  return result
-
+  return MultiExtendedEnv(xs, vs, e)
 def extend1(e, x, v):
   return ExtendedEnv(x, v, e)
 def extendrest(e, xs, x_rest, vs):
