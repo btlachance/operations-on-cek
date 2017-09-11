@@ -275,29 +275,21 @@ class TernaryPrim(m.cl_e):
                                                self.arg3.pprint(0))
 
 class Env(m.cl_env):
-  _immutable_fields_ = ['promote']
-  def __init__(self):
-    self.promote = False
   def lookup(self, x):
     raise Exception("subclass responsibility")
 class EmptyEnv(Env):
-  _immutable_fields_ = ['promote']
-  def __init__(self):
-    self.promote = False
-    pass
   def lookup(self, y):
     raise CEKError("Variable %s not found" % y)
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
 class ExtendedEnv(Env):
-  _immutable_fields_ = ['x', 'v', 'e', 'promote']
+  _immutable_fields_ = ['x', 'v', 'e']
   def __init__(self, x, v, e):
     assert isinstance(x, PrimVariable)
     assert isinstance(e, Env)
     self.x = x
     self.v = v
     self.e = e
-    self.promote = not tracing()
   def lookup(self, y):
     if self.x is y:
       return self.v
@@ -306,40 +298,37 @@ class ExtendedEnv(Env):
   def pprint(self, indent):
     return ' ' * indent + '([%s -> %s], %s)' % (self.x.pprint(0), self.v.pprint(0), self.e.pprint(0))
 
-def tracing():
-  return jit.current_trace_length() >= 0
-
 class MultiExtendedEnv(Env):
-  _immutable_fields_ = ['promote', 'e', 'bindings', 'values']
+  _immutable_fields_ = ['e', 'offsets', 'values[*]']
   def __init__(self, xs, vs, e):
     assert isinstance(e, Env)
-    self.promote = not tracing()
     self.e = e
-    self.bindings, self.values = make_env_structure(xs, vs)
 
-  def _getindex(self, name):
-    return self.bindings.get(name, -1)
+    jit.promote(xs)
+    self.offsets = bindings_offsets(xs)
+    self.values = vstolist(vs)[:]
+    if not len(self.offsets.keys()) == len(self.values):
+      raise CEKError("Function called with the wrong number of arguments")
+
+  def _getoffset(self, name):
+    return self.offsets.get(name, -1)
 
   def lookup(self, y):
-    index = self._getindex(y)
-    if index != -1:
-      return self.values[index]
+    offset = self._getoffset(y)
+    if offset != -1:
+      return self.values[offset]
 
     return self.e.lookup(y)
 
-@jit.unroll_safe
-def make_env_structure(xs, vs):
-  bindings = {}
-  values = []
-  while isinstance(xs, m.cl_varl) and isinstance(vs, m.cl_vl):
+@jit.elidable
+def bindings_offsets(xs):
+  offsets = {}
+  i = 0
+  while isinstance(xs, m.cl_varl):
     x, xs = xs.var0, xs.vars1
-    v, vs = vs.v0, vs.vs1
-    assert isinstance(x, PrimVariable)
-    bindings[x] = len(values)
-    values.append(v)
-  if isinstance(xs, m.cl_varl) or isinstance(vs, m.cl_vl):
-    raise CEKError("Function called with the wrong number of arguments")
-  return bindings, values
+    offsets[x] = i
+    i += 1
+  return offsets
 
 class OfftraceVarsAccessedInfo(object):
   def __init__(self):
@@ -546,6 +535,15 @@ def listtovs(lst):
     lst = lst[1:]
     result = m.cl_vl(v, result)
   return result
+
+@jit.unroll_safe
+def vstolist(vs):
+  values = []
+  while isinstance(vs, m.cl_vl):
+    v, vs = vs.v0, vs.vs1
+    values.append(v)
+  assert isinstance(vs, m.cl_vsnil)
+  return values
 
 def vlisttovs(vlist):
   result_reversed = m.val_vsnil_sing
