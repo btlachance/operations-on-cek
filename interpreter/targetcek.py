@@ -3,19 +3,22 @@ from rpython.rlib import jit
 from runtime import driver
 
 def entry_point(argv):
+  jit.set_param(None, 'trace_limit', 1000000)
+  jit.set_param(None, 'threshold', 131)
+  jit.set_param(None, 'trace_eagerness', 50)
+
   # Thanks, pyrolog
   for i in range(len(argv)):
-    if argv[i] == "--jit":
+    if argv[i] == '--jit':
       if len(argv) == i + 1:
-        print "missing argument after --jit"
+        print 'missing argument after --jit'
         return 2
       jitarg = argv[i + 1]
       del argv[i:i+2]
       jit.set_user_param(driver, jitarg)
       break
   if len(argv) > 1:
-    print "too many arguments"
-
+    print 'too many arguments'
   return main(argv)
 
 def target(driver, args):

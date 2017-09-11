@@ -290,12 +290,9 @@ class ExtendedEnv(Env):
     self.e = e
     self.promote = not tracing()
   def lookup(self, y):
-    jit.promote(self.x)
-    if self.x.literal == y.literal:
+    if self.x.literal == y:
       return self.v
     else:
-      if self.e.promote:
-        jit.promote(self.e)
       return self.e.lookup(y)
   def pprint(self, indent):
     return ' ' * indent + '([%s -> %s], %s)' % (self.x.pprint(0), self.v.pprint(0), self.e.pprint(0))
@@ -304,25 +301,23 @@ def tracing():
   return jit.current_trace_length() >= 0
 
 class MultiExtendedEnv(Env):
+  _immutable_fields_ = ['promote', 'e', 'bindings', 'values']
   def __init__(self, xs, vs, e):
     assert isinstance(e, Env)
     self.promote = not tracing()
     self.e = e
     self.bindings, self.values = make_env_structure(xs, vs)
 
-  @jit.elidable
   def _getindex(self, name):
     return self.bindings.get(name, -1)
 
   def lookup(self, y):
-    if self.promote:
-      jit.promote(self.bindings)
-    index = self._getindex(y.literal)
+    index = self._getindex(y)
     if index != -1:
       return self.values[index]
-    if self.e.promote:
-      jit.promote(self.e)
+
     return self.e.lookup(y)
+
 @jit.unroll_safe
 def make_env_structure(xs, vs):
   bindings = {}
@@ -352,9 +347,11 @@ def emptyenv():
   return EmptyEnv()
 def lookup(e, x):
   assert isinstance(x, PrimVariable)
+
   offtrace_vars_info.log_lookup(x)
-  jit.promote_string(x.literal)
-  result = e.lookup(x)
+
+  name = x.literal
+  result = e.lookup(name)
   if isinstance(result, Cell):
     result = result.get()
     if isinstance(result, m.cl_undefinedv):
@@ -462,7 +459,7 @@ def setcell(var, env, v):
   # unwrapping; we have to instead call the environment's lookup
   # method
   assert isinstance(var, PrimVariable)
-  cell = env.lookup(var)
+  cell = env.lookup(var.literal)
   assert isinstance(cell, Cell)
   return cell.set(v)
 def setcells(vars, env, vs):
