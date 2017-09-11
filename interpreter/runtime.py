@@ -17,13 +17,23 @@ class CEKDone(Exception):
     self.result = result
 
 def mkvariable(name):
-  return PrimVariable(name)
+  return PrimVariable.make(name)
 class PrimVariable(m.cl_variable):
   _immutable_fields_ = ['literal']
   def __init__(self, name):
     self.literal = name
   def pprint(self, indent):
     return self.literal
+
+  @staticmethod
+  def make(name):
+    var = PrimVariable.all_vars.get(name, None)
+    if var is None:
+      var = PrimVariable(name)
+      PrimVariable.all_vars[name] = var
+    return var
+
+PrimVariable.all_vars = {}
 
 def guardnum(v):
   if not isinstance(v, Number):
@@ -123,7 +133,6 @@ def mkfloat(n):
 class Float(Number):
   _immutable_fields_ = ['value']
   def __init__(self, n):
-    assert isinstance(n, float)
     self.value = n
   def _value(self):
     return self.value
@@ -290,7 +299,7 @@ class ExtendedEnv(Env):
     self.e = e
     self.promote = not tracing()
   def lookup(self, y):
-    if self.x.literal == y:
+    if self.x is y:
       return self.v
     else:
       return self.e.lookup(y)
@@ -326,7 +335,7 @@ def make_env_structure(xs, vs):
     x, xs = xs.var0, xs.vars1
     v, vs = vs.v0, vs.vs1
     assert isinstance(x, PrimVariable)
-    bindings[x.literal] = len(values)
+    bindings[x] = len(values)
     values.append(v)
   if isinstance(xs, m.cl_varl) or isinstance(vs, m.cl_vl):
     raise CEKError("Function called with the wrong number of arguments")
@@ -336,11 +345,10 @@ class OfftraceVarsAccessedInfo(object):
   def __init__(self):
     self.info = {}
   def log_lookup(self, x):
-    name = x.literal
     if not jit.we_are_jitted():
-      if not name in self.info:
-        self.info[name] = 0
-      self.info[name] += 1
+      if not x in self.info:
+        self.info[x] = 0
+      self.info[x] += 1
 offtrace_vars_info = OfftraceVarsAccessedInfo()
 
 def emptyenv():
@@ -350,8 +358,7 @@ def lookup(e, x):
 
   offtrace_vars_info.log_lookup(x)
 
-  name = x.literal
-  result = e.lookup(name)
+  result = e.lookup(x)
   if isinstance(result, Cell):
     result = result.get()
     if isinstance(result, m.cl_undefinedv):
@@ -459,7 +466,7 @@ def setcell(var, env, v):
   # unwrapping; we have to instead call the environment's lookup
   # method
   assert isinstance(var, PrimVariable)
-  cell = env.lookup(var.literal)
+  cell = env.lookup(var)
   assert isinstance(cell, Cell)
   return cell.set(v)
 def setcells(vars, env, vs):
@@ -671,6 +678,6 @@ def run(p):
         print c.pprint(0)
         return 1
   finally:
-    formatted = ', '.join(['%s=%s' % item for item in offtrace_vars_info.info.items()])
+    formatted = ', '.join(['%s=%s' % (var.pprint(0), n) for (var,n) in offtrace_vars_info.info.items()])
     print 'offtrace lookup info: %s' % formatted
     stdout.flush()
