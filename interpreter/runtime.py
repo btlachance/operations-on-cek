@@ -310,11 +310,12 @@ class MultiExtendedEnv(Env):
     if not len(self.offsets.keys()) == len(self.values):
       raise CEKError("Function called with the wrong number of arguments")
 
+  # XXX Any attempts to elide this only hurt performance
   def _getoffset(self, name):
     return self.offsets.get(name, -1)
 
   def lookup(self, y):
-    offset = self._getoffset(y)
+    offset = jit.promote(self._getoffset(y))
     if offset != -1:
       return self.values[offset]
 
