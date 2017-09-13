@@ -206,6 +206,8 @@
                    (list 'exacttoinexactimpl (nt 'var))
                    (list 'exactintegerp (nt 'var))
                    (list 'inexactp (nt 'var))
+                   (list 'quotientimpl (nt 'var) (nt 'var))
+                   (list 'sinimpl (nt 'var))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -257,6 +259,8 @@
                    'exacttoinexactimpl 'e
                    'exactintegerp 'e
                    'inexactp 'e
+                   'quotientimpl 'e
+                   'sinimpl 'e
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

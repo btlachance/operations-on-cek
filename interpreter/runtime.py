@@ -1,4 +1,5 @@
 import time
+import math
 import machine as m
 from rpython.rlib import jit
 
@@ -127,6 +128,12 @@ class Integer(Number):
     return mkint(self.value * i)
   def toinexact(self):
     return mkfloat(float(self.value))
+  def quotient(self, other):
+    return mkint(int(self.value / other.value))
+  def sin(self):
+    if self.value == 0:
+      return mkint(0)
+    return mkfloat(math.sin(self.value))
 
 def mkfloat(n):
   return Float(n)
@@ -167,6 +174,8 @@ class Float(Number):
   def multint(self, i):
     assert isinstance(i, int) or isinstance(i, long)
     return mkfloat(self.value * i)
+  def sin(self):
+    return mkfloat(math.sin(self.value))
 
 def zeropimpl(n):
   return UnaryPrim(n, 'zerop', lambda n: guardnum(n).is_zero())
@@ -200,6 +209,10 @@ def exactintegerp(v):
   return UnaryPrim(v, 'exact-integer?', lambda v: m.cl_true() if isinstance(v, Integer) else m.cl_false())
 def inexactp(v):
   return UnaryPrim(v, 'inexact?', lambda n: m.cl_true() if isinstance(guardnum(n), Float) else m.cl_false())
+def quotientimpl(m, n):
+  return BinaryPrim(m, n, 'quotient', lambda m, n: guardint(m).quotient(guardint(n)))
+def sinimpl(n):
+  return UnaryPrim(n, 'sin', lambda n: guardnum(n).sin())
 
 def mkbox(v):
   return Box(v)
