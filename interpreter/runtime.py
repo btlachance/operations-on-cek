@@ -311,38 +311,44 @@ class ExtendedEnv(Env):
   def pprint(self, indent):
     return ' ' * indent + '([%s -> %s], %s)' % (self.x.pprint(0), self.v.pprint(0), self.e.pprint(0))
 
+@jit.unroll_safe
+def len_varl(xs):
+  n = 0
+  while isinstance(xs, m.cl_varl):
+    x, xs = xs.var0, xs.vars1
+    n += 1
+  return n
+
 class MultiExtendedEnv(Env):
-  _immutable_fields_ = ['e', 'offsets', 'values[*]']
+  _immutable_fields_ = ['e', 'xs', 'values[*]']
   def __init__(self, xs, vs, e):
     assert isinstance(e, Env)
     self.e = e
-
-    jit.promote(xs)
-    self.offsets = bindings_offsets(xs)
+    self.xs = xs
     self.values = vstolist(vs)[:]
-    if not len(self.offsets.keys()) == len(self.values):
+
+    if not len_varl(xs) == len(self.values):
       raise CEKError("Function called with the wrong number of arguments")
 
   # XXX Any attempts to elide this only hurt performance
   def _getoffset(self, name):
     return self.offsets.get(name, -1)
 
+  @jit.unroll_safe
   def lookup(self, y):
-    offset = jit.promote(self._getoffset(y))
-    if offset != -1:
-      return self.values[offset]
+    n, xs = 0, jit.promote(self.xs)
+    i = -1
 
+    while isinstance(xs, m.cl_varl):
+      x, xs = xs.var0, xs.vars1
+      if x is y:
+        i = n
+        break
+      n += 1
+
+    if i != -1:
+      return self.values[i]
     return self.e.lookup(y)
-
-@jit.elidable
-def bindings_offsets(xs):
-  offsets = {}
-  i = 0
-  while isinstance(xs, m.cl_varl):
-    x, xs = xs.var0, xs.vars1
-    offsets[x] = i
-    i += 1
-  return offsets
 
 class OfftraceVarsAccessedInfo(object):
   def __init__(self):
