@@ -88,7 +88,7 @@
   (timings name cpu gc total))
 
 (module+ main
-  (define default-benchmarks '(fib mbrot sum))
+  (define default-benchmarks '(fib mbrot sum nqueens fft))
   (define benchmarks (make-parameter '()))
 
   (command-line
