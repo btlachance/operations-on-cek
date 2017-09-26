@@ -324,10 +324,10 @@ class MultiExtendedEnv(Env):
   def __init__(self, xs, vs, e):
     assert isinstance(e, Env)
     self.e = e
-    self.xs = xs
+    self.xs = jit.promote(xs)
     self.values = vstolist(vs)[:]
 
-    if not len_varl(xs) == len(self.values):
+    if not len_varl(self.xs) == len(self.values):
       raise CEKError("Function called with the wrong number of arguments")
 
   # XXX Any attempts to elide this only hurt performance
