@@ -330,10 +330,6 @@ class MultiExtendedEnv(Env):
     if not len_varl(self.xs) == len(self.values):
       raise CEKError("Function called with the wrong number of arguments")
 
-  # XXX Any attempts to elide this only hurt performance
-  def _getoffset(self, name):
-    return self.offsets.get(name, -1)
-
   @jit.unroll_safe
   def lookup(self, y):
     n, xs = 0, jit.promote(self.xs)
