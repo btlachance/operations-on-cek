@@ -326,10 +326,10 @@ def len_varl(xs):
 
 class MultiExtendedEnv(Env):
   _immutable_fields_ = ['e', 'xs', 'values[*]']
-  def __init__(self, xs, vs, e):
+  def __init__(self, xs, vs, e, promote=True):
     assert isinstance(e, Env)
     self.e = e
-    self.xs = jit.promote(xs)
+    self.xs = jit.promote(xs) if promote else xs
     self.values = vstolist(vs)[:]
 
     if not len_varl(self.xs) == len(self.values):
@@ -386,6 +386,12 @@ def env_for_call(prev, current, xs, vs):
     elif isinstance(e, prev.__class__) and e.e is prev:
       prev = e.e
   return MultiExtendedEnv(xs, vs, prev)
+
+def extendcells(e, xs):
+  xs = jit.promote(xs)
+  n = len_varl(xs)
+  vs = listtovs([mkcell(m.val_undefinedv_sing) for i in range(n)])
+  return extend(e, xs, vs)
 
 def extend(e, xs, vs):
   return MultiExtendedEnv(xs, vs, e)

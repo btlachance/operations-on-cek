@@ -233,14 +233,17 @@
   [(ignore env (bindvaluesk env_arg varsnil (vbl (vb vars e_vars) valuesbinds) env_acc es expk))
    -->
    (e_vars env_arg (bindvaluesk env_arg vars valuesbinds env_acc es expk))]
-  [(ignore env (ret v (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 es expk)))
+  [(ignore env (ret v (bindvaluesk env_arg vars valuesbinds env_acc0 es expk)))
    -->
    (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
-   #:where env_acc1 (extend1 env_acc0 var v)]
-  [(ignore env (ret (vl v vsnil) (bindvaluesk env_arg (varl var varsnil) valuesbinds env_acc0 es expk)))
+   #:where (varl var varsnil) vars
+   #:where env_acc1 (extend env_acc0 vars (vl v vsnil))]
+  [(ignore env (ret vs (bindvaluesk env_arg vars valuesbinds env_acc0 es expk)))
    -->
    (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
-   #:where env_acc1 (extend1 env_acc0 var v)]
+   #:where (vl v vsnil) vs
+   #:where (varl var varsnil) vars
+   #:where env_acc1 (extend env_acc0 vars vs)]
   [(ignore env (ret vs (bindvaluesk env_arg vars valuesbinds env_acc0 es expk)))
    -->
    (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
@@ -250,10 +253,8 @@
   [(ignore env (bindrec (vbl (vb vars e) valuesbinds) expk))
    -->
    (ignore env (bindvarscells vars (bindrec valuesbinds expk)))]
-  [(ignore env (bindvarscells varsnil expk)) --> (ignore env expk)]
-  [(ignore env (bindvarscells (varl var vars) expk)) --> (ignore env_1 (bindvarscells vars expk))
-   #:where v (mkcell undefinedv)
-   #:where env_1 (extend1 env var v)]
+  [(ignore env (bindvarscells vars expk)) --> (ignore env_1 expk)
+   #:where env_1 (extendcells env vars)]
   [(ignore env (evalrec valuesbindsnil es expk)) --> (ignore env (expsk env es expk))]
   [(ignore env (evalrec (vbl (vb vars e) valuesbinds) es expk))
    -->
