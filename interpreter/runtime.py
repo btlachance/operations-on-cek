@@ -304,7 +304,8 @@ class ExtendedEnv(Env):
     self.v = v
     self.e = e
   def lookup(self, y):
-    if self.x is y:
+    x = jit.promote(self.x)
+    if x is y:
       return self.v
     else:
       return self.e.lookup(y)
