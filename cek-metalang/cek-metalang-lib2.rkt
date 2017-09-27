@@ -165,6 +165,7 @@
                    (list 'extend (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extend1 (nt 'env) (nt 'var) (nt 'v))
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'var) (nt 'vs))
+                   (list 'env_for_call (nt 'env) (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
                    (list 'predimpl (nt 'var))
@@ -218,6 +219,7 @@
                    'extend 'env
                    'extend1 'env
                    'extendrest 'env
+                   'env_for_call 'env
                    'zeropimpl 'e
                    'succimpl 'e
                    'predimpl 'e

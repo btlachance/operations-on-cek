@@ -288,9 +288,13 @@ class TernaryPrim(m.cl_e):
                                                self.arg3.pprint(0))
 
 class Env(m.cl_env):
+  _immutable_fields_ = ['e']
+  def __init__(self):
+    self.e = None
   def lookup(self, x):
     raise Exception("subclass responsibility")
 class EmptyEnv(Env):
+  _immutable_fields_ = ['e']
   def lookup(self, y):
     raise CEKError("Variable %s not found" % y)
   def pprint(self, indent):
@@ -370,6 +374,18 @@ def lookup(e, x):
     if isinstance(result, m.cl_undefinedv):
       raise CEKError("%s: undefined; cannot use before initialization" % x.pprint(0))
   return result
+
+def env_for_call(prev, current, xs, vs):
+  assert isinstance(prev, Env)
+  assert isinstance(current, Env)
+
+  if isinstance(current, prev.__class__):
+    e = current.e
+    if e is prev:
+      prev = e
+    elif isinstance(e, prev.__class__) and e.e is prev:
+      prev = e.e
+  return MultiExtendedEnv(xs, vs, prev)
 
 def extend(e, xs, vs):
   return MultiExtendedEnv(xs, vs, e)
