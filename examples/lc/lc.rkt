@@ -21,7 +21,7 @@
   (binding ::= (bp))
   (bp ::= (p var e))
   (var ::= variable)
-  (l ::= (lam vars e es) (lamrest vars var e es))
+  (l ::= (lam vars e es) (lamrest vars e es))
   (v ::= (clo l env) c (cons v v) undefinedv voidv)
   (c ::= nil true false number string (sym var))
 
@@ -64,8 +64,8 @@
                                        init
                                        (app fn (el (app car (el xs esnil)) (el (app foldr (el fn (el init (el (app cdr (el xs esnil)) esnil)))) esnil))))
                                    esnil))
-               (mf (define list (lamrest varsnil args (app foldr (el cons (el null (el args esnil)))) esnil))
-               (mf (define append (lamrest varsnil ls
+               (mf (define list (lamrest (varl args varsnil) (app foldr (el cons (el null (el args esnil)))) esnil))
+               (mf (define append (lamrest (varl ls varsnil)
                                     (app foldl (el (lam (varl l0 (varl rest varsnil))
                                                      (app foldr (el cons (el l0 (el rest esnil))))
                                                      esnil)
@@ -80,13 +80,13 @@
                (mf (define >= (lam (varl m (varl n varsnil)) (gteqimpl m n) esnil))
                (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2) esnil))
                (mf (define apply (lam (varl fun (varl args varsnil)) (apply fun args) esnil))
-               (mf (define vector (lamrest varsnil args (vectorimpl args) esnil))
+               (mf (define vector (lamrest (varl args varsnil) (vectorimpl args) esnil))
                (mf (define vector-ref (lam (varl vec (varl pos varsnil)) (vecrefimpl vec pos) esnil))
                (mf (define vector-set! (lam (varl vec (varl pos (varl new-v varsnil)))
                                          (vecsetimpl vec pos new-v)
                                          esnil))
                (mf (define vector-length (lam (varl vec varsnil) (veclengthimpl vec) esnil))
-               (mf (define make-vector (lamrest (varl size varsnil) args
+               (mf (define make-vector (lamrest (varl size (varl args varsnil))
                                          (letvalues (vbl (vb (varl val varsnil)
                                                              (if (app null? (el args esnil))
                                                                  (quote 0)
@@ -96,7 +96,7 @@
                                                     esnil)
                                          esnil))
                (mf (define current-command-line-arguments (lam varsnil (app vector esnil) esnil))
-               (mf (define void (lamrest varsnil args (mkvoid) esnil))
+               (mf (define void (lamrest (varl args varsnil) (mkvoid) esnil))
                (mf (define symbol? (lam (varl s varsnil) (issymbolimpl s) esnil))
                (mf (define newline (lam varsnil
                                      (app fprintf (el (app current-output-port esnil) (el (quote "\n") esnil)))
@@ -105,7 +105,7 @@
                (mf (define current-seconds (lam varsnil (currentsecondsimpl) esnil))
                (mf (define current-error-port (lam varsnil (currenterrorportimpl) esnil))
                (mf (define current-output-port (lam varsnil (currentoutputportimpl) esnil))
-               (mf (define fprintf (lamrest (varl out (varl form varsnil)) vals
+               (mf (define fprintf (lamrest (varl out (varl form (varl vals varsnil)))
                                      (fprintfimpl out form vals)
                                      esnil))
                (mf (define not (lam (varl val varsnil)
@@ -113,9 +113,9 @@
                                      (quote false)
                                      (quote true))
                                  esnil))
-               (mf (define values (lamrest varsnil args (values args) esnil))
+               (mf (define values (lamrest (varl args varsnil) (values args) esnil))
                (mf (define call-with-values (lam (varl gen (varl recv varsnil)) (cwv gen recv) esnil))
-               (mf (define exit (lamrest varsnil args
+               (mf (define exit (lamrest (varl args varsnil)
                                   (letvalues (vbl (vb (varl exitv varsnil)
                                                       (if (app null? (el args esnil))
                                                           (quote true)
@@ -215,11 +215,12 @@
   [(ignore env_0 (fn vs esnil env_1 expk)) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (vl v vs_args) (vsreverse vs)
    #:where (clo (lam vars e es) env_clo) v
-   #:where env (env_for_call env_clo env_1 vars vs_args)]
+   #:where env_call (env_for_call env_clo env_1 vars)
+   #:where env (extend env_call vars vs_args)]
   [(ignore env_0 (fn vs esnil env_1 expk)) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (vl v vs_args) (vsreverse vs)
-   #:where (clo (lamrest vars var_rest e es) env_clo) v
-   #:where env (extendrest env_clo vars var_rest vs_args)]
+   #:where (clo (lamrest vars e es) env_clo) v
+   #:where env (extendrest env_clo vars vs_args)]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
@@ -276,7 +277,7 @@
   [(ignore env_0 (ret v (getargs e_args env expk))) --> (e_args env (applyk v expk))]
   [(ignore env_0 (ret v (applyk (clo (lam vars e es) env) expk))) --> (ignore env_0 (expsk (extend env vars vs) (el e es) expk))
    #:where vs (vlisttovs v)]
-  [(ignore env_0 (ret v (applyk (clo (lamrest vars var_rest e es) env) expk))) --> (ignore env_0 (expsk (extendrest env vars var_rest vs) (el e es) expk))
+  [(ignore env_0 (ret v (applyk (clo (lamrest vars e es) env) expk))) --> (ignore env_0 (expsk (extendrest env vars vs) (el e es) expk))
    #:where vs (vlisttovs v)]
   [(ignore env_0 (ret v (cwvk var_recv env expk))) --> (ignore env_0 (fn (vl v (vl v_recv vsnil)) esnil env_0 expk))
    #:where v_recv (lookup env var_recv)]
@@ -345,13 +346,13 @@
           #,(kernel->core #'e1)
           #,(es->el (attribute e-rest)))]
       [(lam x:id e es ...)
-       #`(lamrest varsnil x #,(kernel->core #'e) #,(es->el (attribute es)))]
+       #`(lamrest #,(ids->vars (list #'x)) #,(kernel->core #'e) #,(es->el (attribute es)))]
       [(lam (xs ...) e es ...)
        #`(lam #,(ids->vars (attribute xs))
            #,(kernel->core #'e)
            #,(es->el (attribute es)))]
       [(lam (xs ... . rest:id) e es ...)
-       #`(lamrest #,(ids->vars (attribute xs)) rest
+       #`(lamrest #,(ids->vars (append (attribute xs) (list #'rest)))
            #,(kernel->core #'e)
            #,(es->el (attribute es)))]
       [(define-values (id) e)

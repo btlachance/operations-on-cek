@@ -288,33 +288,19 @@ class TernaryPrim(m.cl_e):
                                                self.arg3.pprint(0))
 
 class Env(m.cl_env):
-  _immutable_fields_ = ['e']
-  def __init__(self):
-    self.e = None
+  _immutable_fields_ = ['e', 'xs', 'xs_structure']
   def lookup(self, x):
     raise Exception("subclass responsibility")
 class EmptyEnv(Env):
-  _immutable_fields_ = ['e']
+  _immutable_fields_ = ['e', 'xs', 'xs_structure']
+  def __init__(self):
+    self.e = None
+    self.xs = None
+    self.xs_structure = []
   def lookup(self, y):
     raise CEKError("Variable %s not found" % y)
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
-class ExtendedEnv(Env):
-  _immutable_fields_ = ['x', 'v', 'e']
-  def __init__(self, x, v, e):
-    assert isinstance(x, PrimVariable)
-    assert isinstance(e, Env)
-    self.x = x
-    self.v = v
-    self.e = e
-  def lookup(self, y):
-    x = jit.promote(self.x)
-    if x is y:
-      return self.v
-    else:
-      return self.e.lookup(y)
-  def pprint(self, indent):
-    return ' ' * indent + '([%s -> %s], %s)' % (self.x.pprint(0), self.v.pprint(0), self.e.pprint(0))
 
 @jit.unroll_safe
 def len_varl(xs):
@@ -325,12 +311,12 @@ def len_varl(xs):
   return n
 
 class MultiExtendedEnv(Env):
-  _immutable_fields_ = ['e', 'xs', 'values[*]']
-  def __init__(self, xs, vs, e, promote=True):
+  _immutable_fields_ = ['e', 'xs', 'values[*]',]
+  def __init__(self, xs, values, e, promote=True):
     assert isinstance(e, Env)
     self.e = e
     self.xs = jit.promote(xs) if promote else xs
-    self.values = vstolist(vs)[:]
+    self.values = values[:]
 
     if not len_varl(self.xs) == len(self.values):
       raise CEKError("Function called with the wrong number of arguments")
@@ -375,17 +361,24 @@ def lookup(e, x):
       raise CEKError("%s: undefined; cannot use before initialization" % x.pprint(0))
   return result
 
-def env_for_call(prev, current, xs, vs):
-  assert isinstance(prev, Env)
-  assert isinstance(current, Env)
+@jit.unroll_safe
+# For a given environment prev, find an environment in the chain from
+# current.e .. None that is identical to prev. Pycket appears to rely
+# on this a bit, and it appears to work for us too.
+def env_for_call(prev, current, xs):
+  assert isinstance(prev, MultiExtendedEnv)
+  assert isinstance(current, MultiExtendedEnv)
 
-  if isinstance(current, prev.__class__):
-    e = current.e
-    if e is prev:
-      prev = e
-    elif isinstance(e, prev.__class__) and e.e is prev:
-      prev = e.e
-  return MultiExtendedEnv(xs, vs, prev)
+  env, current_xs = current, jit.promote(current.xs)
+  jit.promote(xs)
+
+  while current_xs is not None:
+    if current_xs is xs:
+      if env is prev:
+        return env
+    env = env.e
+    current_xs = jit.promote(env.xs)
+  return prev
 
 def extendcells(e, xs):
   xs = jit.promote(xs)
@@ -394,24 +387,27 @@ def extendcells(e, xs):
   return extend(e, xs, vs)
 
 def extend(e, xs, vs):
-  return MultiExtendedEnv(xs, vs, e)
-def extend1(e, x, v):
-  return ExtendedEnv(x, v, e)
-def extendrest(e, xs, x_rest, vs):
-  result = e
-  while isinstance(xs, m.cl_varl) and isinstance(vs, m.cl_vl):
-    x, xs = xs.var0, xs.vars1
-    v, vs = vs.v0, vs.vs1
-    result = extend1(result, x, v)
-  if isinstance(xs, m.cl_varl):
+  return MultiExtendedEnv(xs, vstolist(vs), e)
+
+@jit.unroll_safe
+# invariant: len_varl(xs) >= 1 and the last var is the rest arg
+def extendrest(e, xs, vs):
+  jit.promote(xs)
+  fixed_argcount = len_varl(xs) - 1
+  assert fixed_argcount >= 0
+
+  args = vstolist(vs)
+  if len(args) < fixed_argcount:
     raise CEKError("Function called with too few arguments")
 
-  restvs_reversed = vsreverse(vs)
+  fixed_args = args[:fixed_argcount]
+  rest_args = args[fixed_argcount:]
+
   rest_list = m.val_nil_sing
-  while isinstance(restvs_reversed, m.cl_vl):
-    rest_list = m.cl_cons(restvs_reversed.v0, rest_list)
-    restvs_reversed = restvs_reversed.vs1
-  return extend1(result, x_rest, rest_list)
+  for v in reversed(rest_args):
+    rest_list = m.cl_cons(v, rest_list)
+
+  return MultiExtendedEnv(xs, fixed_args + [rest_list], e)
 
 def resulttovlist(result):
   if isinstance(result, m.cl_v):
