@@ -165,6 +165,7 @@
                    (list 'extend (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extendcells (nt 'env) (nt 'vars))
+                   (list 'env_for_call (nt 'env) (nt 'envinfo) (nt 'env))
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
                    (list 'predimpl (nt 'var))
@@ -218,6 +219,7 @@
                    'extend 'env
                    'extendrest 'env
                    'extendcells 'env
+                   'env_for_call 'env
                    'zeropimpl 'e
                    'succimpl 'e
                    'predimpl 'e
@@ -526,7 +528,9 @@
     (pretty-display
      (string-join
       '("import runtime as r"
+        "from rpython.tool.pairtype import extendabletype"
         "class CEKTop(object):"
+        "  __metaclass__ = extendabletype"
         "  _attrs_ = []")
       "\n"))
     (for ([def (in-sequences nt-class-defs other-class-defs)])

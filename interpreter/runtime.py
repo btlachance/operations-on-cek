@@ -288,27 +288,57 @@ class TernaryPrim(m.cl_e):
                                                self.arg3.pprint(0))
 
 class Env(m.cl_env):
-  _immutable_fields_ = ['e', 'xs']
+  _immutable_fields_ = ['e', 'shape']
   def lookup(self, x):
     raise Exception("subclass responsibility")
 
   @staticmethod
   def make(xs, args, e):
     argcount = len(args)
+
+    # XXX I don't think I reflect this in my environment structure
+    # annotation pass, so I'm unsure how that interacts with this
     if argcount == 0:
       return e
 
     assert isinstance(xs, m.cl_varl)
     if argcount == 1:
-      return Env1(xs.var0, args[0], e)
+      return Env1(xs.var0, args[0], e, xs)
     else:
       return MultiExtendedEnv(xs, args, e)
 
+@jit.unroll_safe
+def equal_varl(xs, ys):
+  xs = jit.promote(xs)
+  ys = jit.promote(ys)
+  while isinstance(xs, m.cl_varl) and isinstance(ys, m.cl_varl):
+    x, xs = xs.var0, xs.vars1
+    y, ys = ys.var0, ys.vars1
+    if x != y:
+      return False
+  return isinstance(xs, m.cl_varsnil) and isinstance(ys, m.cl_varsnil)
+
+@jit.unroll_safe
+def env_for_call(clo_env, envinfo, current_env):
+  assert isinstance(clo_env, Env)
+  assert isinstance(current_env, Env)
+
+  xs = jit.promote(clo_env.shape)
+  envinfo = jit.promote(envinfo)
+
+  while isinstance(envinfo, m.cl_info):
+    if equal_varl(xs, envinfo.vars0):
+      if clo_env is current_env:
+        return current_env
+    envinfo = envinfo.envinfo1
+    current_env = current_env.e
+  return clo_env
+
 class EmptyEnv(Env):
-  _immutable_fields_ = ['e', 'xs']
+  _immutable_fields_ = ['e', 'shape']
   def __init__(self):
     self.e = None
-    self.xs = None
+    self.shape = None
   def lookup(self, y):
     raise CEKError("Variable %s not found" % y)
   def pprint(self, indent):
@@ -316,10 +346,12 @@ class EmptyEnv(Env):
 
 class Env1(Env):
   _immutable_fields_ = ['x', 'v', 'e']
-  def __init__(self, x, v, e):
+  def __init__(self, x, v, e, shape):
+    assert isinstance(e, Env)
     self.x = x
     self.v = v
     self.e = e
+    self.shape = shape
   def lookup(self, y):
     x = jit.promote(self.x)
     if x is y:
@@ -336,11 +368,11 @@ def len_varl(xs):
   return n
 
 class MultiExtendedEnv(Env):
-  _immutable_fields_ = ['e', 'xs', 'values[*]',]
-  def __init__(self, xs, values, e, promote=True):
+  _immutable_fields_ = ['e', 'xs', 'values[*]']
+  def __init__(self, xs, values, e):
     assert isinstance(e, Env)
     self.e = e
-    self.xs = jit.promote(xs) if promote else xs
+    self.xs = self.shape = jit.promote(xs)
     self.values = values[:]
 
     if not len_varl(self.xs) == len(self.values):
@@ -391,8 +423,8 @@ def lookup(e, x):
 def extendcells(e, xs):
   xs = jit.promote(xs)
   n = len_varl(xs)
-  vs = listtovs([mkcell(m.val_undefinedv_sing) for i in range(n)])
-  return extend(e, xs, vs)
+  vs = [mkcell(m.val_undefinedv_sing) for i in range(n)]
+  return Env.make(xs, vs, e)
 
 def extend(e, xs, vs):
   return Env.make(xs, vstolist(vs), e)
@@ -484,13 +516,7 @@ class Cell(m.cl_v):
   def get(self):
     return self.val
   def pprint(self, indent):
-    v = self.val
-    if isinstance(v, m.cl_clo):
-      valstr = v.l0.pprint(0)
-    else:
-      valstr = v.pprint(0)
-
-    return ' ' * indent + valstr
+    return ' ' * indent + '(cell %s)' % self.val.pprint(0)
 def mkcell(v):
   return Cell(v)
 def setcell(var, env, v):
@@ -652,7 +678,8 @@ def currentsecondsimpl():
 
 def apply(f, args, k):
   vs = m.cl_vl(f, vlisttovs(args))
-  return m.val_ignore_sing, emptyenv(), m.cl_fn(vsreverse(vs), m.val_esnil_sing, emptyenv(), k)
+  return m.val_ignore_sing, emptyenv(), m.cl_fn(vsreverse(vs), m.val_esnil_sing,
+                                                emptyenv(), m.val_infoempty_sing, k)
 
 class TimeApply(m.cl_e):
   def __init__(self, proc, lst):
@@ -692,21 +719,38 @@ def docontinuation(extensionk, result):
 def timeapplyimpl(proc, init):
   return TimeApply(proc, init)
 
+class __extend__(m.CEKTop):
+  def can_enter(self):
+    return False
+
+class __extend__(m.cl_clo):
+  def pprint(self, indent):
+    return ' '* indent + '(clo %s env-hidden)' % self.l0.pprint(0)
+
+class __extend__(m.cl_appinfo):
+  def pprint(self, indent):
+    return ' '* indent + '(appinfo %s %s)' % (self.e0.pprint(0), self.es1.pprint(0))
+
+class __extend__(m.cl_app, m.cl_appinfo):
+  def can_enter(self):
+    return True
+
 driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c', 'prev_c'],
                        get_printable_location=lambda c, prev_c: c.pprint(0))
+
 def run(p):
   c, e, k = m.init(p)
   prev_c = c
   try:
     while True:
       driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
-      prev_c = c if isinstance(c, m.cl_app) else prev_c
+      prev_c = c if c.can_enter() else prev_c
       # prev_c = c
       # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
       try:
         c, e, k = c.interpret(e, k)
-        if isinstance(c, m.cl_app):
+        if c.can_enter():
           driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)
       except CEKDone as d:
         result = d.result
