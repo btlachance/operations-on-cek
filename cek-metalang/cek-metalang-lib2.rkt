@@ -164,7 +164,6 @@
              (list (list 'lookup (nt 'env) (nt 'var))
                    (list 'extend (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'vs))
-                   (list 'env_for_call (nt 'env) (nt 'env) (nt 'vars))
                    (list 'extendcells (nt 'env) (nt 'vars))
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
@@ -218,7 +217,6 @@
              (hash 'lookup 'v
                    'extend 'env
                    'extendrest 'env
-                   'env_for_call 'env
                    'extendcells 'env
                    'zeropimpl 'e
                    'succimpl 'e

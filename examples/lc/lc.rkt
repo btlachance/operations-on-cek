@@ -215,8 +215,7 @@
   [(ignore env_0 (fn vs esnil env_1 expk)) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (vl v vs_args) (vsreverse vs)
    #:where (clo (lam vars e es) env_clo) v
-   #:where env_call (env_for_call env_clo env_1 vars)
-   #:where env (extend env_call vars vs_args)]
+   #:where env (extend env_clo vars vs_args)]
   [(ignore env_0 (fn vs esnil env_1 expk)) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (vl v vs_args) (vsreverse vs)
    #:where (clo (lamrest vars e es) env_clo) v

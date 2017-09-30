@@ -288,19 +288,44 @@ class TernaryPrim(m.cl_e):
                                                self.arg3.pprint(0))
 
 class Env(m.cl_env):
-  _immutable_fields_ = ['e', 'xs', 'xs_structure']
+  _immutable_fields_ = ['e', 'xs']
   def lookup(self, x):
     raise Exception("subclass responsibility")
+
+  @staticmethod
+  def make(xs, args, e):
+    argcount = len(args)
+    if argcount == 0:
+      return e
+
+    assert isinstance(xs, m.cl_varl)
+    if argcount == 1:
+      return Env1(xs.var0, args[0], e)
+    else:
+      return MultiExtendedEnv(xs, args, e)
+
 class EmptyEnv(Env):
-  _immutable_fields_ = ['e', 'xs', 'xs_structure']
+  _immutable_fields_ = ['e', 'xs']
   def __init__(self):
     self.e = None
     self.xs = None
-    self.xs_structure = []
   def lookup(self, y):
     raise CEKError("Variable %s not found" % y)
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
+
+class Env1(Env):
+  _immutable_fields_ = ['x', 'v', 'e']
+  def __init__(self, x, v, e):
+    self.x = x
+    self.v = v
+    self.e = e
+  def lookup(self, y):
+    x = jit.promote(self.x)
+    if x is y:
+      return self.v
+    else:
+      return self.e.lookup(y)
 
 @jit.unroll_safe
 def len_varl(xs):
@@ -352,6 +377,7 @@ def emptyenv():
 def lookup(e, x):
   assert isinstance(x, PrimVariable)
 
+  x = jit.promote(x)
   offtrace_vars_info.log_lookup(x)
 
   result = e.lookup(x)
@@ -362,24 +388,6 @@ def lookup(e, x):
   return result
 
 @jit.unroll_safe
-# For a given environment prev, find an environment in the chain from
-# current.e .. None that is identical to prev. Pycket appears to rely
-# on this a bit, and it appears to work for us too.
-def env_for_call(prev, current, xs):
-  assert isinstance(prev, MultiExtendedEnv)
-  assert isinstance(current, MultiExtendedEnv)
-
-  env, current_xs = current, jit.promote(current.xs)
-  jit.promote(xs)
-
-  while current_xs is not None:
-    if current_xs is xs:
-      if env is prev:
-        return env
-    env = env.e
-    current_xs = jit.promote(env.xs)
-  return prev
-
 def extendcells(e, xs):
   xs = jit.promote(xs)
   n = len_varl(xs)
@@ -387,7 +395,7 @@ def extendcells(e, xs):
   return extend(e, xs, vs)
 
 def extend(e, xs, vs):
-  return MultiExtendedEnv(xs, vstolist(vs), e)
+  return Env.make(xs, vstolist(vs), e)
 
 @jit.unroll_safe
 # invariant: len_varl(xs) >= 1 and the last var is the rest arg
@@ -407,7 +415,7 @@ def extendrest(e, xs, vs):
   for v in reversed(rest_args):
     rest_list = m.cl_cons(v, rest_list)
 
-  return MultiExtendedEnv(xs, fixed_args + [rest_list], e)
+  return Env.make(xs, fixed_args + [rest_list], e)
 
 def resulttovlist(result):
   if isinstance(result, m.cl_v):
