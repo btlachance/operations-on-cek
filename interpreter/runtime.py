@@ -295,9 +295,6 @@ class Env(m.cl_env):
   @staticmethod
   def make(xs, args, e):
     argcount = len(args)
-
-    # XXX I don't think I reflect this in my environment structure
-    # annotation pass, so I'm unsure how that interacts with this
     if argcount == 0:
       return e
 

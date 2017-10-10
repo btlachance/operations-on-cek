@@ -381,7 +381,10 @@
        #`(lamrest #,vars #,(kernel->core #'e newinfo) #,(es->el (attribute es) newinfo))]
       [(lam (xs ...) e es ...)
        (define vars (ids->vars (attribute xs)))
-       (define newinfo (make-info vars envinfo))
+       (define newinfo
+         (if (null? (attribute xs))
+             envinfo
+             (make-info vars envinfo)))
        #`(lam #,vars
            #,(kernel->core #'e newinfo)
            #,(es->el (attribute es) newinfo))]
