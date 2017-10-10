@@ -195,7 +195,7 @@
    #:unless (sym var) c]
   [((quote (sym var)) env_0 expk) --> (ignore env_0 (ret v expk))
    #:where v (mksymbol var)]
-  [((app e_1 es) env expk) --> ((appinfo e_1 es infoempty) env expk)]
+  [((app e_1 es) env expk) --> (e_1 env (fn vsnil es env infoempty expk))]
   [((appinfo e_1 es envinfo) env expk) --> (e_1 env (fn vsnil es env envinfo expk))]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
   [((letvalues valuesbinds e_body0 es_body) env expk)
