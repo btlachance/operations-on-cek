@@ -131,6 +131,7 @@
                (mf (define inexact? (lam (varl val varsnil) (inexactp val) esnil))
                (mf (define quotient (lam (varl m (varl n varsnil)) (quotientimpl m n) esnil))
                (mf (define sin (lam (varl n varsnil) (sinimpl n) esnil))
+               ;; Update the list in corify/lc-term->json
                  modforms)))))))))))))))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
@@ -305,9 +306,9 @@
       [(#%require _) #t]
       [_ #f]))
 
-  (define (ids->vars ids)
+  (define (ids->vars ids [onto-vars #'varsnil])
     (foldr (lambda (id rest) #`(varl #,id #,rest))
-           #'varsnil
+           onto-vars
            ids))
   (define (es->el es envinfo)
     (foldr (lambda (e es-rest) #`(el #,(kernel->core e envinfo) #,es-rest))
@@ -326,8 +327,14 @@
   (define empty-info #'infoempty)
   (define (make-info vars prev-info)
     #`(info #,vars #,prev-info))
+  (define (info-vars info)
+    (syntax-parse info
+      #:datum-literals (info infoempty)
+      [infoempty (raise-arguments-error
+                  'info-vars
+                  "infoempty has no vars")]
+      [(info vars _) (attribute vars)]))
 
-  
   ;; The way I implemented letrec isn't the obvious way: instead of
   ;; initializing a single environment with all of the locations for
   ;; all of the letrec bound variables, I construct an environment for
@@ -355,7 +362,11 @@
                         if)
       [(module id lang
          (mb form ...+))
-       (define forms-vars (ids->vars (modforms-ids (attribute form))))
+       ;; INVARIANT: Assumes the identifiers in envinfo are going to
+       ;; be bound in the same environment as the one created for the
+       ;; modbegin but before the ones in the modbegin
+       (define basis-vars (info-vars envinfo))
+       (define forms-vars (ids->vars (modforms-ids (attribute form)) basis-vars))
        (define newinfo (make-info forms-vars envinfo))
        #`(modbegin
           #,(foldr
@@ -436,7 +447,17 @@
   (define (corify/lc-term->json stx)
     #;(pretty-print (syntax->datum stx) (current-error-port))
     #;(pretty-print (syntax->datum (kernel->core stx empty-info)) (current-error-port))
-    (lc-term->json (kernel->core stx empty-info)))
+    (define names-in-basis
+      #'(;; Update these whenever the basis changes
+         zero? add1 sub1 + - * / box unbox set-box! cons car cdr null?
+         null foldl foldr list append print = < > <= >= equal? apply
+         vector vector-ref vector-set! vector-length make-vector
+         current-command-line-arguments void symbol? newline time-apply
+         current-seconds current-error-port current-output-port fprintf
+         not values call-with-values exit exact->inexact exact-integer?
+         inexact? quotient sin))
+    (define basis-info (make-info (ids->vars (syntax->list names-in-basis)) empty-info))
+    (lc-term->json (kernel->core stx basis-info)))
 
   (command-line
    #:program "lc"
