@@ -6,6 +6,7 @@ def entry_point(argv):
   jit.set_param(None, 'trace_limit', 1000000)
   jit.set_param(None, 'threshold', 131)
   jit.set_param(None, 'trace_eagerness', 50)
+  jit.set_param(None, 'max_unroll_loops', 15)
 
   # Thanks, pyrolog
   for i in range(len(argv)):
