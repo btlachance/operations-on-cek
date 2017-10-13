@@ -716,7 +716,7 @@ def docontinuation(extensionk, result):
 def timeapplyimpl(proc, init):
   return TimeApply(proc, init)
 
-class __extend__(m.CEKTop):
+class __extend__(m.cl_term):
   def can_enter(self):
     return False
 
@@ -734,7 +734,7 @@ class __extend__(m.cl_app, m.cl_appinfo):
 
 driver = jit.JitDriver(reds = ['e', 'k'],
                        greens = ['c', 'prev_c'],
-                       get_printable_location=lambda c, prev_c: c.pprint(0))
+                       get_printable_location=lambda c, prev_c: '%s from %s' % (c.pprint(0), prev_c.pprint(0)))
 
 def run(p):
   c, e, k = m.init(p)
@@ -743,7 +743,6 @@ def run(p):
     while True:
       driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
       prev_c = c if c.can_enter() else prev_c
-      # prev_c = c
       # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
       try:
         c, e, k = c.interpret(e, k)
