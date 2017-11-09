@@ -166,6 +166,7 @@
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extendcells (nt 'env) (nt 'vars))
                    (list 'env_for_call (nt 'env) (nt 'envinfo) (nt 'env))
+                   (list 'register_call (nt 'l) (nt 'callingapp) (nt 'k))
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
                    (list 'predimpl (nt 'var))
@@ -220,6 +221,7 @@
                    'extendrest 'env
                    'extendcells 'env
                    'env_for_call 'env
+                   'register_call 'e
                    'zeropimpl 'e
                    'succimpl 'e
                    'predimpl 'e
@@ -356,8 +358,15 @@
       (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
       clauses
       (map temp* (list c*-ast e*-ast k*-ast) cek/tys)))
-    (if (or (metavar? k0-ast)
-            (prim? k0-ast))
+    ;; TOTAL HACK: we only dispatch on the continuation if it's a
+    ;; named metavar or if it's a pattern that decomposes the
+    ;; continuation (i.e. not a prim). Remember: named metavar's have
+    ;; a truthy metavar-suffix
+    (define dispatch-on-k?
+      (cond
+        [(metavar? k0-ast) (metavar-suffix k0-ast)]
+        [else (not (prim? k0-ast))]))
+    (if (not dispatch-on-k?)
         (list
          (method
           (ast->name c0-ast)
@@ -531,7 +540,7 @@
         "from rpython.tool.pairtype import extendabletype"
         "class CEKTop(object):"
         "  __metaclass__ = extendabletype"
-        "  _attrs_ = []")
+        "  _attrs_ = _immutable_fields_ = ['surrounding_lambda', 'should_enter']")
       "\n"))
     (for ([def (in-sequences nt-class-defs other-class-defs)])
       (pretty-display (class-def->py def)))

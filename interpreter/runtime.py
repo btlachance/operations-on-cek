@@ -1,7 +1,10 @@
 import time
 import math
 import machine as m
-from rpython.rlib import jit
+import pprint_hacks, can_enter_hacks, surrounding_lambda_hacks, cont_next_ast_hacks
+from pycket.callgraph import CallGraph
+from rpython.rlib import jit, types
+from rpython.rlib.signature import signature
 
 class CEKError(Exception):
   def __init__(self, message):
@@ -14,15 +17,17 @@ class CEKUnlessFailure(CEKError):
   def __init__(self):
     pass
 class CEKDone(Exception):
+  _attrs_ = ['result']
   def __init__(self, result):
     self.result = result
 
 def mkvariable(name):
   return PrimVariable.make(name)
 class PrimVariable(m.cl_variable):
-  _immutable_fields_ = ['literal']
+  _immutable_fields_ = ['literal', 'should_enter']
   def __init__(self, name):
     self.literal = name
+    self.should_enter = False
   def pprint(self, indent):
     return self.literal
 
@@ -241,6 +246,7 @@ class NullaryPrim(m.cl_e):
   def __init__(self, opname, op):
     self.opname = opname
     self.op = op
+    self.should_enter = False
   def interpret(self, env, k):
     return m.val_ignore_sing, env, m.cl_ret(self.op(), k)
   def pprint(self, indent):
@@ -251,6 +257,7 @@ class UnaryPrim(m.cl_e):
     self.arg = arg
     self.opname = opname
     self.op = op
+    self.should_enter = False
   def interpret(self, env, k):
     v = lookup(env, self.arg)
     return m.val_ignore_sing, env, m.cl_ret(self.op(v), k)
@@ -264,6 +271,7 @@ class BinaryPrim(m.cl_e):
     self.arg2 = arg2
     self.opname = opname
     self.op = op
+    self.should_enter = False
   def interpret(self, env, k):
     v1 = lookup(env, self.arg1)
     v2 = lookup(env, self.arg2)
@@ -278,6 +286,7 @@ class TernaryPrim(m.cl_e):
     self.arg3 = arg3
     self.opname = opname
     self.op = op
+    self.should_enter = False
   def interpret(self, env, k):
     v1 = lookup(env, self.arg1)
     v2 = lookup(env, self.arg2)
@@ -330,6 +339,20 @@ def env_for_call(clo_env, envinfo, current_env):
     envinfo = envinfo.envinfo1
     current_env = current_env.e
   return clo_env
+
+callgraph = CallGraph()
+def register_call(lam, callingapp, cont):
+  assert isinstance(callingapp, m.cl_callingapp)
+  env_arg_unused = None
+  if isinstance(callingapp, m.cl_ca):
+    calling_app = callingapp.a0
+    assert isinstance(calling_app, m.cl_a)
+  else:
+    calling_app = None
+
+
+  callgraph.register_call(lam, calling_app, cont, env_arg_unused)
+  return lam
 
 class EmptyEnv(Env):
   _immutable_fields_ = ['e', 'shape']
@@ -676,12 +699,14 @@ def currentsecondsimpl():
 def apply(f, args, k):
   vs = m.cl_vl(f, vlisttovs(args))
   return m.val_ignore_sing, emptyenv(), m.cl_fn(vsreverse(vs), m.val_esnil_sing,
-                                                emptyenv(), m.val_infoempty_sing, k)
+                                                emptyenv(), m.val_infoempty_sing,
+                                                m.val_nocallingapp_sing, k)
 
 class TimeApply(m.cl_e):
   def __init__(self, proc, lst):
     self.proc = proc
     self.lst = lst
+    self.should_enter = False
   def pprint(self, indent):
     return ' ' * indent + '(p#time-apply %s %s)' % (self.proc.pprint(0), self.lst.pprint(0))
 
@@ -707,6 +732,8 @@ class TimeApplyK(ExtensionK):
     return m.val_ignore_sing, emptyenv(), m.cl_ret(timing_results, self.k)
   def pprint(self, indent):
     return ' ' * indent + '(timeapplyk %s %s)' % (self.start, self.k.pprint(0))
+  def get_next_executed_ast(self):
+    return self.k.get_next_executed_ast()
 
 def docontinuation(extensionk, result):
   assert isinstance(extensionk, ExtensionK)
@@ -716,49 +743,51 @@ def docontinuation(extensionk, result):
 def timeapplyimpl(proc, init):
   return TimeApply(proc, init)
 
-class __extend__(m.cl_term):
-  def can_enter(self):
-    return False
-
-class __extend__(m.cl_clo):
-  def pprint(self, indent):
-    return ' '* indent + '(clo %s env-hidden)' % self.l0.pprint(0)
-
-class __extend__(m.cl_appinfo):
-  def pprint(self, indent):
-    return ' '* indent + '(appinfo %s %s)' % (self.e0.pprint(0), self.es1.pprint(0))
-
-class __extend__(m.cl_app, m.cl_appinfo):
-  def can_enter(self):
-    return True
-
-driver = jit.JitDriver(reds = ['e', 'k'],
-                       greens = ['c', 'prev_c'],
-                       get_printable_location=lambda c, prev_c: '%s from %s' % (c.pprint(0), prev_c.pprint(0)))
-
 def run(p):
   c, e, k = m.init(p)
-  prev_c = c
+  c.set_surrounding_lambda()
   try:
-    while True:
-      driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
-      prev_c = c if c.can_enter() else prev_c
-      # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
-      try:
-        c, e, k = c.interpret(e, k)
-        if c.can_enter():
-          driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)
-      except CEKDone as d:
-        result = d.result
-        if isinstance(result, Integer):
-          return result.value
-        return 0
-      except CEKError as err:
-        print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
-        print err.__str__()
-        print c.pprint(0)
-        return 1
+    inner(c, e, k)
+  except CEKDone as d:
+    result = d.result
+    if isinstance(result, Integer):
+      return result.value
+    return 0
+  except CEKError as err:
+    print err.__str__()
+    return 1
   finally:
     formatted = ', '.join(['%s=%s' % (var.pprint(0), n) for (var,n) in offtrace_vars_info.info.items()])
     print 'offtrace lookup info: %s' % formatted
     stdout.flush()
+
+def get_printable_location(c, prev_c):
+  if c.can_enter():
+    return '%s from %s' % (c.pprint(0), prev_c.pprint(0))
+  return c.pprint(0)
+
+driver = jit.JitDriver(reds = ['e', 'k'],
+                       greens = ['c', 'prev_c'],
+                       get_printable_location=get_printable_location)
+
+@signature(types.any(), types.any(), types.instance(m.cl_k), returns=types.any())
+def inner(c, e, k):
+  # Ugh, without annotating k w/type m.cl_k the translator complains
+  # about the initial value of k (k_0) not being in _forcelink. Part
+  # of the reason it complains is because k_0 is known to be constant:
+  # it's always the singleton value for the mt continuation. And this
+  # somehow causes the _forcelink error. Anyhow, pulling this part of
+  # the main loop into its own function and using signature seems to
+  # make the error go away---simply asserting that k has a more
+  # general type does *not* make the error go away; and without
+  # pulling this into it's own function, it's hard to use signature
+  # since the intial continuation is the result of a function call.
+
+  prev_c = c
+  while True:
+    driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
+    prev_c = c if isinstance(c, m.cl_a) else prev_c
+    # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
+    c, e, k = c.interpret(e, k)
+    if c.can_enter():
+      driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)

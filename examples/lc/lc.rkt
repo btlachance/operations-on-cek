@@ -14,8 +14,9 @@
   (vars ::= varsnil (varl var vars))
   (valuesbinds ::= valuesbindsnil (vbl valuesbind valuesbinds))
   (envinfo ::= infoempty (info vars envinfo))
+  (callingapp ::= nocallingapp (ca a))
 
-  (e ::= var l (app e es) (appinfo e es envinfo)
+  (e ::= var l a
      (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
      (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var) (begin e es))
@@ -24,6 +25,7 @@
   (bp ::= (p var e))
   (var ::= variable)
   (l ::= (lam vars e es) (lamrest vars e es))
+  (a ::= (app e es) (appinfo e es envinfo))
   (v ::= (clo l env) c (cons v v) undefinedv voidv)
   (c ::= nil true false number string (sym var))
 
@@ -32,7 +34,7 @@
   (config ::= (conf term env k))
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms vars vs modforms k))
-  (expk ::= (fn vs es env envinfo k) (sel e e env k) (ret result k)
+  (expk ::= (fn vs es env envinfo callingapp k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
         (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds es k) (setcellsk vars env expk)
@@ -195,8 +197,10 @@
    #:unless (sym var) c]
   [((quote (sym var)) env_0 expk) --> (ignore env_0 (ret v expk))
    #:where v (mksymbol var)]
-  [((app e_1 es) env expk) --> (e_1 env (fn vsnil es env infoempty expk))]
-  [((appinfo e_1 es envinfo) env expk) --> (e_1 env (fn vsnil es env envinfo expk))]
+  [(a env expk) --> (e_1 env (fn vsnil es env infoempty (ca a) expk))
+   #:where (app e_1 es) a]
+  [(a env expk) --> (e_1 env (fn vsnil es env envinfo (ca a) expk))
+   #:where (appinfo e_1 es envinfo) a]
   [((if e_test e_then e_else) env expk) --> (e_test env (sel e_then e_else env expk))]
   [((letvalues valuesbinds e_body0 es_body) env expk)
    -->
@@ -215,17 +219,23 @@
   [((cwv var_gen var_recv) env expk) --> ((app var_gen esnil) env (cwvk var_recv env expk))]
   [((begin e_0 es) env expk) --> (ignore env (expsk env (el e_0 es) expk))]
 
-  [(ignore env_0 (ret v (fn vs es env envinfo expk))) --> (ignore env_0 (fn (vl v vs) es env envinfo expk))]
-  [(ignore env_0 (fn vs (el e es) env envinfo expk)) --> (e env (fn vs es env envinfo expk))]
-  [(ignore env_0 (fn vs esnil env_1 envinfo expk)) --> (ignore env_0 (expsk env (el e es) expk))
+  [(ignore env_0 (ret v (fn vs es env envinfo callingapp expk))) --> (ignore env_0 (fn (vl v vs) es env envinfo callingapp expk))]
+  [(ignore env_0 (fn vs (el e es) env envinfo callingapp expk)) --> (e env (fn vs es env envinfo callingapp expk))]
+  [(ignore env_0 expk_fn) --> (ignore env_0 (expsk env (el e es) expk))
+   #:where (fn vs esnil env_1 envinfo callingapp expk) expk_fn
    #:where (vl v vs_args) (vsreverse vs)
-   #:where (clo (lam vars e es) env_clo) v
+   #:where (clo l env_clo) v
+   #:where (lam vars e es) l
    #:where env_spec (env_for_call env_clo envinfo env_1)
+   #:where e_ignore (register_call l callingapp expk_fn)
    #:where env (extend env_spec vars vs_args)]
-  [(ignore env_0 (fn vs esnil env_1 envinfo expk)) --> (ignore env_0 (expsk env (el e es) expk))
+  [(ignore env_0 expk_fn) --> (ignore env_0 (expsk env (el e es) expk))
+   #:where (fn vs esnil env_1 envinfo callingapp expk) expk_fn
    #:where (vl v vs_args) (vsreverse vs)
-   #:where (clo (lamrest vars e es) env_clo) v
+   #:where (clo l env_clo) v
+   #:where (lamrest vars e es) l
    #:where env_spec (env_for_call env_clo envinfo env_1)
+   #:where e_ignore (register_call l callingapp expk_fn)
    #:where env (extendrest env_spec vars vs_args)]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
@@ -279,9 +289,9 @@
    #:where vs (vlisttovs v)]
   [(ignore env_0 (ret v (applyk (clo (lamrest vars e es) env) expk))) --> (ignore env_0 (expsk (extendrest env vars vs) (el e es) expk))
    #:where vs (vlisttovs v)]
-  [(ignore env_0 (ret v (cwvk var_recv env expk))) --> (ignore env_0 (fn (vl v (vl v_recv vsnil)) esnil env_0 infoempty expk))
+  [(ignore env_0 (ret v (cwvk var_recv env expk))) --> (ignore env_0 (fn (vl v (vl v_recv vsnil)) esnil env_0 infoempty nocallingapp expk))
    #:where v_recv (lookup env var_recv)]
-  [(ignore env_0 (ret vs_vals (cwvk var_recv env expk))) --> (ignore env_0 (fn vs esnil env_0 infoempty expk))
+  [(ignore env_0 (ret vs_vals (cwvk var_recv env expk))) --> (ignore env_0 (fn vs esnil env_0 infoempty nocallingapp expk))
    #:where v_recv (lookup env var_recv)
    #:where vs (vsreverse (vl v_recv vs_vals))]
   [(ignore env_0 (ret result k)) --> (e env k)

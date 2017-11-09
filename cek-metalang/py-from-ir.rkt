@@ -38,6 +38,7 @@
           attrs
           constructor
           method
+          (make-subterms-method fdefs)
           #:separator "\n")
       (if debug?
           (~a
@@ -75,6 +76,23 @@
                   "      pass"
                   "    raise CEKError(\"No cases matched for method in class app\")")
                  "\n")))
+
+(define (make-subterms-method field-defs)
+  (define header-template "~adef subterms(self):")
+  (define body-template
+    (match field-defs
+      [(or #f (list))
+       "~a  return []"]
+      [(list (ir:field-def names _) ...)
+       (define (name->access n) (format "self.~a" n))
+       (format
+        "~~a  return [~a]"
+        (apply ~a (map name->access names)
+               #:separator ", "))]))
+  (string-join
+   (list (format header-template "  ")
+         (format body-template "  "))
+   "\n"))
 
 (define (make-pprint-method class-name field-defs)
   (match field-defs
@@ -119,19 +137,21 @@
 
 ;; field-defs->constructor-py : name (U #f (listof field-def)) -> string 
 (define (field-defs->constructor-py class-name fdefs #:indent [prefix ""])
+  (define default-body (string-join
+                        (list (format "~a  self.should_enter = False" prefix)
+                              (format "~a  self.surrounding_lambda = None" prefix))
+                        "\n"))
   ;; TODO Fix this inconcistency: we explicitly add the self argument
   ;; to the constructor, yet for method-def's we rely on the self
   ;; argument being in the IR
   (match fdefs
     [#f
      (define header (format "~adef __init__(self):" prefix))
-     (define body (format "~apass" prefix))
-     (format "~a\n  ~a" header body)]
+     (format "~a\n~a" header default-body)]
     [(list) ;; explicit empty case for similar reasons as ir:return
             ;; but also since we need to emit "pass"
      (define header (format "~adef __init__(self):" prefix))
-     (define body (format "~apass" prefix))
-     (format "~a\n  ~a" header body)]
+     (format "~a\n~a" header default-body)]
     [_
      (define (fdef->arg d) (~a (ir:field-def-fieldname d)))
      (define header
@@ -141,7 +161,7 @@
        (define fieldname (ir:field-def-fieldname d))
        (format "~a  self.~a = ~a" prefix fieldname fieldname))
      (define bodies (map fdef->assign fdefs))
-     (string-join (cons header bodies) "\n")]))
+     (string-join (append (cons header bodies) (list default-body)) "\n")]))
 
 (module+ test
   (check-equal? (field-defs->constructor-py 'mt #f)
@@ -167,17 +187,15 @@
                  "\n")))
 
 (define (field-defs->attrs fdefs #:indent [prefix ""])
-  (define attrs-rhs
+  (define default-field-names '(surrounding_lambda should_enter))
+  (define actual-field-names
     (match fdefs
-      [(or #f (list)) ""]
-      [(list (ir:field-def names _) ...)
-       (define (format-attr-name s) (format "'~a'" s))
-       (apply ~a #:separator ", " (map format-attr-name names))]))
-  (string-join
-   (list
-    (format "~a_attrs_ = [~a]" prefix attrs-rhs)
-    (format "~a_immutable_fields_ = [~a]" prefix attrs-rhs))
-   "\n"))
+      [#f '()]
+      [(list (ir:field-def names _) ...) names]))
+  (define (format-attr-name s) (format "'~a'" s))
+  (define attrs-rhs
+    (apply ~a #:separator ", " (map format-attr-name (append default-field-names actual-field-names))))
+  (format "~a_attrs_ = _immutable_fields_ = [~a]" prefix attrs-rhs))
 
 ;; method-def->py : name (U 'super ir:method-def) -> string
 (define (method-def->py class-name mdef #:indent [prefix ""] #:super [super-name 'top])
@@ -198,7 +216,7 @@
        (ir->py/handle-match-failure ir #:indent (string-append prefix "  ")))
      (define fallthrough-error
        (if (equal? super-name 'top)
-           (format "~araise CEKError(~s)"
+           (format "~araise r.CEKError(~s)"
                    (string-append prefix "  ")
                    (format "No cases matched for method in class ~a" class-name))
            (format "~areturn ~a.interpret(~a)"
