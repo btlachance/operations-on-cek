@@ -3,7 +3,8 @@ import math
 import machine as m
 import pprint_hacks, can_enter_hacks, surrounding_lambda_hacks, cont_next_ast_hacks
 from pycket.callgraph import CallGraph
-from rpython.rlib import jit, types
+from rpython.rlib import jit, types, rarithmetic
+from rpython.rlib.rbigint import rbigint
 from rpython.rlib.signature import signature
 
 class CEKError(Exception):
@@ -45,47 +46,59 @@ def guardnum(v):
   if not isinstance(v, Number):
     raise CEKError("Expected a number")
   return v
+
 class Number(m.cl_number):
-  def _value(self):
+  def normalize(self, v):
     raise CEKError("subclass responsibility")
   def eq(self, other):
-    raise CEKError("subclass responsibility")
+    self, v = self.normalize(other)
+    return self.eq_same(v)
+  def eq_same(self, v):
+    raise CEKError("Subclass responsibility")
   def ne(self, other):
     return not self.eq(other)
-  def pprint(self, indent):
-    if isinstance(self, Integer):
-      valstr = '%s' % self._value()
-    else:
-      valstr = '%s' % self._value()
-
-    return ' ' * indent + valstr
   def is_zero(self):
-    return m.cl_true() if self._value() == 0 else m.cl_false()
+    raise CEKError("Subclass responsibility")
   def add(self, v):
-    raise CEKError("subclass responsibility")
-  def addint(self, i):
-    raise CEKError("subclass responsibility")
+    self, v = self.normalize(v)
+    return self.add_same(v)
+  def add_same(self, v):
+    raise CEKError("Subclass responsibility")
   def sub(self, v):
-    raise CEKError("subclass responsibility")
-  def subint(self, i):
-    raise CEKError("subclass responibility")
+    self, v = self.normalize(v)
+    return self.sub_same(v)
+  def sub_same(self, v):
+    raise CEKError("Subclass responsibility")
   def mult(self, v):
-    raise CEKError("subclass responsibility")
-  def multint(self, i):
-    raise CEKError("subclass responibility")
+    self, v = self.normalize(v)
+    return self.mult_same(v)
+  def mult_same(self, v):
+    raise CEKError("Subclass responsibility")
   def div(self, v):
-    dividend = self._value()
-    divisor = v._value()
-    quotient = dividend / divisor
-    return mkfloat(quotient) # ugh
+    self, v = self.normalize(v)
+    return self.div_same(v)
+  def div_same(self, v):
+    raise CEKError("Subclass responsibility")
   def lt(self, v):
-    return m.cl_true() if self._value() < v._value() else m.cl_false()
+    self, v = self.normalize(v)
+    return self.lt_same(v)
+  def lt_same(self, v):
+    raise CEKError("Subclass responsibility")
   def gt(self, v):
-    return m.cl_true() if self._value() > v._value() else m.cl_false()
+    self, v = self.normalize(v)
+    return self.gt_same(v)
+  def gt_same(self, v):
+    raise CEKError("Subclass responsibility")
   def lteq(self, v):
-    return m.cl_true() if self._value() <= v._value() else m.cl_false()
+    self, v = self.normalize(v)
+    return self.lteq_same(v)
+  def lteq_same(self, v):
+    raise CEKError("Subclass responsibility")
   def gteq(self, v):
-    return m.cl_true() if self._value() >= v._value() else m.cl_false()
+    self, v = self.normalize(v)
+    return self.gteq_same(v)
+  def gteq_same(self, v):
+    raise CEKError("Subclass responsibility")
 
 def mkint(n):
   return Integer(n)
@@ -96,98 +109,176 @@ def guardint(v):
 class Integer(Number):
   _immutable_fields_ = ['value']
   def __init__(self, n):
-    assert isinstance(n, int) or isinstance(n, long)
+    assert isinstance(n, int)
     self.value = n
-  def _value(self):
-    return self.value
-  def eq(self, other):
-    if isinstance(other, Integer):
-      return self.value == other.value
-    elif isinstance(other, Float):
-      return self.value == other.value
-    else:
-      return False
-  def add(self, v):
+  def pprint(self, indent):
+    return ' ' * indent + '%s' % self.value
+  def normalize(self, v):
     if isinstance(v, Integer):
-      return mkint(self.value + v.value)
-    else:
-      return v.addint(self.value)
-  def addint(self, i):
-    assert isinstance(i, int) or isinstance(i, long)
-    return mkint(self.value + i)
-  def sub(self, v):
-    if isinstance(v, Integer):
-      return mkint(self.value - v.value)
-    else:
-      return v.subint(self.value)
-  def subint(self, i):
-    assert isinstance(i, int) or isinstance(i, long)
-    return mkint(i - self.value)
-  def mult(self, v):
-    if isinstance(v, Integer):
-      return mkint(self.value * v.value)
-    else:
-      return v.multint(self.value)
-  def multint(self, i):
-    assert isinstance(i, int) or isinstance(i, long)
-    return mkint(self.value * i)
+      return self, v
+    if isinstance(v, Float):
+      return Float(float(self.value)), v
+    if isinstance(v, BigInteger):
+      return BigInteger.fromint(self.value), v
+    assert False
+  def is_zero(self):
+    return m.cl_true() if self.value == 0 else m.cl_false()
+  def eq_same(self, v):
+    assert isinstance(v, Integer)
+    return self.value == v.value
+  def add_same(self, v):
+    assert isinstance(v, Integer)
+    try:
+      return Integer(rarithmetic.ovfcheck(self.value + v.value))
+    except OverflowError:
+      return BigInteger(rbigint.fromint(self.value)).add(v)
+  def sub_same(self, v):
+    assert isinstance(v, Integer)
+    try:
+      return Integer(rarithmetic.ovfcheck(self.value - v.value))
+    except OverflowError:
+      return BigInteger(rbigint.fromint(self.value)).sub(v)
+  def mult_same(self, v):
+    assert isinstance(v, Integer)
+    try:
+      return Integer(rarithmetic.ovfcheck(self.value * v.value))
+    except OverflowError:
+      return BigInteger(rbigint.fromint(self.value)).mult(v)
+  def div_same(self, v):
+    assert isinstance(v, Integer)
+    return Float(float(self.value) / float(v.value))
+  def lt_same(self, v):
+    assert isinstance(v, Integer)
+    return m.cl_true() if self.value < v.value else m.cl_false()
+  def gt_same(self, v):
+    assert isinstance(v, Integer)
+    return m.cl_true() if self.value > v.value else m.cl_false()
+  def lteq_same(self, v):
+    assert isinstance(v, Integer)
+    return m.cl_true() if self.value <= v.value else m.cl_false()
+  def gteq_same(self, v):
+    assert isinstance(v, Integer)
+    return m.cl_true() if self.value >= v.value else m.cl_false()
   def toinexact(self):
-    return mkfloat(float(self.value))
+    return Float(float(self.value))
   def quotient(self, other):
-    return mkint(int(self.value / other.value))
+    return Integer(self.value / other.value)
   def sin(self):
     if self.value == 0:
-      return mkint(0)
-    return mkfloat(math.sin(self.value))
+      return self
+    return Float(math.sin(float(self.value)))
+
+class BigInteger(Number):
+  _immutable_fields_ = ['value']
+  def __init__(self, n):
+    assert isinstance(n, rbigint)
+    self.value = n
+
+  @staticmethod
+  def fromint(n):
+    return BigInteger(rbigint.fromint(n))
+
+  def pprint(self, indent):
+    return ' ' * indent + '%s' % self.value
+  def normalize(self, v):
+    if isinstance(v, BigInteger):
+      return self, v
+    if isinstance(v, Integer):
+      return self, BigInteger.fromint(v.value)
+    if isinstance(v, Float):
+      return Float(self.value.tofloat()), v
+    assert False
+  def is_zero(self):
+    return m.cl_true() if self.value.int_eq(0) else m.cl_false()
+  def eq_same(self, v):
+    assert isinstance(v, BigInteger)
+    return self.value.eq(v.value)
+  def add_same(self, v):
+    assert isinstance(v, BigInteger)
+    return BigInteger(self.value.add(v.value))
+  def sub_same(self, v):
+    assert isinstance(v, BigInteger)
+    return BigInteger(self.value.sub(v.value))
+  def mult_same(self, v):
+    assert isinstance(v, BigInteger)
+    return BigInteger(self.value.mul(v.value))
+  def div_same(self, v):
+    assert isinstance(v, BigInteger)
+    return Float(self.value.div(v.value).tofloat())
+  def lt_same(self, v):
+    assert isinstance(v, BigInteger)
+    return m.cl_true() if self.value.lt(v.value) else m.cl_false()
+  def gt_same(self, v):
+    assert isinstance(v, BigInteger)
+    return m.cl_true() if self.value.gt(v.value) else m.cl_false()
+  def lteq_same(self, v):
+    assert isinstance(v, BigInteger)
+    return m.cl_true() if self.value.le(v.value) else m.cl_false()
+  def gteq_same(self, v):
+    assert isinstance(v, BigInteger)
+    return m.cl_true() if self.value.ge(v.value) else m.cl_false()
+  def toinexact(self):
+    return Float(self.value.tofloat())
+  def sin(self):
+    if self.value.int_eq(0):
+      return self
+    return Float(math.sin(self.value.tofloat()))
 
 def mkfloat(n):
   return Float(n)
 class Float(Number):
   _immutable_fields_ = ['value']
   def __init__(self, n):
+    assert isinstance(n, float)
     self.value = n
-  def _value(self):
-    return self.value
-  def eq(self, other):
-    if isinstance(other, Float):
-      return self.value == other.value
-    elif isinstance(other, Integer):
-      return self.value == other.value
-    else:
-      return False
-  def add(self, v):
+  def pprint(self, indent):
+    return ' ' * indent + '%s' % self.value
+  def normalize(self, v):
     if isinstance(v, Float):
-      return mkfloat(self.value + v.value)
-    else:
-      return mkfloat(self.value + v._value())
-  def addint(self, i):
-    assert isinstance(i, int) or isinstance(i, long)
-    return mkfloat(self.value + i)
-  def sub(self, v):
-    if isinstance(v, Float):
-      return mkfloat(self.value - v.value)
-    else:
-      return mkfloat(self.value - v._value())
-  def subint(self, i):
-    assert isinstance(i, int) or isinstance(i, long)
-    return mkfloat(i - self.value)
-  def mult(self, v):
-    if isinstance(v, Float):
-      return mkfloat(self.value * v.value)
-    else:
-      return mkfloat(self.value * v._value())
-  def multint(self, i):
-    assert isinstance(i, int) or isinstance(i, long)
-    return mkfloat(self.value * i)
+      return self, v
+    if isinstance(v, Integer):
+      return self, Float(float(v.value))
+    if isinstance(v, BigInteger):
+      return self, Float(v.value.tofloat())
+    assert False
+  def is_zero(self):
+    return m.cl_true() if self.value == 0.0 else m.cl_false()
+  def eq_same(self, v):
+    assert isinstance(v, Float)
+    return self.value == v.value
+  def add_same(self, v):
+    assert isinstance(v, Float)
+    return Float(self.value + v.value)
+  def sub_same(self, v):
+    assert isinstance(v, Float)
+    return Float(self.value - v.value)
+  def mult_same(self, v):
+    assert isinstance(v, Float)
+    return Float(self.value * v.value)
+  def div_same(self, v):
+    assert isinstance(v, Float)
+    return Float(self.value / v.value)
+  def lt_same(self, v):
+    assert isinstance(v, Float)
+    return m.cl_true() if self.value < v.value else m.cl_false()
+  def gt_same(self, v):
+    assert isinstance(v, Float)
+    return m.cl_true() if self.value > v.value else m.cl_false()
+  def lteq_same(self, v):
+    assert isinstance(v, Float)
+    return m.cl_true() if self.value <= v.value else m.cl_false()
+  def gteq_same(self, v):
+    assert isinstance(v, Float)
+    return m.cl_true() if self.value >= v.value else m.cl_false()
   def sin(self):
-    return mkfloat(math.sin(self.value))
+    return Float(math.sin(self.value))
 
 def zeropimpl(n):
   return UnaryPrim(n, 'zerop', lambda n: guardnum(n).is_zero())
 def succimpl(n):
-  return UnaryPrim(n, 'succ', lambda n: guardnum(n).addint(1))
+  return UnaryPrim(n, 'succ', lambda n: guardnum(n).add(Integer(1)))
 def predimpl(n):
-  return UnaryPrim(n, 'pred', lambda n: guardnum(n).addint(-1))
+  return UnaryPrim(n, 'pred', lambda n: guardnum(n).add(Integer(-1)))
 def addimpl(n1, n2):
   return BinaryPrim(n1, n2, '+', lambda n1, n2: guardnum(n1).add(guardnum(n2)))
 def subimpl(n1, n2):
