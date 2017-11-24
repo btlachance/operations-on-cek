@@ -162,7 +162,7 @@
   (lang-info nonterminals
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
-                   (list 'extend (nt 'env) (nt 'vars) (nt 'vs))
+                   (list 'extend (nt 'env) (nt 'vars) (nt 'result))
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extendcells (nt 'env) (nt 'vars))
                    (list 'env_for_call (nt 'env) (nt 'envinfo) (nt 'env))
@@ -180,7 +180,7 @@
                    (list 'modformsreverse (nt 'modforms))
                    (list 'mkcell (nt 'v))
                    (list 'setcell (nt 'var) (nt 'env) (nt 'v))
-                   (list 'setcells (nt 'vars) (nt 'env) (nt 'vs))
+                   (list 'setcells (nt 'vars) (nt 'env) (nt 'result))
                    (list 'vsreverse (nt 'vs))
                    (list 'printimpl (nt 'var))
                    (list 'ltimpl (nt 'var) (nt 'var))

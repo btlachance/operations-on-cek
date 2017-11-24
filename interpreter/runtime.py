@@ -446,7 +446,12 @@ def extendcells(e, xs):
   vs = [mkcell(m.val_undefinedv_sing) for i in range(n)]
   return Env.make(xs, vs, e)
 
-def extend(e, xs, vs):
+def extend(e, xs, result):
+  if isinstance(result, m.cl_v):
+    v = result
+    return Env.make(xs, [v], e)
+
+  vs = result
   return Env.make(xs, vstolist(vs), e)
 
 @jit.unroll_safe
@@ -547,7 +552,17 @@ def setcell(var, env, v):
   cell = env.lookup(var)
   assert isinstance(cell, Cell)
   return cell.set(v)
-def setcells(vars, env, vs):
+
+def setcells(vars, env, result):
+  if isinstance(result, m.cl_v):
+    v = result
+    assert isinstance(vars, m.cl_varl)
+    var, vars = vars.var0, vars.vars1
+    if not isinstance(vars, m.cl_varsnil):
+      raise CEKError("Number of variables and values did not agree")
+    return setcell(var, env, v)
+
+  vs = result
   while isinstance(vars, m.cl_varl) and isinstance(vs, m.cl_vl):
     setcell(vars.var0, env, vs.v0)
     vars = vars.vars1

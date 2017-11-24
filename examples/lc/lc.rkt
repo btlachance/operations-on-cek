@@ -250,15 +250,10 @@
   [(ignore env (bindvaluesk env_arg varsnil (vbl (vb vars e_vars) valuesbinds) env_acc es expk))
    -->
    (e_vars env_arg (bindvaluesk env_arg vars valuesbinds env_acc es expk))]
-  [(ignore env (ret v (bindvaluesk env_arg vars valuesbinds env_acc0 es expk)))
+  [(ignore env (ret result (bindvaluesk env_arg vars valuesbinds env_acc0 es expk)))
    -->
    (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
-   #:where (varl var varsnil) vars
-   #:where env_acc1 (extend env_acc0 vars (vl v vsnil))]
-  [(ignore env (ret vs (bindvaluesk env_arg vars valuesbinds env_acc0 es expk)))
-   -->
-   (ignore env (bindvaluesk env_arg varsnil valuesbinds env_acc1 es expk))
-   #:where env_acc1 (extend env_acc0 vars vs)]
+   #:where env_acc1 (extend env_acc0 vars result)]
 
   [(ignore env (bindrec valuesbindsnil expk)) --> (ignore env expk)]
   [(ignore env (bindrec (vbl (vb vars e) valuesbinds) expk))
@@ -270,12 +265,8 @@
   [(ignore env (evalrec (vbl (vb vars e) valuesbinds) es expk))
    -->
    (e env (setcellsk vars env (evalrec valuesbinds es expk)))]
-  [(ignore env_0 (ret v (setcellsk (varl var varsnil) env expk))) --> (ignore env expk)
-   #:where v_ignore (setcell var env v)]
-  [(ignore env_0 (ret (vl v vsnil) (setcellsk (varl var varsnil) env expk))) --> (ignore env expk)
-   #:where v_ignore (setcell var env v)]
-  [(ignore env_0 (ret vs (setcellsk vars env expk))) --> (ignore env expk)
-   #:where v_ignore (setcells vars env vs)]
+  [(ignore env_0 (ret result (setcellsk vars env expk))) --> (ignore env expk)
+   #:where v_ignore (setcells vars env result)]
 
   [(ignore env_0 (ret (cons v_1 v_2) (cark expk))) --> (ignore env_0 (ret v_1 expk))]
   [(ignore env_0 (ret (cons v_1 v_2) (cdrk expk))) --> (ignore env_0 (ret v_2 expk))]
