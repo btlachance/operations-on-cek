@@ -227,7 +227,7 @@
    #:where (clo l env_clo) v
    #:where (lam vars e es) l
    #:where env_spec (env_for_call env_clo envinfo env_1)
-   #:where e_ignore (register_call l callingapp expk_fn)
+   #:where e_ignore (register_call l callingapp expk)
    #:where env (extend env_spec vars vs_args)]
   [(ignore env_0 expk_fn) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (fn vs esnil env_1 envinfo callingapp expk) expk_fn
@@ -235,7 +235,7 @@
    #:where (clo l env_clo) v
    #:where (lamrest vars e es) l
    #:where env_spec (env_for_call env_clo envinfo env_1)
-   #:where e_ignore (register_call l callingapp expk_fn)
+   #:where e_ignore (register_call l callingapp expk)
    #:where env (extendrest env_spec vars vs_args)]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)

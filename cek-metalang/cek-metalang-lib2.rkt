@@ -540,7 +540,9 @@
         "from rpython.tool.pairtype import extendabletype"
         "class CEKTop(object):"
         "  __metaclass__ = extendabletype"
-        "  _attrs_ = _immutable_fields_ = ['surrounding_lambda', 'should_enter']")
+        "  _attrs_ = _immutable_fields_ = ['surrounding_lambda', 'should_enter']"
+        "  should_enter = False"
+        "  surrounding_lambda = None")
       "\n"))
     (for ([def (in-sequences nt-class-defs other-class-defs)])
       (pretty-display (class-def->py def)))
