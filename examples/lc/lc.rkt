@@ -307,10 +307,15 @@
       [(#%require _) #t]
       [_ #f]))
 
-  (define (ids->vars ids [onto-vars #'varsnil])
+  (define (ids->vars ids)
     (foldr (lambda (id rest) #`(varl #,id #,rest))
-           onto-vars
+           #'varsnil
            ids))
+  (define (vars->ids vars0)
+    (syntax-parse vars0
+      [(~literal varsnil) '()]
+      [(varl id vars)
+       (cons #'id (vars->ids #'vars))]))
   (define (es->el es envinfo)
     (foldr (lambda (e es-rest) #`(el #,(kernel->core e envinfo) #,es-rest))
            #'esnil
@@ -366,15 +371,16 @@
        ;; INVARIANT: Assumes the identifiers in envinfo are going to
        ;; be bound in the same environment as the one created for the
        ;; modbegin but before the ones in the modbegin
-       (define basis-vars (info-vars envinfo))
-       (define forms-vars (ids->vars (modforms-ids (attribute form)) basis-vars))
+       (define basis-ids (vars->ids (info-vars envinfo)))
+       (define forms (filter-not ignored-modform? (attribute form)))
+       (define forms-vars (ids->vars (append basis-ids (modforms-ids forms))))
        (define newinfo (make-info forms-vars envinfo))
        #`(modbegin
           #,(foldr
              (lambda (form rest)
                #`(mf #,(kernel->core form newinfo) #,rest))
              #'mfnil
-             (filter-not ignored-modform? (attribute form))))]
+             forms))]
       [(app (~datum call-with-values) (lam () exp) (~datum print-values))
        #`(app call-with-values
               (el #,(kernel->core #'(lambda () exp) envinfo)
@@ -458,7 +464,8 @@
          not values call-with-values exit exact->inexact exact-integer?
          inexact? quotient sin))
     (define basis-info (make-info (ids->vars (syntax->list names-in-basis)) empty-info))
-    (lc-term->json (kernel->core stx basis-info)))
+    (define core (kernel->core stx basis-info))
+    (lc-term->json core))
 
   (command-line
    #:program "lc"
