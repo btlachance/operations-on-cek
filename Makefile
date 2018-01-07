@@ -3,7 +3,7 @@ RPYTHON=$(PYTHON) ~/projects/pypy/rpython/bin/rpython
 RPYTHONOPTS=
 _=$(shell mkdir -p build)
 METALANGDEPS=$(wildcard cek-metalang/*.rkt)
-RTDEPS=$(wildcard interpreter/*.py)
+RTDEPS=$(shell find interpreter -type f -name '*.py')
 .PHONY: all unittest inttest test clean quicktest
 .PRECIOUS: build/interpreter-%/main.py
 
