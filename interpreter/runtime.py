@@ -633,17 +633,40 @@ def exit(v):
 
 class Cell(m.cl_v):
   _immutable_fields_ = ['val']
-  def __init__(self, init):
-    self.val = init
+  def __init__(self, v):
+    self.val = v
   def set(self, v):
     self.val = v
     return v
   def get(self):
+    raise Exception("subclass responsibility")
+  def pprint(self, indent):
+    raise Exception("subclass responsibility")
+  @staticmethod
+  def make(promotable, init):
+    if promotable:
+      return PromotableCell(init)
+    else:
+      return StandardCell(init)
+
+class StandardCell(Cell):
+  _immutable_fields_ = ['val']
+  def get(self):
     return self.val
   def pprint(self, indent):
-    return ' ' * indent + '(cell %s)' % self.val.pprint(0)
+    return ' ' * indent + '(standardcell %s)' % self.val.pprint(0)
+
+class PromotableCell(Cell):
+  _immutable_fields_ = ['val']
+  def get(self):
+    return jit.promote(self.val)
+  def pprint(self, indent):
+    return ' ' * indent + '(promotablecell %s)' % self.val.pprint(0)
+
 def mkcell(v):
-  return Cell(v)
+  return Cell.make(False, v)
+def mkpromotablecell(v):
+  return Cell.make(True, v)
 def setcell(var, env, v):
   # We can't use the lookup function because it handles cell
   # unwrapping; we have to instead call the environment's lookup

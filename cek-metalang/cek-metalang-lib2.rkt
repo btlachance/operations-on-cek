@@ -179,6 +179,7 @@
                    (list 'setboximpl (nt 'var) (nt 'var))
                    (list 'modformsreverse (nt 'modforms))
                    (list 'mkcell (nt 'v))
+                   (list 'mkpromotablecell (nt 'v))
                    (list 'setcell (nt 'var) (nt 'env) (nt 'v))
                    (list 'setcells (nt 'vars) (nt 'env) (nt 'result))
                    (list 'vsreverse (nt 'vs))
@@ -234,6 +235,7 @@
                    'setboximpl 'e
                    'modformsreverse 'modforms
                    'mkcell 'v
+                   'mkpromotablecell 'v
                    'setcell 'v
                    'setcells 'v
                    'vsreverse 'vs

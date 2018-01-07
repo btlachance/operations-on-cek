@@ -165,7 +165,7 @@
    -->
    (ignore env (binddefs modforms_tobind (varl var vars) (vl v vs) modforms_toeval k))
    #:where (define var e_0) gtopform
-   #:where v (mkcell undefinedv)]
+   #:where v (mkpromotablecell undefinedv)]
   [(e_0 env (binddefs modforms_tobind vars vs modforms_toeval k))
    -->
    (ignore env (binddefs modforms_tobind vars vs modforms_toeval k))]
