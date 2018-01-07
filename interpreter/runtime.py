@@ -415,6 +415,15 @@ def equal_varl(xs, ys):
       return False
   return isinstance(xs, m.cl_varsnil) and isinstance(ys, m.cl_varsnil)
 
+def varl_to_xs(varl):
+  xs = []
+  while isinstance(varl, m.cl_varl):
+    var, varl = varl.var0, varl.vars1
+    xs.append(var)
+  return xs
+def format_xs(xs):
+  return ",".join([x.pprint(0) for x in xs])
+
 @jit.unroll_safe
 def env_for_call(clo_env, envinfo, current_env):
   assert isinstance(clo_env, Env)
