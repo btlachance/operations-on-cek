@@ -211,6 +211,7 @@
                    (list 'inexactp (nt 'var))
                    (list 'quotientimpl (nt 'var) (nt 'var))
                    (list 'sinimpl (nt 'var))
+                   (list 'trypromote (nt 'v))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -267,6 +268,7 @@
                    'inexactp 'e
                    'quotientimpl 'e
                    'sinimpl 'e
+                   'trypromote 'v
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

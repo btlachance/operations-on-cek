@@ -224,7 +224,7 @@
   [(ignore env_0 expk_fn) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (fn vs esnil env_1 envinfo callingapp expk) expk_fn
    #:where (vl v vs_args) (vsreverse vs)
-   #:where (clo l env_clo) v
+   #:where (clo l env_clo) (trypromote v)
    #:where (lam vars e es) l
    #:where env_spec (env_for_call env_clo envinfo env_1)
    #:where e_ignore (register_call l callingapp expk)

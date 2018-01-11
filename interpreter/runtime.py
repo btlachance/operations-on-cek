@@ -639,34 +639,36 @@ class Cell(m.cl_v):
     self.val = v
     return v
   def get(self):
-    raise Exception("subclass responsibility")
-  def pprint(self, indent):
-    raise Exception("subclass responsibility")
-  @staticmethod
-  def make(promotable, init):
-    if promotable:
-      return PromotableCell(init)
-    else:
-      return StandardCell(init)
-
-class StandardCell(Cell):
-  _immutable_fields_ = ['val']
-  def get(self):
     return self.val
   def pprint(self, indent):
-    return ' ' * indent + '(standardcell %s)' % self.val.pprint(0)
-
-class PromotableCell(Cell):
-  _immutable_fields_ = ['val']
-  def get(self):
-    return jit.promote(self.val)
+    return ' ' * indent + '(cell %s)' % self.val.pprint(0)
+class CellOfPromotable(Cell):
+  def set(self, v):
+    return Cell.set(self, v.aspromotable())
   def pprint(self, indent):
-    return ' ' * indent + '(promotablecell %s)' % self.val.pprint(0)
+    return ' ' * indent + '(cellofpromotable %s)' % self.val.pprint(0)
+
+class __extend__(m.cl_v):
+  def aspromotable(self):
+    return self
+  def promote(self):
+    pass
+class __extend__(m.cl_clo):
+  def aspromotable(self):
+    return PromotableClosure(self.l0, self.env1)
+class PromotableClosure(m.cl_clo):
+  def promote(self):
+    jit.promote(self)
+  def aspromotable(self):
+    return self
+def trypromote(v):
+  v.promote()
+  return v
 
 def mkcell(v):
-  return Cell.make(False, v)
+  return Cell(v)
 def mkpromotablecell(v):
-  return Cell.make(True, v)
+  return CellOfPromotable(v)
 def setcell(var, env, v):
   # We can't use the lookup function because it handles cell
   # unwrapping; we have to instead call the environment's lookup
