@@ -219,7 +219,7 @@
   [((cwv var_gen var_recv) env expk) --> ((app var_gen esnil) env (cwvk var_recv env expk))]
   [((begin e_0 es) env expk) --> (ignore env (expsk env (el e_0 es) expk))]
 
-  [(ignore env_0 (ret v (fn vs es env envinfo callingapp expk))) --> (ignore env_0 (fn (vl v vs) es env envinfo callingapp expk))]
+  [(ignore env_0 (ret v (fn vs es env envinfo callingapp expk))) --> (ignore env_0 (fn (vl v vs) (promotees es) env envinfo callingapp expk))]
   [(ignore env_0 (fn vs (el e es) env envinfo callingapp expk)) --> (e env (fn vs es env envinfo callingapp expk))]
   [(ignore env_0 expk_fn) --> (ignore env_0 (expsk env (el e es) expk))
    #:where (fn vs esnil env_1 envinfo callingapp expk) expk_fn

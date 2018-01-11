@@ -665,6 +665,9 @@ def trypromote(v):
   v.promote()
   return v
 
+def promotees(es):
+  return jit.promote(es)
+
 def mkcell(v):
   return Cell(v)
 def mkpromotablecell(v):
