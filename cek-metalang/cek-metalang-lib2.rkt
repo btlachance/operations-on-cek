@@ -165,6 +165,7 @@
                    (list 'extend (nt 'env) (nt 'vars) (nt 'result))
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extendcells (nt 'env) (nt 'vars))
+                   (list 'extendtoplevel (nt 'env) (nt 'vars) (nt 'result))
                    (list 'env_for_call (nt 'env) (nt 'envinfo) (nt 'env))
                    (list 'register_call (nt 'l) (nt 'callingapp) (nt 'k))
                    (list 'zeropimpl (nt 'var))
@@ -223,6 +224,7 @@
                    'extend 'env
                    'extendrest 'env
                    'extendcells 'env
+                   'extendtoplevel 'env
                    'env_for_call 'env
                    'register_call 'e
                    'zeropimpl 'e

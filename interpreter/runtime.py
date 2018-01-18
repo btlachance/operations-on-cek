@@ -516,6 +516,12 @@ class MultiExtendedEnv(Env):
       return self.values[i]
     return self.e.lookup(y)
 
+class ToplevelEnv(MultiExtendedEnv):
+  def lookup(self, y):
+    jit.promote(self)
+    jit.promote(y)
+    return jit.promote(MultiExtendedEnv.lookup(self, y))
+
 class OfftraceVarsAccessedInfo(object):
   def __init__(self):
     self.info = {}
@@ -548,13 +554,24 @@ def extendcells(e, xs):
   vs = [mkcell(m.val_undefinedv_sing) for i in range(n)]
   return Env.make(xs, vs, e)
 
-def extend(e, xs, result):
+def extendtoplevel(e, xs, result):
+  return extend(e, xs, result, True)
+
+def extend(e, xs, result, toplevel=False):
   if isinstance(result, m.cl_v):
     v = result
-    return Env.make(xs, [v], e)
+    if toplevel:
+      return ToplevelEnv(xs, [v], e)
+    else:
+      return Env.make(xs, [v], e)
+    
 
   vs = result
-  return Env.make(xs, vstolist(vs), e)
+  if toplevel:
+    return ToplevelEnv(xs, vstolist(vs), e)
+  else:
+    return Env.make(xs, vstolist(vs), e)
+  
 
 @jit.unroll_safe
 # invariant: len_varl(xs) >= 1 and the last var is the rest arg

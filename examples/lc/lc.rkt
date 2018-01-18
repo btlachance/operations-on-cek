@@ -154,7 +154,7 @@
    (modform_toeval env_1 (evaldefs modform_toeval modforms_toeval env_1 k))
    #:where vars (varsreverse vars_rev)
    #:where vs (vsreverse vs_rev)
-   #:where env_1 (extend env_0 vars vs)]
+   #:where env_1 (extendtoplevel env_0 vars vs)]
   [(ignore env (binddefs mfnil varsnil vsnil mfnil k))
    ;; This rule shouldn't happen since modbegin checks that the module
    ;; body is nonempty
