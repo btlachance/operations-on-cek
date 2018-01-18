@@ -371,6 +371,7 @@ class BinaryPrim(m.cl_e):
     return ' ' * indent + '(p#%s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0))
 
 class TernaryPrim(m.cl_e):
+  _immutable_fields_ = ['arg1', 'arg2', 'arg3', 'opname', 'op']
   def __init__(self, arg1, arg2, arg3, opname, op):
     self.arg1 = arg1
     self.arg2 = arg2
