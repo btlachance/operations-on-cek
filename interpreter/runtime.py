@@ -426,6 +426,7 @@ def format_xs(xs):
 
 @jit.unroll_safe
 def env_for_call(clo_env, envinfo, current_env):
+  # envinfo describes current_env; it's not the info for clo_env
   assert isinstance(clo_env, Env)
   assert isinstance(current_env, Env)
 
@@ -681,6 +682,7 @@ def setcell(var, env, v):
   assert isinstance(cell, Cell)
   return cell.set(v)
 
+@jit.unroll_safe
 def setcells(vars, env, result):
   if isinstance(result, m.cl_v):
     v = result
