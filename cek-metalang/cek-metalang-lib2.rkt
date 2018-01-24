@@ -214,6 +214,7 @@
                    (list 'sinimpl (nt 'var))
                    (list 'trypromote (nt 'v))
                    (list 'promotees (nt 'es))
+                   (list 'mutate (nt 'env) (nt 'var) (nt 'v))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -273,6 +274,7 @@
                    'sinimpl 'e
                    'trypromote 'v
                    'promotees 'es
+                   'mutate 'v
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 

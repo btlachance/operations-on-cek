@@ -19,7 +19,8 @@
   (e ::= var l a
      (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
-     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var) (begin e es))
+     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var) (begin e es)
+     (set var e))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
   (bp ::= (p var e))
@@ -38,7 +39,7 @@
         (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
         (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds es k) (setcellsk vars env expk)
-        (cwvk var env k) (expsk env es k) extensionk)
+        (cwvk var env k) (expsk env es k) extensionk (setk var env k))
   #:control-string term
   #:environment env
   #:continuation k
@@ -192,6 +193,7 @@
    (ignore env (ret v k))]
 
   [(var env_0 expk) --> (ignore env_0 (ret (lookup env_0 var) expk))]
+  [((set var e_0) env_0 expk) --> (e_0 env_0 (setk var env_0 expk))]
   [(l env_0 expk) --> (ignore env_0 (ret (clo l env_0) expk))]
   [((quote c) env_0 expk) --> (ignore env_0 (ret c expk))
    #:unless (sym var) c]
@@ -285,6 +287,8 @@
   [(ignore env_0 (ret vs_vals (cwvk var_recv env expk))) --> (ignore env_0 (fn vs esnil env_0 infoempty nocallingapp expk))
    #:where v_recv (lookup env var_recv)
    #:where vs (vsreverse (vl v_recv vs_vals))]
+  [(ignore env_0 (ret v (setk var env expk))) --> (ignore env_0 (ret voidv expk))
+   #:where v_ignore (mutate env var v)]
   [(ignore env_0 (ret result k)) --> (e env k)
    #:where extensionk k
    #:where (conf e env k) (docontinuation k result)])
@@ -445,6 +449,8 @@
        #`(if #,(kernel->core #'e1 envinfo)
              #,(kernel->core #'e2 envinfo)
              #,(kernel->core #'e3 envinfo))]
+      [(set! x e)
+       #`(set x #,(kernel->core #'e envinfo))]
       [(quote #t) #'(quote true)]
       [(quote #f) #'(quote false)]
       [(quote ()) #'(quote nil)]

@@ -461,8 +461,12 @@ class EmptyEnv(Env):
   def __init__(self):
     self.e = None
     self.shape = None
+  def getindex(self, y):
+    raise CEKError("Variable %s not found" % y.pprint(0))
   def lookup(self, y):
     raise CEKError("Variable %s not found" % y.pprint(0))
+  def mutate(self, x, v):
+    raise CEKError("Cannot mutate unbound varaible" % x.pprint(0))
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
 
@@ -474,12 +478,31 @@ class Env1(Env):
     self.v = v
     self.e = e
     self.shape = shape
-  def lookup(self, y):
+
+  def getindex(self, y):
     x = jit.promote(self.x)
     if x is y:
+      return 0
+    return -1
+
+  def lookup(self, y):
+    i = self.getindex(y)
+    if i == 0:
       return self.v
     else:
       return self.e.lookup(y)
+
+  def mutate(self, y, v):
+    i = self.getindex(y)
+    if i == 0:
+      val = self.v
+      if isinstance(val, Cell):
+        val.set(v)
+      else:
+        self.v = v
+    else:
+      self.e.mutate(y, v)
+
 
 @jit.unroll_safe
 def len_varl(xs):
@@ -501,7 +524,7 @@ class MultiExtendedEnv(Env):
       raise CEKError("Function called with the wrong number of arguments")
 
   @jit.unroll_safe
-  def lookup(self, y):
+  def getindex(self, y):
     n, xs = 0, jit.promote(self.xs)
     i = -1
 
@@ -512,15 +535,34 @@ class MultiExtendedEnv(Env):
         break
       n += 1
 
+    return i
+
+  def lookup(self, y):
+    i = self.getindex(y)
     if i != -1:
       return self.values[i]
     return self.e.lookup(y)
+
+  def mutate(self, y, v):
+    i = self.getindex(y)
+    if i != -1:
+      val = self.values[i]
+      if isinstance(val, Cell):
+        val.set(v)
+      else:
+        self.values[i] = v
+    else:
+      self.e.mutate(y, v)
 
 class ToplevelEnv(MultiExtendedEnv):
   def lookup(self, y):
     jit.promote(self)
     jit.promote(y)
     return jit.promote(MultiExtendedEnv.lookup(self, y))
+
+def mutate(env, x, v):
+  env.mutate(x, v)
+  return m.val_voidv_sing
 
 class OfftraceVarsAccessedInfo(object):
   def __init__(self):
@@ -651,7 +693,6 @@ def exit(v):
     ret(Integer(0))
 
 class Cell(m.cl_v):
-  _immutable_fields_ = ['val']
   def __init__(self, v):
     self.val = v
   def set(self, v):
