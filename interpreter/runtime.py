@@ -462,7 +462,7 @@ class EmptyEnv(Env):
     self.e = None
     self.shape = None
   def lookup(self, y):
-    raise CEKError("Variable %s not found" % y)
+    raise CEKError("Variable %s not found" % y.pprint(0))
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
 
@@ -735,6 +735,17 @@ def guardstr(v):
   if not isinstance(v, String):
     raise CEKError("Expected a string")
   return v
+
+class __extend__(m.cl_cons):
+  def eq(self, other):
+    if not isinstance(other, m.cl_cons):
+      return False
+    assert isinstance(other, m.cl_cons)
+    return self.v0.eq(other.v0) and self.v1.eq(other.v1)
+
+class __extend__(m.cl_nil):
+  def eq(self, other):
+    return isinstance(other, m.cl_nil)
 
 class Vector(m.cl_v):
   def __init__(self, vs):
