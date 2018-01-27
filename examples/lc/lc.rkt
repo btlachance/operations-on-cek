@@ -19,7 +19,7 @@
   (e ::= var l a
      (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
-     (car e) (cdr e) (nullp e) (mkcons e e) (apply e e) (mkvoid) (cwv var var) (begin e es)
+     (car e) (cdr e) (nullp e) (mkcons var var) (apply e e) (mkvoid) (cwv var var) (begin e es)
      (set var e))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
@@ -36,7 +36,7 @@
   (k ::= modk expk mt)
   (modk ::= (binddefs modforms vars vs modforms k))
   (expk ::= (fn vs es env envinfo callingapp k) (sel e e env k) (ret result k)
-        (cark k) (cdrk k) (nullk k) (consr e env k) (pair v k) (getargs e env k) (applyk v k)
+        (cark k) (cdrk k) (nullk k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
         (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds es k) (setcellsk vars env expk)
         (cwvk var env k) (expsk env es k) extensionk (setk var env k))
@@ -241,7 +241,7 @@
   [((car e_0) env k) --> (e_0 env (cark k))]
   [((cdr e_0) env k) --> (e_0 env (cdrk k))]
   [((nullp e_0) env k) --> (e_0 env (nullk k))]
-  [((mkcons e_1 e_2) env k) --> (e_1 env (consr e_2 env k))]
+  [((mkcons var_1 var_2) env k) --> (ignore env (ret (cons (lookup env var_1) (lookup env var_2)) k))]
   [((apply e_1 e_2) env k) --> (e_1 env (getargs e_2 env k))]
   [((mkvoid) env k) --> (ignore env (ret voidv k))]
   [((values var) env expk) --> (ignore env (ret vs expk))
@@ -303,8 +303,6 @@
   [(ignore env_0 (ret nil (nullk expk))) --> (ignore env_0 (ret true expk))]
   [(ignore env_0 (ret v (nullk expk))) --> (ignore env_0 (ret false expk))
    #:unless nil v]
-  [(ignore env_0 (ret v (consr e env expk))) --> (e env (pair v expk))]
-  [(ignore env_0 (ret v_right (pair v_left expk))) --> (ignore env_0 (ret (cons v_left v_right) expk))]
   [(ignore env_0 (ret v (getargs e_args env expk))) --> (e_args env (applyk v expk))]
   [(ignore env_0 (ret v (applyk (clo (lam vars e es) env) expk))) --> (ignore env_0 (expsk (extend env vars vs) (el e es) expk))
    #:where vs (vlisttovs v)]
