@@ -48,7 +48,19 @@
                (mf (define zero? (lam (varl n varsnil) (zeropimpl n) esnil))
                (mf (define add1 (lam (varl n varsnil) (succimpl n) esnil))
                (mf (define sub1 (lam (varl n varsnil) (predimpl n) esnil))
-               (mf (define + (lam (varl m (varl n varsnil)) (addimpl m n) esnil))
+               (mf (define + (lamrest (varl args varsnil)
+                               (if (app null? (el args esnil))
+                                   (quote 0)
+                                   (if (app null? (el (app cdr (el args esnil)) esnil))
+                                       (app (lam (varl m (varl n varsnil)) (addimpl m n) esnil)
+                                            (el (app car (el args esnil)) (el (quote 0) esnil)))
+                                       (if (app null? (el (app cddr (el args esnil)) esnil))
+                                           (app (lam (varl m (varl n varsnil)) (addimpl m n) esnil)
+                                                (el (app car (el args esnil)) (el (app cadr (el args esnil)) esnil)))
+                                           (app foldl (el (lam (varl n (varl so-far varsnil)) (addimpl n so-far) esnil)
+                                                          (el (quote 0)
+                                                              (el args esnil)))))))
+                               esnil))
                (mf (define - (lam (varl m (varl n varsnil)) (subimpl m n) esnil))
                (mf (define * (lam (varl m (varl n varsnil)) (multimpl m n) esnil))
                (mf (define / (lam (varl m (varl n varsnil)) (divimpl m n) esnil))
@@ -58,6 +70,8 @@
                (mf (define cons (lam (varl val1 (varl val2 varsnil)) (mkcons val1 val2) esnil))
                (mf (define car (lam (varl val varsnil) (car val) esnil))
                (mf (define cdr (lam (varl val varsnil) (cdr val) esnil))
+               (mf (define cadr (lam (varl val varsnil) (app car (el (app cdr (el val esnil)) esnil)) esnil))
+               (mf (define cddr (lam (varl val varsnil) (app cdr (el (app cdr (el val esnil)) esnil)) esnil))
                (mf (define null? (lam (varl val varsnil) (nullp val) esnil))
                (mf (define null (quote nil))
                (mf (define foldl (lam (varl fn (varl init (varl xs varsnil)))
@@ -70,6 +84,13 @@
                                        (app fn (el (app car (el xs esnil)) (el (app foldr (el fn (el init (el (app cdr (el xs esnil)) esnil)))) esnil))))
                                    esnil))
                (mf (define list (lamrest (varl args varsnil) (app foldr (el cons (el null (el args esnil)))) esnil))
+               (mf (define length (lam (varl xs varsnil)
+                                    (app foldl (el (lam (varl _ (varl n varsnil))
+                                                     (app + (el (quote 1) (el n esnil)))
+                                                     esnil)
+                                                   (el (quote 0)
+                                                       (el xs esnil))))
+                                    esnil))
                (mf (define append (lamrest (varl ls varsnil)
                                     (app foldl (el (lam (varl l0 (varl rest varsnil))
                                                      (app foldr (el cons (el l0 (el rest esnil))))
@@ -83,6 +104,13 @@
                (mf (define > (lam (varl m (varl n varsnil)) (gtimpl m n) esnil))
                (mf (define <= (lam (varl m (varl n varsnil)) (lteqimpl m n) esnil))
                (mf (define >= (lam (varl m (varl n varsnil)) (gteqimpl m n) esnil))
+               (mf (define negative? (lam (varl n varsnil) (app < (el n (el (quote 0) esnil))) esnil))
+               (mf (define positive? (lam (varl n varsnil) (app > (el n (el (quote 0) esnil))) esnil))
+               (mf (define max (lam (varl m (varl n varsnil))
+                                 (if (app > (el n (el m esnil)))
+                                     n
+                                     m)
+                                 esnil))
                (mf (define equal? (lam (varl v1 (varl v2 varsnil)) (eqlimpl v1 v2) esnil))
                (mf (define apply (lam (varl fun (varl args varsnil)) (apply fun args) esnil))
                (mf (define vector (lamrest (varl args varsnil) (vectorimpl args) esnil))
@@ -135,7 +163,7 @@
                (mf (define quotient (lam (varl m (varl n varsnil)) (quotientimpl m n) esnil))
                (mf (define sin (lam (varl n varsnil) (sinimpl n) esnil))
                ;; Update the list in corify/lc-term->json
-                 modforms)))))))))))))))))))))))))))))))))))))))))))))))))))
+                 modforms)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -462,8 +490,8 @@
     #;(pretty-print (syntax->datum (kernel->core stx empty-info)) (current-error-port))
     (define names-in-basis
       #'(;; Update these whenever the basis changes
-         zero? add1 sub1 + - * / box unbox set-box! cons car cdr null?
-         null foldl foldr list append print = < > <= >= equal? apply
+         zero? add1 sub1 + - * / box unbox set-box! cons car cdr cadr cddr null?
+         null foldl foldr list length append print = < > <= >= negative? positive? max equal? apply
          vector vector-ref vector-set! vector-length make-vector
          current-command-line-arguments void symbol? newline time-apply
          current-seconds current-error-port current-output-port fprintf
