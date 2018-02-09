@@ -38,7 +38,7 @@
   (expk ::= (fn vs es env envinfo callingapp k) (sel e e env k) (ret result k)
         (cark k) (cdrk k) (nullk k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
-        (bindrec valuesbinds k) (bindvarscells vars k) (evalrec valuesbinds es k) (setcellsk vars env expk)
+        (bindrec valuesbinds k) (evalrec valuesbinds es k) (setcellsk vars env expk)
         (cwvk var env k) (expsk env es k) extensionk (setk var env k))
   #:control-string term
   #:environment env
@@ -61,9 +61,29 @@
                                                           (el (quote 0)
                                                               (el args esnil)))))))
                                esnil))
-               (mf (define - (lam (varl m (varl n varsnil)) (subimpl m n) esnil))
+               (mf (define - (lamrest (varl x (varl args varsnil))
+                               (if (app null? (el args esnil))
+                                   (app (lam (varl m (varl n varsnil)) (subimpl m n) esnil)
+                                        (el (quote 0) (el x esnil)))
+                                   (if (app null? (el (app cdr (el args esnil)) esnil))
+                                       (app (lam (varl m (varl n varsnil)) (subimpl m n) esnil)
+                                            (el x (el (app car (el args esnil)) esnil)))
+                                       (app foldr (el (lam (varl n (varl so-far varsnil)) (subimpl so-far n) esnil)
+                                                      (el x
+                                                          (el args esnil))))))
+                               esnil))
                (mf (define * (lam (varl m (varl n varsnil)) (multimpl m n) esnil))
-               (mf (define / (lam (varl m (varl n varsnil)) (divimpl m n) esnil))
+               (mf (define / (lamrest (varl x (varl args varsnil))
+                               (if (app null? (el args esnil))
+                                   (app (lam (varl m (varl n varsnil)) (divimpl m n) esnil)
+                                        (el (quote 1) (el x esnil)))
+                                   (if (app null? (el (app cdr (el args esnil)) esnil))
+                                       (app (lam (varl m (varl n varsnil)) (divimpl m n) esnil)
+                                            (el x (el (app car (el args esnil)) esnil)))
+                                       (app foldl (el (lam (varl n (varl so-far varsnil)) (divimpl so-far n) esnil)
+                                                      (el (quote 1)
+                                                          (el (mkcons x args) esnil))))))
+                               esnil))
                (mf (define box (lam (varl b varsnil) (boximpl b) esnil))
                (mf (define unbox  (lam (varl b varsnil) (unboximpl b) esnil))
                (mf (define set-box! (lam (varl b (varl val varsnil)) (setboximpl b val) esnil))
@@ -288,9 +308,7 @@
   [(ignore env (bindrec valuesbindsnil expk)) --> (ignore env expk)]
   [(ignore env (bindrec (vbl (vb vars e) valuesbinds) expk))
    -->
-   (ignore env (bindvarscells vars (bindrec valuesbinds expk)))]
-  [(ignore env (bindvarscells vars expk)) --> (ignore env_1 expk)
-   #:where env_1 (extendcells env vars)]
+   (ignore (extendcells env vars) (bindrec valuesbinds expk))]
   [(ignore env (evalrec valuesbindsnil es expk)) --> (ignore env (expsk env es expk))]
   [(ignore env (evalrec (vbl (vb vars e) valuesbinds) es expk))
    -->

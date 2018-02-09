@@ -395,6 +395,9 @@ class Env(m.cl_env):
 
   @staticmethod
   def make(xs, args, e):
+    if len_varl(xs) != len(args):
+      raise CEKError("Function called with the wrong number of arguments")
+
     argcount = len(args)
     if argcount == 0:
       return e
@@ -508,8 +511,9 @@ class Env1(Env):
 def len_varl(xs):
   n = 0
   while isinstance(xs, m.cl_varl):
-    x, xs = xs.var0, xs.vars1
+    xs = xs.vars1
     n += 1
+  assert isinstance(xs, m.cl_varsnil)
   return n
 
 class MultiExtendedEnv(Env):
@@ -519,9 +523,6 @@ class MultiExtendedEnv(Env):
     self.e = e
     self.xs = self.shape = jit.promote(xs)
     self.values = values[:]
-
-    if not len_varl(self.xs) == len(self.values):
-      raise CEKError("Function called with the wrong number of arguments")
 
   @jit.unroll_safe
   def getindex(self, y):
