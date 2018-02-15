@@ -273,6 +273,69 @@ class Float(Number):
   def sin(self):
     return Float(math.sin(self.value))
 
+def variadicaddimpl(args):
+  return UnaryPrim(args, '+', lambda ns: addlist(ns))
+
+@jit.unroll_safe
+def addlist(ns):
+  if isinstance(ns, m.cl_nil):
+    return Integer(0)
+  assert isinstance(ns, m.cl_cons)
+  n1, ns = ns.v0, ns.v1
+  if isinstance(ns, m.cl_nil):
+    return guardnum(n1).add(Integer(0))
+  assert isinstance(ns, m.cl_cons)
+  n2, ns = ns.v0, ns.v1
+  result = guardnum(n1).add(guardnum(n2))
+  if isinstance(ns, m.cl_nil):
+    return result
+  while isinstance(ns, m.cl_cons):
+    n, ns = ns.v0, ns.v1
+    result = result.add(guardnum(n))
+  assert isinstance(ns, m.cl_nil)
+  return result
+
+def variadicsubimpl(args):
+  return UnaryPrim(args, '-', lambda ns: sublist(ns))
+
+@jit.unroll_safe
+def sublist(ns):
+  assert isinstance(ns, m.cl_cons)
+  n1, ns = ns.v0, ns.v1
+  if isinstance(ns, m.cl_nil):
+    return Integer(0).sub(guardnum(n1))
+  assert isinstance(ns, m.cl_cons)
+  n2, ns = ns.v0, ns.v1
+  result = guardnum(n1).sub(guardnum(n2))
+  if isinstance(ns, m.cl_nil):
+    return result
+  while isinstance(ns, m.cl_cons):
+    n, ns = ns.v0, ns.v1
+    result = result.add(guardnum(n))
+  assert isinstance(ns, m.cl_nil)
+  return result
+
+def variadicdivimpl(args):
+  return UnaryPrim(args, '/', lambda ns: divlist(ns))
+
+@jit.unroll_safe
+def divlist(ns):
+  assert isinstance(ns, m.cl_cons)
+  n1, ns = ns.v0, ns.v1
+  if isinstance(ns, m.cl_nil):
+    return Integer(1).div(guardnum(n1))
+  assert isinstance(ns, m.cl_cons)
+  n2, ns = ns.v0, ns.v1
+  result = guardnum(n1).div(guardnum(n2))
+  if isinstance(ns, m.cl_nil):
+    return result
+  while isinstance(ns, m.cl_cons):
+    n, ns = ns.v0, ns.v1
+    result = result.div(guardnum(n))
+  assert isinstance(ns, m.cl_nil)
+  return result
+
+
 def zeropimpl(n):
   return UnaryPrim(n, 'zerop', lambda n: guardnum(n).is_zero())
 def succimpl(n):

@@ -172,9 +172,12 @@
                    (list 'succimpl (nt 'var))
                    (list 'predimpl (nt 'var))
                    (list 'addimpl (nt 'var) (nt 'var))
+                   (list 'variadicaddimpl (nt 'var))
                    (list 'subimpl (nt 'var) (nt 'var))
+                   (list 'variadicsubimpl (nt 'var))
                    (list 'multimpl (nt 'var) (nt 'var))
                    (list 'divimpl (nt 'var) (nt 'var))
+                   (list 'variadicdivimpl (nt 'var))
                    (list 'boximpl (nt 'var))
                    (list 'unboximpl (nt 'var))
                    (list 'setboximpl (nt 'var) (nt 'var))
@@ -232,9 +235,12 @@
                    'succimpl 'e
                    'predimpl 'e
                    'addimpl 'e
+                   'variadicaddimpl 'e
                    'subimpl 'e
+                   'variadicsubimpl 'e
                    'multimpl 'e
                    'divimpl 'e
+                   'variadicdivimpl 'e
                    'boximpl 'e
                    'unboximpl 'e
                    'setboximpl 'e
