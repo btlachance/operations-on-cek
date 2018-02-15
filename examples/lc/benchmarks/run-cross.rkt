@@ -87,13 +87,33 @@
   (define-values (cpu gc total) (get-timings timings-output-port))
   (timings name cpu gc total))
 
+
 (module+ main
   (define default-benchmarks '(fib mbrot sum nqueens fft perm9 pnpoly
-                               triangl diviter paraffins))
+                               triangl diviter paraffins simplex))
   (define benchmarks (make-parameter '()))
+
+  (struct bench-format (before with-timings))
+  (define default-format
+    (bench-format
+     (lambda (name) (pretty-display (format "Running benchmark ~a" name)))
+     (lambda (timings) (pretty-display timings))))
+  (define pycket-bench
+    (bench-format
+     (lambda (name) (void))
+     (lambda (t)
+       (match-define (timings _ cpu gc total) t)
+       (pretty-display (format "RESULT-cpu: ~a.0\nRESULT-gc: ~a.0\nRESULT-total: ~a.0"
+                               cpu gc total)))))
+  (define output-format (make-parameter default-format))
 
   (command-line
    #:program "run-cross"
+   #:once-each
+   ["--pycket-bench" "Write output that's compatible with pycket-bench"
+                     (output-format pycket-bench)]
+   ["--default-bench" "Write output using the built-in format (default)"
+                      (output-format default-format)]
    #:multi
    ["--bench" b
               "Run benchmark <b>"
@@ -108,5 +128,7 @@
                  (reverse (benchmarks)))])
       (define racket-source-path
         (build-path (PYCKET-BENCH-PATH) "CrossBenchmarks" "racket" (format "~a-nothing.rkt" b)))
-      (pretty-display (format "Running benchmark ~a" b))
-      (pretty-display (run-benchmark b racket-source-path)))))
+      (let ([before (bench-format-before (output-format))]
+            [with-timings (bench-format-with-timings (output-format))])
+        (before b)
+        (with-timings (run-benchmark b racket-source-path))))))

@@ -798,6 +798,17 @@ class Vector(m.cl_v):
       vs = vs.vs1
     assert isinstance(vs, m.cl_vsnil)
 
+  def eq(self, other):
+    if not isinstance(other, Vector):
+      return False
+    vs, othervs = self.vs, other.vs
+    if len(vs) != len(othervs):
+      return False
+    for i in range(len(vs)):
+      if not vs[i].eq(othervs[i]):
+        return False
+    return True
+
   def _checkrange(self, name, pos):
     if pos < 0 or pos >= self.length():
       raise CEKError("%s: index %s is out of range; max index: %s" % (name, pos, self.length() - 1))
@@ -832,6 +843,7 @@ def makevector(size_num, v):
     raise CEKError("make-vector: expected an exact nonnegative integer")
   return Vector(listtovs(size * [v]))
 
+@jit.unroll_safe
 def listtovs(lst):
   lst.reverse()
   result = m.val_vsnil_sing
@@ -850,6 +862,7 @@ def vstolist(vs):
   assert isinstance(vs, m.cl_vsnil)
   return values
 
+@jit.unroll_safe
 def vlisttovs(vlist):
   result_reversed = m.val_vsnil_sing
   while isinstance(vlist, m.cl_cons):
