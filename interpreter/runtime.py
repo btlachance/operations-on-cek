@@ -373,6 +373,21 @@ def quotientimpl(m, n):
 def sinimpl(n):
   return UnaryPrim(n, 'sin', lambda n: guardnum(n).sin())
 
+def lengthimpl(n):
+  return UnaryPrim(n, 'length', lambda v: guardedlength(v))
+
+@jit.unroll_safe
+def guardedlength(v):
+  if isinstance(v, m.cl_nil):
+    return Integer(0)
+  assert isinstance(v, m.cl_cons)
+  length = 0
+  while isinstance(v, m.cl_cons):
+    _, v = v.v0, v.v1
+    length += 1
+  assert isinstance(v, m.cl_nil)
+  return Integer(length)
+
 def mkbox(v):
   return Box(v)
 def guardbox(v):

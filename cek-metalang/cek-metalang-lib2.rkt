@@ -215,6 +215,7 @@
                    (list 'inexactp (nt 'var))
                    (list 'quotientimpl (nt 'var) (nt 'var))
                    (list 'sinimpl (nt 'var))
+                   (list 'lengthimpl (nt 'var))
                    (list 'trypromote (nt 'v))
                    (list 'promotees (nt 'es))
                    (list 'mutate (nt 'env) (nt 'var) (nt 'v))
@@ -278,6 +279,7 @@
                    'inexactp 'e
                    'quotientimpl 'e
                    'sinimpl 'e
+                   'lengthimpl 'e
                    'trypromote 'v
                    'promotees 'es
                    'mutate 'v
