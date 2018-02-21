@@ -1,11 +1,15 @@
 import time
 import math
 import machine as m
-import pprint_hacks, can_enter_hacks, surrounding_lambda_hacks, cont_next_ast_hacks
+import pprint_hacks, can_enter_hacks, surrounding_lambda_hacks, cont_next_ast_hacks, free_vars_hacks
 from pycket.callgraph import CallGraph
-from rpython.rlib import jit, types, rarithmetic
+from pycket.hash.persistent_hash_map import make_persistent_hash_type
+from rpython.rlib import jit, types, rarithmetic, objectmodel
 from rpython.rlib.rbigint import rbigint
+from rpython.rlib.rarithmetic import r_uint
+from rpython.rlib.objectmodel import compute_hash
 from rpython.rlib.signature import signature
+
 
 class CEKError(Exception):
   def __init__(self, message):
@@ -29,6 +33,12 @@ class PrimVariable(m.cl_variable):
   def __init__(self, name):
     self.literal = name
     self.should_enter = False
+
+  # frees is defined here because otherwise there's a definition-time
+  # circular dependency between runtime and free_vars_hacks
+  def frees(self):
+    return SymbolSet.singleton(self)
+
   def pprint(self, indent):
     return self.literal
 
@@ -41,6 +51,26 @@ class PrimVariable(m.cl_variable):
     return var
 
 PrimVariable.all_vars = {}
+
+@objectmodel.always_inline
+def equal(a, b):
+    assert a is None or isinstance(a, PrimVariable)
+    assert b is None or isinstance(b, PrimVariable)
+    return a is b
+
+@objectmodel.always_inline
+def hashfun(v):
+    assert v is None or isinstance(v, PrimVariable)
+    return r_uint(compute_hash(v))
+
+SymbolSet = make_persistent_hash_type(
+  super = m.CEKTop,
+  base = object,
+  keytype = PrimVariable,
+  valtype = PrimVariable,
+  name = "SymbolSet",
+  hashfun = hashfun,
+  equal = equal)
 
 def guardnum(v):
   if not isinstance(v, Number):
@@ -412,6 +442,7 @@ def setboximpl(b, v):
   return BinaryPrim(b, v, 'box-set!', lambda b, v: guardbox(b).set(v))
 
 class NullaryPrim(m.cl_e):
+  _immutable_fields_ = ['opname', 'op', 'should_enter']
   def __init__(self, opname, op):
     self.opname = opname
     self.op = op
@@ -422,6 +453,7 @@ class NullaryPrim(m.cl_e):
     return ' ' * indent + '(p#%s)' % self.opname
 
 class UnaryPrim(m.cl_e):
+  _immtuable_fields_ = ['arg', 'opname', 'op', 'should_enter']
   def __init__(self, arg, opname, op):
     self.arg = arg
     self.opname = opname
@@ -434,7 +466,7 @@ class UnaryPrim(m.cl_e):
     return ' ' * indent + '(p#%s %s)' % (self.opname, self.arg.pprint(0))
 
 class BinaryPrim(m.cl_e):
-  _immutable_fields_ = ['arg1', 'arg2', 'opname', 'op']
+  _immutable_fields_ = ['arg1', 'arg2', 'opname', 'op', 'should_enter']
   def __init__(self, arg1, arg2, opname, op):
     self.arg1 = arg1
     self.arg2 = arg2
@@ -449,7 +481,7 @@ class BinaryPrim(m.cl_e):
     return ' ' * indent + '(p#%s %s %s)' % (self.opname, self.arg1.pprint(0), self.arg2.pprint(0))
 
 class TernaryPrim(m.cl_e):
-  _immutable_fields_ = ['arg1', 'arg2', 'arg3', 'opname', 'op']
+  _immutable_fields_ = ['arg1', 'arg2', 'arg3', 'opname', 'op', 'should_enter']
   def __init__(self, arg1, arg2, arg3, opname, op):
     self.arg1 = arg1
     self.arg2 = arg2
@@ -633,12 +665,6 @@ class MultiExtendedEnv(Env):
     else:
       self.e.mutate(y, v)
 
-class ToplevelEnv(MultiExtendedEnv):
-  def lookup(self, y):
-    jit.promote(self)
-    jit.promote(y)
-    return jit.promote(MultiExtendedEnv.lookup(self, y))
-
 def mutate(env, x, v):
   env.mutate(x, v)
   return m.val_voidv_sing
@@ -680,19 +706,32 @@ def extendtoplevel(e, xs, result):
 
 def extend(e, xs, result, toplevel=False):
   if isinstance(result, m.cl_v):
-    v = result
-    if toplevel:
-      return ToplevelEnv(xs, [v], e)
-    else:
-      return Env.make(xs, [v], e)
-    
-
-  vs = result
-  if toplevel:
-    return ToplevelEnv(xs, vstolist(vs), e)
+    vs = [result]
   else:
-    return Env.make(xs, vstolist(vs), e)
-  
+    vs = vstolist(result)
+
+  if toplevel:
+    toplevel_vars.set(xs)
+  return Env.make(xs, vs, e)
+
+class ToplevelVars(object):
+  _attrs_ = _immutable_fields_ = ['vars']
+  vars = None
+
+  def set(self, varl):
+    vars = SymbolSet.EMPTY
+    for x in varl_to_xs(varl):
+      vars = vars.union(SymbolSet.singleton(x))
+    self.vars = vars
+  def contains_all(self, frees):
+    if not self.vars:
+      return False
+
+    for x in frees.keys():
+      if not self.vars.haskey(x):
+        return False
+    return True
+toplevel_vars = ToplevelVars()
 
 @jit.unroll_safe
 # invariant: len_varl(xs) >= 1 and the last var is the rest arg
@@ -781,25 +820,13 @@ class Cell(m.cl_v):
     return self.val
   def pprint(self, indent):
     return ' ' * indent + '(cell %s)' % self.val.pprint(0)
-class CellOfPromotable(Cell):
-  def set(self, v):
-    return Cell.set(self, v.aspromotable())
-  def pprint(self, indent):
-    return ' ' * indent + '(cellofpromotable %s)' % self.val.pprint(0)
 
 class __extend__(m.cl_v):
-  def aspromotable(self):
-    return self
   def promote(self):
     pass
-class __extend__(m.cl_clo):
-  def aspromotable(self):
-    return PromotableClosure(self.l0, self.env1)
 class PromotableClosure(m.cl_clo):
   def promote(self):
     jit.promote(self)
-  def aspromotable(self):
-    return self
 def trypromote(v):
   v.promote()
   return v
@@ -809,8 +836,6 @@ def promotees(es):
 
 def mkcell(v):
   return Cell(v)
-def mkpromotablecell(v):
-  return CellOfPromotable(v)
 def setcell(var, env, v):
   # We can't use the lookup function because it handles cell
   # unwrapping; we have to instead call the environment's lookup
@@ -967,6 +992,13 @@ def mksymbol(var):
 def issymbolimpl(s):
   return UnaryPrim(s, "symbol?", lambda s: m.cl_true() if isinstance(s, Symbol) else m.cl_false())
 
+class __extend__(m.cl_false):
+  def eq(self, other):
+    return isinstance(other, m.cl_false)
+class __extend__(m.cl_true):
+  def eq(self, other):
+    return isinstance(other, m.cl_true)
+
 from rpython.rlib import streamio as sio
 # Heavily inspired by Pycket's representations, not that it's anything
 # too special. I couldn't find too good of docs on sio so I checked
@@ -1049,6 +1081,7 @@ def docontinuation(extensionk, result):
 
 def timeapplyimpl(proc, init):
   return TimeApply(proc, init)
+
 
 def run(p):
   c, e, k = m.init(p)

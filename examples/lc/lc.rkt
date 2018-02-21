@@ -81,6 +81,8 @@
                                                        (el ls esnil))))
                                     esnil))
                (mf (define print (lam (varl val varsnil) (printimpl val) esnil))
+               (mf (define display (lam (varl val varsnil) (printimpl val) esnil))
+               (mf (define write (lam (varl val varsnil) (printimpl val) esnil))
                (mf (define = (lam (varl m (varl n varsnil)) (numequalimpl m n) esnil))
                (mf (define < (lam (varl m (varl n varsnil)) (ltimpl m n) esnil))
                (mf (define > (lam (varl m (varl n varsnil)) (gtimpl m n) esnil))
@@ -145,7 +147,7 @@
                (mf (define quotient (lam (varl m (varl n varsnil)) (quotientimpl m n) esnil))
                (mf (define sin (lam (varl n varsnil) (sinimpl n) esnil))
                ;; Update the list in corify/lc-term->json
-                 modforms)))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+                 modforms)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -176,7 +178,7 @@
    -->
    (ignore env (binddefs modforms_tobind (varl var vars) (vl v vs) modforms_toeval k))
    #:where (define var e_0) gtopform
-   #:where v (mkpromotablecell undefinedv)]
+   #:where v (mkcell undefinedv)]
   [(e_0 env (binddefs modforms_tobind vars vs modforms_toeval k))
    -->
    (ignore env (binddefs modforms_tobind vars vs modforms_toeval k))]
@@ -463,21 +465,21 @@
       [(quote s:id) #'(quote (sym s))]
       [_ this-syntax]))
 
-  (define (corify/lc-term->json stx)
+  (define (corify stx)
     #;(pretty-print (syntax->datum stx) (current-error-port))
     #;(pretty-print (syntax->datum (kernel->core stx empty-info)) (current-error-port))
     (define names-in-basis
       #'(;; Update these whenever the basis changes
          zero? add1 sub1 + - * / box unbox set-box! cons car cdr cadr cddr null?
-         null foldl foldr list length append print = < > <= >= negative? positive? max equal? apply
-         vector vector-ref vector-set! vector-length make-vector
+         null foldl foldr list length append print display write = < > <= >= negative? positive? max equal?
+         apply vector vector-ref vector-set! vector-length make-vector
          current-command-line-arguments void symbol? newline time-apply
          current-seconds current-error-port current-output-port fprintf
          not values call-with-values exit exact->inexact exact-integer?
          inexact? quotient sin))
     (define basis-info (make-info (ids->vars (syntax->list names-in-basis)) empty-info))
-    (define core (kernel->core stx basis-info))
-    (lc-term->json core))
+    (kernel->core stx basis-info))
+  (define corify/lc-term->json (compose lc-term->json corify))
 
   (command-line
    #:program "lc"
@@ -490,4 +492,6 @@
                      (print-lc-parser)]
    ["--compile-term" ("Read a lc term from stdin and print the JSON"
                       "representation of that term to stdout.")
-                     (pretty-display (corify/lc-term->json (read-syntax)))]))
+                     (pretty-display (corify/lc-term->json (read-syntax)))]
+   ["--pretty-print-term" "Like --compile-term, but print before JSON"
+                          (pretty-display (syntax->datum (corify (read-syntax))))]))
