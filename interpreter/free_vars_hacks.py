@@ -14,7 +14,7 @@ class __extend__(m.cl_appinfo):
 class __extend__(m.cl_define):
   def __init__(self, var0, e1):
     self.var0 = var0
-    self.e1 = e1.remake_with_rec(var0)
+    self.e1 = e1.remake_with_recs([var0])
 
 class __extend__(m.cl_e):
   def frees(self):
@@ -22,12 +22,44 @@ class __extend__(m.cl_e):
     for subterm in self.subterms():
       frees = frees.union(subterm.frees())
     return frees
-  def remake_with_rec(self, var):
+  # Given a list of variables, returns an object like self but the
+  # free variables of self/expressions inside don't contain recs
+  def remake_with_recs(self, recs):
     return self
 
 class __extend__(m.cl_el):
   def frees(self):
     return self.e0.frees().union(self.es1.frees())
+
+class __extend__(m.cl_letrecvalues):
+  def __init__(self, valuesbinds0, e1, es2):
+    recnames = valuesbinds0.boundnames()
+    self.valuesbinds0 = valuesbinds0.remake_with_recs(recnames.keys())
+    self.e1 = e1
+    self.es2 = es2
+
+class __extend__(m.cl_valuesbinds):
+  # Returns a set of variables that this form binds
+  def boundnames(self):
+    return r.SymbolSet.EMPTY
+  def remake_with_recs(self, recs):
+    return self
+class __extend__(m.cl_vbl):
+  def boundnames(self):
+    return self.valuesbind0.boundnames().union(self.valuesbinds1.boundnames())
+  def remake_with_recs(self, recs):
+    return m.cl_vbl(self.valuesbind0.remake_with_recs(recs),
+                    self.valuesbinds1.remake_with_recs(recs))
+class __extend__(m.cl_vb):
+  def boundnames(self):
+    names = r.SymbolSet.EMPTY
+    for x in r.varl_to_xs(self.vars0):
+      names = names.union(r.SymbolSet.singleton(x))
+    return names
+  def remake_with_recs(self, recs):
+    return m.cl_vb(self.vars0, self.e1.remake_with_recs(recs))
+
+
 
 class ClosureStrategy(object):
   pass
@@ -85,8 +117,8 @@ for c in [m.cl_lam, m.cl_lamrest]:
 # other code I generate couldn't correctly distinguish between cl_lam
 # and cl_lamrest
 class __extend__(m.cl_lam):
-  def remake_with_rec(self, rec):
-    return m.cl_lam(self.vars0, self.e1, self.es2, self._frees.without(rec))
+  def remake_with_recs(self, recs):
+    return m.cl_lam(self.vars0, self.e1, self.es2, self._frees.without_many(recs))
 class __extend__(m.cl_lamrest):
-  def remake_with_rec(self, rec):
-    return m.cl_lamrest(self.vars0, self.e1, self.es2, self._frees.without(rec))
+  def remake_with_recs(self, recs):
+    return m.cl_lamrest(self.vars0, self.e1, self.es2, self._frees.without_many(recs))

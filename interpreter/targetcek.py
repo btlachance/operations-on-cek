@@ -3,6 +3,7 @@ from rpython.rlib import jit
 from runtime import driver
 
 def entry_point(argv):
+  # Pycket's numbers
   jit.set_param(None, 'trace_limit', 1000000)
   jit.set_param(None, 'threshold', 131)
   jit.set_param(None, 'trace_eagerness', 50)
