@@ -217,7 +217,6 @@
                    (list 'lengthimpl (nt 'var))
                    (list 'trypromote (nt 'v))
                    (list 'promotees (nt 'es))
-                   (list 'mutate (nt 'env) (nt 'var) (nt 'v))
                    (list 'emptyenv))
              ;; TODO hard-code the environment prim
              (list (parser variable-parse-fun variable-parse-fun)
@@ -280,7 +279,6 @@
                    'lengthimpl 'e
                    'trypromote 'v
                    'promotees 'es
-                   'mutate 'v
                    'emptyenv 'env)
              (mk/parent-of nonterminals productions)))
 
@@ -571,8 +569,11 @@
           (ir->py body #:indent "  "))
          "\n")])))
 
+  ;; Because of how I do assignment-conversion for lc, I need to at
+  ;; least be able to parse the box metafunctions. Since that's just
+  ;; an experiment I'm going to open the floodgates and.
   (match-define (parser simple-parse-template _)
-    (lang-parser terminals '() compounds '() prim-parsers))
+    (lang-parser terminals '() compounds metafunctions prim-parsers))
   (define (term->json stx)
     (define ast (simple-parse-template stx))
     (tc-temps/expecteds (list ast) (list (syntax-e c-id)) '())

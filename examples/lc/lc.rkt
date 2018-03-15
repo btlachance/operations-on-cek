@@ -19,8 +19,7 @@
   (e ::= var l a
      (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
-     (car e) (cdr e) (nullp e) (mkcons var var) (apply e e) (mkvoid) (cwv var var) (begin e es)
-     (set var e))
+     (car e) (cdr e) (nullp e) (mkcons var var) (apply e e) (mkvoid) (cwv var var) (begin e es))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
   (bp ::= (p var e))
@@ -39,7 +38,7 @@
         (cark k) (cdrk k) (nullk k) (getargs e env k) (applyk v k)
         (evaldefs modform modforms env k) (bindvaluesk env vars valuesbinds env es k)
         (bindrec valuesbinds k) (evalrec valuesbinds es k) (setcellsk vars env expk)
-        (cwvk var env k) (expsk env es k) extensionk (setk var env k))
+        (cwvk var env k) (expsk env es k) extensionk)
   #:control-string term
   #:environment env
   #:continuation k
@@ -205,7 +204,6 @@
    (ignore env (ret v k))]
 
   [(var env_0 expk) --> (ignore env_0 (ret (lookup env_0 var) expk))]
-  [((set var e_0) env_0 expk) --> (e_0 env_0 (setk var env_0 expk))]
   [(l env_0 expk) --> (ignore env_0 (ret (clo l env_0) expk))]
   [((quote c) env_0 expk) --> (ignore env_0 (ret c expk))
    #:unless (sym var) c]
@@ -295,14 +293,12 @@
   [(ignore env_0 (ret vs_vals (cwvk var_recv env expk))) --> (ignore env_0 (fn vs esnil env_0 infoempty nocallingapp expk))
    #:where v_recv (lookup env var_recv)
    #:where vs (vsreverse (vl v_recv vs_vals))]
-  [(ignore env_0 (ret v (setk var env expk))) --> (ignore env_0 (ret voidv expk))
-   #:where v_ignore (mutate env var v)]
   [(ignore env_0 (ret result k)) --> (e env k)
    #:where extensionk k
    #:where (conf e env k) (docontinuation k result)])
 
 (module+ main
-  (require syntax/parse)
+  (require syntax/parse syntax/id-set)
   (define (ignored-modform? stx)
     (syntax-parse stx
       #:datum-literals (module define-syntaxes define-values
@@ -329,7 +325,8 @@
       [(varl id vars)
        (cons #'id (vars->ids #'vars))]))
   (define (es->el es envinfo)
-    (foldr (lambda (e es-rest) #`(el #,(kernel->core e envinfo) #,es-rest))
+    (foldr (lambda (e es-rest)
+             #`(el #,(kernel->core e envinfo) #,es-rest))
            #'esnil
            es))
 
@@ -366,6 +363,151 @@
      prev-info
      xss))
 
+  (define (mutable-var x) (syntax-property x 'mutable? #t))
+  (define (mutable-var? x) (syntax-property x 'mutable?))
+  (define (assignable-ids stx) (or (syntax-property stx 'assignable-ids) '()))
+
+  (define (assignable-vars stx)
+    (syntax-parse stx
+      #:datum-literals (module
+                        [mb #%module-begin]
+                        [app #%app]
+                        [lam lambda]
+                        quote
+                        define-values
+                        let-values
+                        letrec-values
+                        begin
+                        if
+                        set!)
+      [(module id lang
+         (mb form ...+))
+       (apply
+        free-id-set-union
+        (map assignable-vars (attribute form)))]
+
+      [(~or (app e0 e ...)
+            (lam _ e0 e ...)
+            (begin e0 e ...))
+       (apply
+        free-id-set-union
+        (assignable-vars #'e0)
+        (map assignable-vars (attribute e)))]
+
+      [(define-values _ e)
+       (assignable-vars #'e)]
+
+      [((~or let-values letrec-values)
+        ([(xs ...) e] ...)
+        e-body0
+        e-body ...)
+       (apply
+        free-id-set-union
+        (assignable-vars #'e-body0)
+        (map
+         assignable-vars
+         (append (attribute e) (attribute e-body))))]
+
+      [(if e1 e2 e3)
+       (apply
+        free-id-set-union
+        (map
+         assignable-vars
+         (list #'e1 #'e2 #'e3)))]
+
+      [(set! x e)
+       (free-id-set-union
+        (immutable-free-id-set (list #'x))
+        (assignable-vars #'e))]
+
+      [_ (immutable-free-id-set)]))
+
+  (define (mark-assignables stx assignable-vars)
+    (define (assignable-var? id) (free-id-set-member? assignable-vars id))
+    (define (mark-f form) (mark-assignables form assignable-vars))
+    (define (mark-ids orig ids)
+      (syntax-property
+       orig
+       'assignable-ids
+       (filter assignable-var? ids)))
+
+    (define-syntax-class lambda-bound-ids
+      (pattern x:identifier
+               #:attr ids (list #'x))
+      (pattern ()
+               #:attr ids '())
+      (pattern (x . y:lambda-bound-ids)
+               #:attr ids (cons #'x (attribute y.ids))))
+
+    (syntax-parse stx
+      #:datum-literals (module
+                        [mb #%module-begin]
+                        [app #%app]
+                        [lam lambda]
+                        quote
+                        define-values
+                        let-values
+                        letrec-values
+                        begin
+                        if
+                        set!)
+      [(module id lang
+         (mb form ...+))
+       #`(module id lang
+           (#%module-begin #,@(map mark-f (attribute form))))]
+
+      [((~and (~or app begin) form) e0 e ...)
+       #`(form #,(mark-f #'e0) #,@(map mark-f (attribute e)))]
+
+      [(lam ids:lambda-bound-ids e0 e ...)
+       #`(lambda #,(mark-ids #'ids (attribute ids.ids)) #,(mark-f #'e0) #,@(map mark-f (attribute e)))]
+
+      [(define-values (~and ids (x)) e)
+       #`(define-values #,(mark-ids #'ids (list #'x)) #,(mark-f #'e))]
+
+      [((~and (~or let-values letrec-values) letx)
+        ([(~and ids (xs ...)) e] ...)
+        e-body0
+        e-body ...)
+        (with-syntax ([(marked-ids ...) (map mark-ids (attribute ids) (attribute xs))]
+                     [(marked-e ...) (map mark-f (attribute e))])
+         #`(letx ([marked-ids marked-e] ...)
+                 #,(mark-f #'e-body0)
+                 #,@(map mark-f (attribute e-body))))]
+
+      [(if e1 e2 e3)
+       #`(if #,@(map mark-f (list #'e1 #'e2 #'e3)))]
+
+      [(set! x e)
+       #`(set! x #,(mark-f #'e))]
+
+      [x:id
+       #:when (assignable-var? #'x)
+       (mutable-var #'x)]
+
+      [_
+       this-syntax]))
+
+  (define (wrap-assignables/lam body0 body assignable-ids)
+    (with-syntax ([(id ...) assignable-ids])
+      #`(let-values ([(id ...) (#%app values (boximpl id) ...)])
+          #,body0
+          #,@body)))
+  (define (wrap-assignables/def body assignable-id)
+    (with-syntax ([(tmp) (generate-temporaries (list assignable-id))])
+      #`(let-values ([(tmp) #,body]) (boximpl tmp))))
+  (define (wrap-assignables/values values-ids assignable-ids values-producer)
+    (define (assignable? id) (member id assignable-ids free-identifier=?))
+    (define values-tmp-ids (generate-temporaries values-ids))
+
+    (with-syntax ([(values-tmp ...) values-tmp-ids])
+      #`(let-values ([(values-tmp ...) #,values-producer])
+          (#%app values #,@(for/list ([tmp-id values-tmp-ids]
+                                      [values-id values-ids])
+                             (if (assignable? values-id)
+                                 #`(boximpl #,tmp-id)
+                                 tmp-id))))))
+
   (define (kernel->core stx envinfo)
     (syntax-parse stx
       #:datum-literals (module
@@ -377,7 +519,8 @@
                         let-values
                         letrec-values
                         begin
-                        if)
+                        if
+                        set!)
       [(module id lang
          (mb form ...+))
        ;; INVARIANT: Assumes the identifiers in envinfo are going to
@@ -387,6 +530,7 @@
        (define forms (filter-not ignored-modform? (attribute form)))
        (define forms-vars (ids->vars (append basis-ids (modforms-ids forms))))
        (define newinfo (make-info forms-vars envinfo))
+
        #`(modbegin
           #,(foldr
              (lambda (form rest)
@@ -408,30 +552,46 @@
       [(lam x:id e es ...)
        (define vars (ids->vars (list #'x)))
        (define newinfo (make-info vars envinfo))
-       #`(lamrest #,vars #,(kernel->core #'e newinfo) #,(es->el (attribute es) newinfo))]
-      [(lam (xs ...) e es ...)
+       (match (assignable-ids #'x)
+         [(list)
+          #`(lamrest #,vars #,(kernel->core #'e newinfo) #,(es->el (attribute es) newinfo))]
+         [(list ids ...)
+          #`(lamrest #,vars #,(kernel->core (wrap-assignables/lam #'e (attribute es) ids) newinfo) esnil)])]
+      [(lam (~and idsstx (xs ...)) e es ...)
        (define vars (ids->vars (attribute xs)))
        (define newinfo
          (if (null? (attribute xs))
              envinfo
              (make-info vars envinfo)))
-       #`(lam #,vars
-           #,(kernel->core #'e newinfo)
-           #,(es->el (attribute es) newinfo))]
-      [(lam (xs ... . rest:id) e es ...)
+       (match (assignable-ids #'idsstx)
+         [(list)
+          #`(lam #,vars
+              #,(kernel->core #'e newinfo)
+              #,(es->el (attribute es) newinfo))]
+         [(list ids ...)
+          #`(lam #,vars #,(kernel->core (wrap-assignables/lam #'e (attribute es) ids) newinfo) esnil)])]
+      [(lam (~and idsstx (xs ... . rest:id)) e es ...)
        (define vars (ids->vars (append (attribute xs) (list #'rest))))
        (define newinfo (make-info vars envinfo))
-       #`(lamrest #,vars
-           #,(kernel->core #'e newinfo)
-           #,(es->el (attribute es) newinfo))]
-      [(define-values (id) e)
+       (match (assignable-ids #'idsstx)
+         [(list)
+          #`(lamrest #,vars
+                #,(kernel->core #'e newinfo)
+              #,(es->el (attribute es) newinfo))]
+         [(list ids ...)
+          #`(lamrest #,vars #,(kernel->core (wrap-assignables/lam #'e (attribute es) ids) newinfo) esnil)])]
+      [(define-values (~and idsstx (id)) e)
        ;; Don't create a new envinfo; define-values only appears in a
        ;; modbegin and we create an envinfo that accounts for all of
        ;; the modbegin-bound variables at the modbegin site
-       #`(define id #,(kernel->core #'e envinfo))]
+       (match (assignable-ids #'idsstx)
+         [(list)
+          #`(define id #,(kernel->core #'e envinfo))]
+         [(list id*)
+          #`(define id #,(kernel->core (wrap-assignables/def #'e id*) envinfo))])]
       [((~or (~and let-values (~bind [name 'letvalues] [type 'seq]))
              (~and letrec-values (~bind [name 'letrecvalues] [type 'rec])))
-        ([(xs ...) e] ...)
+        ([(~and idsstxs (xs ...)) e] ...)
         e-body0 e-body ...)
 
        (define body-info (letx-body-info (attribute xs) envinfo))
@@ -442,12 +602,26 @@
 
        #`(#,(attribute name)
           #,(foldr
-             (lambda (ids e rest)
+             (lambda (ids idsstx e rest)
                #`(vbl
-                  (vb #,(ids->vars ids) #,(kernel->core e rhss-info))
+                  (vb #,(ids->vars ids)
+                      #,(match (assignable-ids idsstx)
+                          ;; The let-values that we create during
+                          ;; desugaring are the only forms that
+                          ;; shouldn't have their binding instances
+                          ;; annotated with assignable info
+                          [(or #f (list)) (kernel->core e rhss-info)]
+                          [(list a-ids ...)
+                           (kernel->core
+                            (wrap-assignables/values
+                             ids
+                             a-ids
+                             e)
+                            rhss-info)]))
                   #,rest))
              #'valuesbindsnil
              (attribute xs)
+             (attribute idsstxs)
              (attribute e))
           #,(kernel->core #'e-body0 body-info)
           #,(es->el (attribute e-body) body-info))]
@@ -458,12 +632,19 @@
              #,(kernel->core #'e2 envinfo)
              #,(kernel->core #'e3 envinfo))]
       [(set! x e)
-       #`(set x #,(kernel->core #'e envinfo))]
+       (with-syntax ([(tmp) (generate-temporaries (list #'x))])
+         (kernel->core
+          #'(let-values ([(tmp) e]) (setboximpl x tmp))
+          envinfo))]
+      [x:identifier
+       #:when (mutable-var? #'x)
+       #'(unboximpl x)]
       [(quote #t) #'(quote true)]
       [(quote #f) #'(quote false)]
       [(quote ()) #'(quote nil)]
       [(quote s:id) #'(quote (sym s))]
-      [_ this-syntax]))
+      [_
+       this-syntax]))
 
   (define (corify stx)
     #;(pretty-print (syntax->datum stx) (current-error-port))
@@ -478,7 +659,8 @@
          not values call-with-values exit exact->inexact exact-integer?
          inexact? quotient sin))
     (define basis-info (make-info (ids->vars (syntax->list names-in-basis)) empty-info))
-    (kernel->core stx basis-info))
+    (define vars (assignable-vars stx))
+    (kernel->core (mark-assignables stx vars) basis-info))
   (define corify/lc-term->json (compose lc-term->json corify))
 
   (command-line

@@ -578,8 +578,6 @@ class EmptyEnv(Env):
     raise CEKError("Variable %s not found" % y.pprint(0))
   def lookup(self, y):
     raise CEKError("Variable %s not found" % y.pprint(0))
-  def mutate(self, x, v):
-    raise CEKError("Cannot mutate unbound varaible" % x.pprint(0))
   def pprint(self, indent):
     return ' ' * indent + 'emptyenv'
 
@@ -605,18 +603,6 @@ class Env1(Env):
     else:
       return self.e.lookup(y)
 
-  def mutate(self, y, v):
-    i = self.getindex(y)
-    if i == 0:
-      val = self.v
-      if isinstance(val, Cell):
-        val.set(v)
-      else:
-        self.v = v
-    else:
-      self.e.mutate(y, v)
-
-
 @jit.unroll_safe
 def len_varl(xs):
   n = 0
@@ -631,7 +617,7 @@ class MultiExtendedEnv(Env):
   def __init__(self, xs, values, e):
     assert isinstance(e, Env)
     self.e = e
-    self.xs = self.shape = jit.promote(xs)
+    self.xs = self.shape = xs
     self.values = values[:]
 
   @jit.unroll_safe
@@ -653,21 +639,6 @@ class MultiExtendedEnv(Env):
     if i != -1:
       return self.values[i]
     return self.e.lookup(y)
-
-  def mutate(self, y, v):
-    i = self.getindex(y)
-    if i != -1:
-      val = self.values[i]
-      if isinstance(val, Cell):
-        val.set(v)
-      else:
-        self.values[i] = v
-    else:
-      self.e.mutate(y, v)
-
-def mutate(env, x, v):
-  env.mutate(x, v)
-  return m.val_voidv_sing
 
 class OfftraceVarsAccessedInfo(object):
   def __init__(self):
@@ -811,6 +782,7 @@ def exit(v):
     ret(Integer(0))
 
 class Cell(m.cl_v):
+  _immutable_fields_ = ['v']
   def __init__(self, v):
     self.val = v
   def set(self, v):
