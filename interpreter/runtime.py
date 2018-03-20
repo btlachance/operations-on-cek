@@ -209,7 +209,7 @@ class BigInteger(Number):
     return BigInteger(rbigint.fromint(n))
 
   def pprint(self, indent):
-    return ' ' * indent + '%s' % self.value
+    return ' ' * indent + '%s' % self.value.str()
   def normalize(self, v):
     if isinstance(v, BigInteger):
       return self, v
@@ -341,7 +341,7 @@ def sublist(ns):
     return result
   while isinstance(ns, m.cl_cons):
     n, ns = ns.v0, ns.v1
-    result = result.add(guardnum(n))
+    result = result.sub(guardnum(n))
   assert isinstance(ns, m.cl_nil)
   return result
 
@@ -453,7 +453,7 @@ class NullaryPrim(m.cl_e):
     return ' ' * indent + '(p#%s)' % self.opname
 
 class UnaryPrim(m.cl_e):
-  _immtuable_fields_ = ['arg', 'opname', 'op', 'should_enter']
+  _immutable_fields_ = ['arg', 'opname', 'op', 'should_enter']
   def __init__(self, arg, opname, op):
     self.arg = arg
     self.opname = opname
