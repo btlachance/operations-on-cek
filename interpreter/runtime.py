@@ -782,7 +782,7 @@ def exit(v):
     ret(Integer(0))
 
 class Cell(m.cl_v):
-  _immutable_fields_ = ['v']
+  _immutable_fields_ = ['val']
   def __init__(self, v):
     self.val = v
   def set(self, v):
