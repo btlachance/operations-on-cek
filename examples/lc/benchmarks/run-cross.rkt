@@ -90,7 +90,7 @@
 
 (module+ main
   (define default-benchmarks '(fib mbrot sum nqueens fft perm9 pnpoly
-                               triangl diviter paraffins simplex))
+                               triangl diviter paraffins simplex fibc))
   (define benchmarks (make-parameter '()))
 
   (struct bench-format (before with-timings))

@@ -19,14 +19,15 @@
   (e ::= var l a
      (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
-     (car e) (cdr e) (nullp e) (mkcons var var) (apply e e) (mkvoid) (cwv var var) (begin e es))
+     (car e) (cdr e) (nullp e) (mkcons var var) (apply e e) (mkvoid) (cwv var var) (begin e es)
+     (callcc var))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
   (bp ::= (p var e))
   (var ::= variable)
   (l ::= (lam vars e es) (lamrest vars e es))
   (a ::= (app e es) (appinfo e es envinfo))
-  (v ::= (clo l env) c (cons v v) undefinedv voidv)
+  (v ::= (clo l env) c (cons v v) (kont k) undefinedv voidv)
   (c ::= nil true false number string (sym var))
 
   (env ::= dummy)
@@ -145,8 +146,10 @@
                (mf (define inexact? (lam (varl val varsnil) (inexactp val) esnil))
                (mf (define quotient (lam (varl m (varl n varsnil)) (quotientimpl m n) esnil))
                (mf (define sin (lam (varl n varsnil) (sinimpl n) esnil))
-               ;; Update the list in corify/lc-term->json
-                 modforms)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
+               (mf (define call/cc (lam (varl f varsnil) (callcc f) esnil))
+               (mf (define call-with-current-continuation call/cc)
+                 ;; Update the list in corify/lc-term->json
+                 modforms)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))
               (emptyenv)
               mt)]
   #:final [(ignore env_0 (ret v mt)) --> ignore]
@@ -230,7 +233,9 @@
    #:where vs (vlisttovs (lookup env var))]
   [((cwv var_gen var_recv) env expk) --> ((app var_gen esnil) env (cwvk var_recv env expk))]
   [((begin e_0 es) env expk) --> (ignore env (expsk env (el e_0 es) expk))]
-
+  [((callcc var_f) env k) --> (ignore env expk)
+   #:where vs_call (vl (kont k) (vl (lookup env var_f) vsnil))
+   #:where expk (fn vs_call esnil env infoempty nocallingapp k)]
   [(ignore env_0 (ret v (fn vs es env envinfo callingapp expk))) --> (ignore env_0 (fn (vl v vs) (promotees es) env envinfo callingapp expk))]
   [(ignore env_0 (fn vs (el e es) env envinfo callingapp expk)) --> (e env (fn vs es env envinfo callingapp expk))]
   [(ignore env_0 expk_fn) --> (ignore env_0 (expsk env (el e es) expk))
@@ -249,6 +254,9 @@
    #:where env_spec (env_for_call env_clo envinfo env_1)
    #:where e_ignore (register_call l callingapp expk)
    #:where env (extendrest env_spec vars vs_args)]
+  [(ignore env_0 (fn vs esnil env_1 envinfo callingapp expk)) --> (ignore env_0 (ret v_0 k))
+   #:where (vl v (vl v_0 vsnil)) (vsreverse vs)
+   #:where (kont k) v]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
    #:unless false v]
@@ -657,7 +665,7 @@
          current-command-line-arguments void symbol? newline time-apply
          current-seconds current-error-port current-output-port fprintf
          not values call-with-values exit exact->inexact exact-integer?
-         inexact? quotient sin))
+         inexact? quotient sin call/cc call-with-current-continuation))
     (define basis-info (make-info (ids->vars (syntax->list names-in-basis)) empty-info))
     (define vars (assignable-vars stx))
     (kernel->core (mark-assignables stx vars) basis-info))
