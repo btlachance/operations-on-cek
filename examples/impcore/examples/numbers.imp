@@ -1,0 +1,8 @@
+#lang s-exp (file "~/projects/operations-on-cek/examples/impcore/impcore.rkt")
+(define add1 (x) (+ x 1))
+(add1 4)
+(add1 (add1 3))
+
+(define double (x) (+ x x))
+(double (+ 3 4))
+(double (add1 (add1 (add1 4))))

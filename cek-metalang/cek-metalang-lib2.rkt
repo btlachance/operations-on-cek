@@ -162,6 +162,7 @@
   (lang-info nonterminals
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
+                   (list 'lookup_backtrack (nt 'env) (nt 'var))
                    (list 'extend (nt 'env) (nt 'vars) (nt 'result))
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extendcells (nt 'env) (nt 'vars))
@@ -187,6 +188,7 @@
                    (list 'setcells (nt 'vars) (nt 'env) (nt 'result))
                    (list 'vsreverse (nt 'vs))
                    (list 'printimpl (nt 'var))
+                   (list 'printlnimpl (nt 'var))
                    (list 'ltimpl (nt 'var) (nt 'var))
                    (list 'gtimpl (nt 'var) (nt 'var))
                    (list 'lteqimpl (nt 'var) (nt 'var))
@@ -224,6 +226,7 @@
                    (parser string-parse-fun string-parse-fun))
              sort->name sort->field-names sort->type
              (hash 'lookup 'v
+                   'lookup_backtrack 'v
                    'extend 'env
                    'extendrest 'env
                    'extendcells 'env
@@ -249,6 +252,7 @@
                    'setcells 'v
                    'vsreverse 'vs
                    'printimpl 'e
+                   'printlnimpl 'e
                    'ltimpl 'e
                    'gtimpl 'e
                    'lteqimpl 'e
@@ -351,8 +355,16 @@
      sort->type
      metafunction->type
      (mk/subtype? parent-of)))
-  (define-values (compile-temp compile-pat compile-clauses)
+  (define-values (compile-temp* compile-pat compile-clauses)
     (lang-compiler sort->field-names sort->name))
+
+  (define used-metafunction-info '())
+  (define (compile-temp ast dest rest)
+    (match ast
+      [(metafunction name (list args ...) _)
+       (set! used-metafunction-info  (set-union used-metafunction-info (list name . (map (lambda (x) 0) args))))]
+      [_ (void)])
+    (compile-temp* ast dest rest))
 
   ;; a method is a (method symbol (listof symbol) (U IR (listof IR)))
   ;; HACK a method only has its cases as a single IR (not a list of
@@ -573,7 +585,11 @@
   ;; least be able to parse the box metafunctions. Since that's just
   ;; an experiment I'm going to open the floodgates and.
   (match-define (parser simple-parse-template _)
-    (lang-parser terminals '() compounds metafunctions prim-parsers))
+    (lang-parser terminals '() compounds (list (list 'boximpl (nt 'var))
+                                               (list 'unboximpl (nt 'var))
+                                               (list 'setboximpl (nt 'var) (nt 'var))
+                                               (list 'printlnimpl (nt 'var)))
+                 prim-parsers))
   (define (term->json stx)
     (define ast (simple-parse-template stx))
     (tc-temps/expecteds (list ast) (list (syntax-e c-id)) '())
@@ -582,5 +598,9 @@
                 (ir:return (list 'program_ast))))
     (term-ir->json ir))
   (values print-interpreter
-          (mk/print-parser other-class-defs metafunctions)
+          (mk/print-parser other-class-defs (set-union used-metafunction-info
+                                                       (list (list 'boximpl 0)
+                                                             (list 'unboximpl 0)
+                                                             (list 'setboximpl 0 0)
+                                                             (list 'printlnimpl 0))))
           term->json))
