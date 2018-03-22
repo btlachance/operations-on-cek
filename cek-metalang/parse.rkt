@@ -113,7 +113,7 @@
                  ;; hands. I can rule out that specific issue here by
                  ;; making sure the lengths are the same, but I don't
                  ;; know what the proper fix is
-                 (~or (~and (~fail #:unless (= (length (syntax-e this-syntax)) (length (car sorts))))
+                 (~or (~and (~fail #:unless (= (length (syntax->list this-syntax)) (length (car sorts))))
                             (~var c1 (-compound-of (car sorts) parse-fun)))
                       (~var c2 (-compound (cdr sorts) parse-fun)))
                  (~bind [data (or (attribute c1.data) (attribute c2.data))]))))

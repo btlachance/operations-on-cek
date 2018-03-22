@@ -1,0 +1,6 @@
+#lang s-exp (file "~/projects/operations-on-cek/examples/impcore/impcore.rkt")
+(define fact (n)
+  (if n
+      (* n (fact (- n 1)))
+      1))
+(fact 5)

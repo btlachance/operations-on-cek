@@ -1,0 +1,10 @@
+#lang s-exp (file "~/projects/operations-on-cek/examples/impcore/impcore.rkt")
+(val r 0)
+(define gcd (m n)
+  (begin
+    (while (!= (set r (mod m n)) 0)
+      (begin
+        (set m n)
+        (set n r)))
+    n))
+(gcd 6 15)
