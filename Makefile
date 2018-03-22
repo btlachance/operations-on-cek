@@ -13,9 +13,10 @@ build/%.html: scribblings/%.scrbl
 	scribble --dest build/ --dest-name $(@F) $<
 
 
-build/interpreter-%/main.py : examples/%/spec.rkt $(RTDEPS) $(METALANGDEPS)
+build/interpreter-%/main.py : examples/%/spec.rkt $(RTDEPS) examples/%/interpreter/*.py $(METALANGDEPS)
 	mkdir -p $(@D)
 	cp -R interpreter/* $(@D)
+	cp -R examples/$*/interpreter/* $(@D)
 	racket $< --print-interp > $(@D)/machine.py
 	racket $< --print-parser > $(@D)/parser.py
 
