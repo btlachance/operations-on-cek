@@ -185,15 +185,22 @@
 
   [(ignore envs (ret v (bindglobalk var k)))
    -->
-   (ignore (eee env_g1 env_f env_l) k)
+   (ignore (eee env_g1 env_f env_l) (ret v k))
    #:where (eee env_g0 env_f env_l) envs
    #:where env_g1 (extend env_g0 (varl var varsnil) (vl v vsnil))]
 
   [(ignore envs (ret v (bindlocalk var k)))
    -->
-   (ignore (eee env_g env_f env_l1) k)
+   (ignore (eee env_g env_f env_l1) (ret v k))
    #:where (eee env_g env_f env_l0) envs
    #:where env_l1 (extend env_l0 (varl var varsnil) (vl v vsnil))]
+
+  ;; All defs except define return a value, so we need progk
+  ;; continuations to those values
+  [(ignore envs (ret v k_0))
+   -->
+   (ignore envs k_0)
+   #:where (progk program k) k_0]
 
   [(ignore envs (progk program k))
    -->
