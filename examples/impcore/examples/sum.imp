@@ -3,10 +3,9 @@
   (if n
       (sum (- n 1) (+ n result))
       result))
-(define run (n)
-  (if (- n 1)
-      (begin
-        (sum 10000 0)
-        (run (- n 1)))
-      (sum 10000 0)))
-(run 350000)
+
+(val iters 350000)
+(while iters
+  (begin
+    (sum 10000 0)
+    (set iters (- iters 1))))
