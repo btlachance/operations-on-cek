@@ -1,4 +1,4 @@
-#lang s-exp (file "~/projects/operations-on-cek/examples/impcore/impcore.rkt")
+#lang s-exp (submod (file "~/projects/operations-on-cek/examples/impcore/spec.rkt") impcore)
 (define add1 (x) (+ x 1))
 (add1 4)
 (add1 (add1 3))

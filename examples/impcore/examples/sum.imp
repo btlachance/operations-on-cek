@@ -1,4 +1,4 @@
-#lang s-exp (file "~/projects/operations-on-cek/examples/impcore/impcore.rkt")
+#lang s-exp (submod (file "~/projects/operations-on-cek/examples/impcore/spec.rkt") impcore)
 (define sum (n result)
   (if n
       (sum (- n 1) (+ n result))

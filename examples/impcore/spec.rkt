@@ -212,25 +212,7 @@
            syntax/parse)
 
   (define (compile-term stx)
-    (parameterize ([current-namespace (make-base-empty-namespace)])
-      ;; Although I could run programs via racket/DrRacket/racket-mode
-      ;; that had a #lang like #lang s-exp (submod ...), I couldn't
-      ;; call expand on them. I would get an error like
-      ;;
-      ;; require: unknown module
-      ;;   module name: #<resolved-module-path:(submod "/Users/blachance/projects/operations-on-cek/examples/spec.rkt" impcore)>
-      ;;
-      ;; So eventually I got to a point where I thought the submod form
-      ;; was the problem, where I learned that it's only used for
-      ;; relative paths. Then I tried, from a plain Racket repl,
-      ;; (require (submod (file "/Users/blachance/.../spec.rkt") impcore))
-      ;; and that also gave me errors. So I decided then to ditch the
-      ;; submod form entirely since I couldn't even get it to work in 
-      ;; plain Racket. That's why there's this impcore.rkt file that
-      ;; just does what the impcore submodule below does.
-
-      (namespace-require (quote-module-path ".." impcore))
-
+    (parameterize ([current-namespace (make-base-namespace)])
       (define expanded (expand stx))
       (syntax-parse expanded
         #:literal-sets (kernel-literals)
@@ -257,8 +239,7 @@
                           (pretty-print (syntax->datum (compile-term (read-syntax))))]))
 
 (module impcore racket
-  (provide module
-           #%module-begin
+  (provide #%module-begin
            #%top
            #%top-interaction
            print
