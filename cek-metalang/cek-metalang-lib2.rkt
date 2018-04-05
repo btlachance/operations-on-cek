@@ -154,6 +154,9 @@
        #:when (real? (syntax-e this-syntax))
        (prim (syntax-e this-syntax) prim:number)]
       [_ #f]))
+  (define-syntax-class string
+    (pattern _
+             #:when (string? (syntax-e this-syntax))))
   (define string-parse-fun
     (syntax-parser
       [:string
@@ -362,7 +365,7 @@
   (define (compile-temp ast dest rest)
     (match ast
       [(metafunction name (list args ...) _)
-       (set! used-metafunction-info  (set-union used-metafunction-info (list name . (map (lambda (x) 0) args))))]
+       (set! used-metafunction-info  (set-add used-metafunction-info (cons name (map (lambda (x) 0) args))))]
       [_ (void)])
     (compile-temp* ast dest rest))
 

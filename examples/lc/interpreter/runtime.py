@@ -763,7 +763,8 @@ def vsreverse(vs):
   return result
 
 def printimpl(x): return UnaryPrim(x, 'print', lambda v: pprint(v) and m.val_voidv_sing)
-def pprint(v):
+def printlnimpl(x): return UnaryPrim(x, 'println', lambda v: pprint(v, True) and m.val_voidv_sing)
+def pprint(v, newline=False):
   output = stdout
   if isinstance(v, m.cl_clo):
     str = v.l0.pprint(0)
@@ -772,6 +773,8 @@ def pprint(v):
   else:
     str = v.pprint(0)
   fprintf(output, mkstr(str), m.val_nil_sing)
+  if newline:
+    output.write('\n')
   return v
 
 def exitimpl(x): return UnaryPrim(x, 'exit', exit)
