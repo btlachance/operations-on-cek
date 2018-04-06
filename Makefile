@@ -1,9 +1,10 @@
-PYTHON=pypy
-RPYTHON=$(PYTHON) ~/projects/pypy/rpython/bin/rpython
+PYPYPATH ?= ~/projects/pypy
+RPYTHON = $(PYPYPATH)/rpython/bin/rpython --batch
 RPYTHONOPTS=
-_=$(shell mkdir -p build)
-METALANGDEPS=$(wildcard cek-metalang/*.rkt)
-RTDEPS=$(shell find interpreter -type f -name '*.py')
+_ = $(shell mkdir -p build)
+METALANGDEPS = $(wildcard cek-metalang/*.rkt)
+RTDEPS = $(shell find interpreter -type f -name '*.py')
+
 .PHONY: all unittest inttest test clean quicktest
 .PRECIOUS: build/interpreter-%/main.py
 
@@ -21,7 +22,7 @@ build/interpreter-%/main.py : examples/%/spec.rkt $(RTDEPS) examples/%/interpret
 	racket $< --print-parser > $(@D)/parser.py
 
 build/interpreter-%/cek-c : build/interpreter-%/main.py
-	$(RPYTHON) -Ojit $(@D)/targetcek.py && mv cek-c $@
+	$(RPYTHON) -Ojit $(RPYTHONOPTS) $(@D)/targetcek.py && mv cek-c $@
 
 runlc-%: build/interpreter-lc/cek-c
 	raco expand examples/lc/lc-$*.rkt |\
