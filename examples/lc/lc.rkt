@@ -254,8 +254,11 @@
    #:where env_spec (env_for_call env_clo envinfo env_1)
    #:where e_ignore (register_call l callingapp expk)
    #:where env (extendrest env_spec vars vs_args)]
-  [(ignore env_0 (fn vs esnil env_1 envinfo callingapp expk)) --> (ignore env_0 (ret v_0 k))
-   #:where (vl v (vl v_0 vsnil)) (vsreverse vs)
+  [(ignore env_0 (fn vs esnil env_1 envinfo callingapp expk)) --> (ignore env_0 (ret v_arg k))
+   #:where (vl v (vl v_arg vsnil)) (vsreverse vs)
+   #:where (kont k) v]
+  [(ignore env_0 (fn vs esnil env_1 envinfo callingapp expk)) --> (ignore env_0 (ret vs_rest k))
+   #:where (vl v vs_rest) (vsreverse vs)
    #:where (kont k) v]
   [(ignore env_0 (ret false (sel e_then e_else env expk))) --> (e_else env expk)]
   [(ignore env_0 (ret v (sel e_then e_else env expk))) --> (e_then env expk)
