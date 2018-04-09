@@ -245,7 +245,7 @@
            print
            println
            begin
-           + - * / < >
+           + - *
            (rename-out
             [imp:datum #%datum]
             [imp:app #%app]
@@ -255,7 +255,9 @@
             [imp:if if]
             [imp:and and]
             [imp:or or]
+            [imp:< <]
             [imp:<= <=]
+            [imp:> >]
             [imp:>= >=]
             [imp:!= !=]
             [imp:mod mod]
@@ -267,7 +269,8 @@
             [imp:>= >=]
             [imp:!= !=]
             [imp:mod mod]
-            [imp:set set])
+            [imp:set set]
+            [quotient /])
            corify)
   (require syntax/parse syntax/parse/define (for-syntax syntax/id-set))
 
@@ -288,8 +291,10 @@
   (define (imp:and b c) (if (test b) c b))
   (define (imp:or b c) (if (test b) b c))
   (define (imp:not b) (if (test b) 0 1))
-  (define (imp:<= m n) (imp:not (> m n)))
-  (define (imp:>= m n) (imp:not (< m n)))
+  (define (imp:< m n) (if (< m n) 1 0))
+  (define (imp:> m n) (if (> m n) 1 0))
+  (define (imp:<= m n) (imp:and (imp:= m n) (imp:< m n)))
+  (define (imp:>= m n) (imp:and (imp:= m n) (imp:> m n)))
   (define (imp:!= m n) (imp:not (imp:= m n)))
   (define (imp:mod m n) (- m (* n (quotient m n))))
 
