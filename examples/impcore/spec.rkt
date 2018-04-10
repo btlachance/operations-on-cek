@@ -117,15 +117,6 @@
    #:where (eee env_g env_f env_l) envs
    #:where (fun vars e_0) (lookup env_f var)]
 
-  [(ignore envs (ret 0 (sel e_then e_else k)))
-   -->
-   (e_else envs k)]
-
-  [(ignore envs (ret v (sel e_then e_else k)))
-   -->
-   (e_then envs k)
-   #:unless 0 v]
-
   [(ignore envs (ret v (looptest (repeat e_test e_body k))))
    -->
    (e_body envs (repeat e_test e_body k))
@@ -194,6 +185,15 @@
    (ignore (eee env_g env_f env_l1) (ret v k))
    #:where (eee env_g env_f env_l0) envs
    #:where env_l1 (extend env_l0 (varl var varsnil) (vl v vsnil))]
+
+  [(ignore envs (ret 0 (sel e_then e_else k)))
+   -->
+   (e_else envs k)]
+
+  [(ignore envs (ret v (sel e_then e_else k)))
+   -->
+   (e_then envs k)
+   #:unless 0 v]
 
   ;; All defs except define return a value, so we need progk
   ;; continuations to those values
