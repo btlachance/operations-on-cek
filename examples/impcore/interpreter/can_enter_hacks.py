@@ -18,6 +18,13 @@ class __extend__(m.cl_define):
 
     self.e2.set_should_enter()
 
+class __extend__(m.cl_while):
+  def __init__(self, e0, e1):
+    self.e0 = e0
+    self.e1 = e1
+
+    self.e1.set_should_enter()
+
 class __extend__(p.UnaryPrim, p.BinaryPrim):
   def set_should_enter(self):
     self.can_enter = False
