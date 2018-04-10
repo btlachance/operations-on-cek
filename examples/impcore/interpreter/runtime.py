@@ -23,8 +23,12 @@ class CEKDone(Exception):
   def __init__(self, result):
     self.result = result
 
+def get_printable_location(c, prev_c):
+  if c.can_enter:
+    return '%s from %s' % (c.pprint(0), prev_c.pprint(0))
+  return c.pprint(0)
 driver = jit.JitDriver(reds = ['e', 'k'], greens = ['c', 'prev_c'],
-                       get_printable_location = lambda c, prev_c: c.pprint(0))
+                       get_printable_location = get_printable_location)
 def run(p):
   c, e, k = m.init(p)
   prev_c = c
