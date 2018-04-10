@@ -1,5 +1,5 @@
 PYPYPATH ?= ~/projects/pypy
-RPYTHON = $(PYPYPATH)/rpython/bin/rpython --batch
+RPYTHON ?= $(PYPYPATH)/rpython/bin/rpython --batch
 RPYTHONOPTS=
 _ = $(shell mkdir -p build)
 METALANGDEPS = $(wildcard cek-metalang/*.rkt)
