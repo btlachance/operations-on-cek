@@ -2,7 +2,6 @@
 (require "../../cek-metalang/cek-metalang.rkt")
 (define-cek impcore
   #:grammar
-  ;; TODO figure out why this doesn't work as (term ::= program e)
   (term ::= program deff)
   (program ::= (defs deff program) defsnil)
 
@@ -337,10 +336,6 @@
   (define (expressions->es exprs)
     (foldr (lambda (e rest) #`(el #,e #,rest)) #'esnil exprs))
 
-  ;; TODO need to turn set!'s into impcore forms
-  ;; TODO b/c of how I print toplevel expressions, need to make sure
-  ;;      there's a global binding for it if the program contains a
-  ;;       toplevel expression
   (define (corify forms)
     (define (corify-form form)
       (syntax-parse form
