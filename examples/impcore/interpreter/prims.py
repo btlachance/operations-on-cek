@@ -13,12 +13,12 @@ def globalenv(eee):
   return eee.env0
 
 class UnaryPrim(m.cl_e):
-  _immutable_fields_ = ['arg', 'opname', 'op', 'should_enter']
+  _immutable_fields_ = ['arg', 'opname', 'op', 'can_enter']
   def __init__(self, arg, opname, op):
     self.arg = arg
     self.opname = opname
     self.op = op
-    self.should_enter = False
+    self.can_enter = False
   def interpret(self, eee, k):
     try:
       e = localenv(eee)
@@ -31,13 +31,13 @@ class UnaryPrim(m.cl_e):
     return ' ' * indent + '(p#%s %s)' % (self.opname, self.arg.pprint(0))
 
 class BinaryPrim(m.cl_e):
-  _immutable_fields_ = ['arg1', 'arg2', 'opname', 'op', 'should_enter']
+  _immutable_fields_ = ['arg1', 'arg2', 'opname', 'op', 'can_enter']
   def __init__(self, arg1, arg2, opname, op):
     self.arg1 = arg1
     self.arg2 = arg2
     self.opname = opname
     self.op = op
-    self.should_enter = False
+    self.can_enter = False
   def interpret(self, eee, k):
     try:
       e = localenv(eee)

@@ -7,10 +7,10 @@ class VariableNotFound(Exception):
   pass
 
 class PrimVariable(m.cl_variable):
-  _immutable_fields_ = ['literal', 'should_enter']
+  _immutable_fields_ = ['literal', 'can_enter']
   def __init__(self, name):
     self.literal = name
-    self.should_enter = False
+    self.can_enter = False
 
   def pprint(self, indent):
     return self.literal
