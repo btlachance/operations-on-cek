@@ -1,5 +1,5 @@
 #lang racket
-(require "../../cek-metalang/cek-metalang.rkt")
+(require (file "~/projects/operations-on-cek/cek-metalang/cek-metalang.rkt"))
 (define-cek impcore
   #:grammar
   (term ::= program deff)
@@ -21,7 +21,7 @@
   (env ::= dummy)
   (envs ::= (eee env env env))
 
-  (k ::= mt (sel e e k) (looptest k) (repeat e e k) (seq e es k) (fn vs es vars e k)
+  (k ::= mt (sel e e k) (looptest k) (repeat e e k) (seq e es k) (fn vs es var k)
      (poplocalenv env k) (ret v k) (bindglobalk var k) (bindlocalk var k)
      (printk k) (progk program k) extensionk)
 
@@ -113,9 +113,7 @@
 
   [((app var es) envs k)
    -->
-   (ignore envs (fn vsnil es vars e_0 k))
-   #:where (eee env_g env_f env_l) envs
-   #:where (fun vars e_0) (lookup env_f var)]
+   (ignore envs (fn vsnil es var k))]
 
   [(ignore envs (ret v (looptest (repeat e_test e_body k))))
    -->
@@ -144,29 +142,31 @@
    (ignore envs k_seq)
    #:where (seq e_0 es k) k_seq]
 
-  [(ignore envs (ret v (fn vs es vars e_0 k)))
+  [(ignore envs (ret v (fn vs es var k)))
    -->
-   (ignore envs (fn (vl v vs) es vars e_0 k))]
+   (ignore envs (fn (vl v vs) es var k))]
 
-  [(ignore envs (fn vs (el e_next es_rest) vars e_0 k))
+  [(ignore envs (fn vs (el e_next es_rest) var k))
    -->
-   (e_next envs (fn vs es_rest vars e_0 k))]
+   (e_next envs (fn vs es_rest var k))]
 
-  [(ignore envs (fn vs esnil vars e_0 k))
+  [(ignore envs (fn vs esnil var k))
    -->
    (e_0 (eee env_g env_f env_l1) (poplocalenv env_l0 k))
    #:unless (poplocalenv env_lignore k_ignore) k
    #:where (eee env_g env_f env_l0) envs
+   #:where (fun vars e_0) (trypromote (lookup env_f var))
    #:where env_l1 (extend (emptyenv) vars (vsreverse vs))]
 
   ;; When the continuation of a function call is a poplocalenv, no
   ;; other expressions could see env_l0. So accumulating a poplocalenv
   ;; to restore it is wasteful, and we can easily avoid doing that.
-  [(ignore envs (fn vs esnil vars e_0 k_0))
+  [(ignore envs (fn vs esnil var k_0))
    -->
    (e_0 (eee env_g env_f env_l1) k_0)
    #:where (poplocalenv env_lignore k) k_0
    #:where (eee env_g env_f env_l0) envs
+   #:where (fun vars e_0) (trypromote (lookup env_f var))
    #:where env_l1 (extend (emptyenv) vars (vsreverse vs))]
 
   [(ignore envs (ret v (poplocalenv env_l1 k)))

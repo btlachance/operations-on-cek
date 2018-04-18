@@ -147,16 +147,22 @@ class __extend__(m.cl_timeapply):
     return ' ' * indent + '(p#timeapply %s %s)' % (self.var0.pprint(0), self.literal1.pprint(0))
 
   def interpret(self, eee, k):
-    funenv = p.funenv(eee)
-    f = lookup(funenv, self.var0)
-    assert isinstance(f, m.cl_fun)
     v = self.literal1.number0
 
     return m.val_ignore_sing, eee, m.cl_fn(m.cl_vl(v, m.val_vsnil_sing),
                                            m.val_esnil_sing,
-                                           f.vars0,
-                                           f.e1,
-                                           TimeApplyK(funenv, time.clock(), k))
+                                           self.var0,
+                                           TimeApplyK(p.funenv(eee), time.clock(), k))
+
+class __extend__(m.cl_v):
+  def promote(self):
+    pass
+class __extend__(m.cl_fun):
+  def promote(self):
+    jit.promote(self)
+def trypromote(v):
+  v.promote()
+  return v
 
 # XXX These have to be in here because I have hacks in the LC language
 # that rely on these functions being available at JSON->AST time
