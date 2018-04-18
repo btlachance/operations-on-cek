@@ -4,8 +4,9 @@
       (sum (- n 1) (+ n result))
       result))
 
-(val iters 350000)
-(while iters
-  (begin
-    (sum 10000 0)
-    (set iters (- iters 1))))
+(define bench (iters)
+  (while iters
+    (begin
+      (sum 10000 0)
+      (set iters (- iters 1)))))
+(timeapply bench 350000)

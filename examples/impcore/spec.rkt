@@ -9,10 +9,11 @@
   (vars ::= (varl var vars) varsnil)
   (es ::= (el e es) esnil)
   (vs ::= (vl v vs) vsnil)
+  (config ::= (conf term envs k))
 
   (deff ::= (val var e) (define var vars e) e)
   (e ::= ignore literal var (set var e) (if e e e) (while e e)
-     (begin es) (app var es))
+     (begin es) (app var es) (timeapply var literal))
   (var ::= variable)
   (literal ::= (quote number))
   (v ::= number (fun vars e))
@@ -22,7 +23,7 @@
 
   (k ::= mt (sel e e k) (looptest k) (repeat e e k) (seq e es k) (fn vs es vars e k)
      (poplocalenv env k) (ret v k) (bindglobalk var k) (bindlocalk var k)
-     (printk k) (progk program k))
+     (printk k) (progk program k) extensionk)
 
   #:control-string term
   #:environment envs
@@ -203,7 +204,13 @@
 
   [(ignore envs (progk program k))
    -->
-   (program envs k)])
+   (program envs k)]
+
+  [(ignore envs_0 (ret v k_0))
+   -->
+   (e envs k)
+   #:where extensionk k_0
+   #:where (conf e envs k) (docontinuation k_0 v)])
 
 (module+ main
   (require (only-in (submod ".."impcore) corify)
@@ -269,21 +276,20 @@
             [imp:!= !=]
             [imp:mod mod]
             [imp:set set]
+            [imp:time-apply timeapply]
             [quotient /])
            corify)
   (require syntax/parse syntax/parse/define (for-syntax syntax/id-set))
 
   (define-literal-set impcore-literals
     (test imp:and imp:= imp:or imp:not imp:<= imp:>= imp:!= imp:mod
-     imp:datum imp:app imp:define imp:val imp:while imp:if imp:set))
+     imp:datum imp:app imp:define imp:val imp:while imp:if imp:set
+     imp:time-apply))
 
   ;; TODO I don't quite handle environments right, e.g. a user can
   ;; write the name of a function and get back its corresponding
   ;; value. They can't do anything with it but it should technically
   ;; be a runtime error.
-  ;; TODO And I also don't yet have the right implementation for
-  ;; val---it needs to expand to either a set! or a define
-
   (define (test x) (not (zero? x)))
 
   (define (imp:= b c) (if (= b c) 1 0))
@@ -296,6 +302,11 @@
   (define (imp:>= m n) (imp:and (imp:= m n) (imp:> m n)))
   (define (imp:!= m n) (imp:not (imp:= m n)))
   (define (imp:mod m n) (- m (* n (quotient m n))))
+  (define (imp:time-apply f v)
+    (define-values (result cpu total gc) (time-apply f (list v)))
+    (printf "RESULT-cpu: ~a.0\nRESULT-gc: ~a\nRESULT-total: ~a.0\n"
+            cpu gc total)
+    (car result))
 
   (begin-for-syntax
     (define val-identifiers (mutable-free-id-set)))
@@ -396,6 +407,9 @@
         ;; which isn't quite the same as what impcore does
         [(#%plain-app call-with-values (#%plain-lambda () e) (~datum print-values))
          (corify-form #'e)]
+
+        [(#%plain-app imp:time-apply f v)
+         #`(timeapply f v)]
 
         [(#%plain-app fname:id e ...)
          #`(app fname #,(expressions->es (map corify-form (attribute e))))]

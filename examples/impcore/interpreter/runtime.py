@@ -6,6 +6,7 @@ import envs
 import prims as p
 import util as u
 import can_enter_hacks
+import time
 
 class CEKError(Exception):
   def __init__(self, message):
@@ -108,6 +109,54 @@ def printlnimpl(n):
     stdout.write("\n")
     return n
   return p.UnaryPrim(n, 'print', _println)
+
+def docontinuation(extensionk, v):
+  assert isinstance(extensionk, m.cl_extensionk)
+  c, eee, k = extensionk.interpretspecial(v)
+  return m.cl_conf(c, eee, k)
+
+class TimeApplyK(m.cl_extensionk):
+  def __init__(self, funenv, start, k):
+    self.funenv = funenv
+    self.start = start
+    self.k = k
+  def interpretspecial(self, v):
+    end = time.clock()
+    ms = mkint(int((end - self.start) * 1000))
+
+    stdout.write("RESULT-cpu: ~a.0\nRESULT-gc: ~a.0\nRESULT-total: ~a.0\n")
+    for _ in [ms, mkint(0), ms]:
+      stdout.write(_.pprint(0))
+      stdout.write("\n")
+
+    eee = m.cl_eee(emptyenv(), self.funenv, emptyenv())
+    return m.val_ignore_sing, eee, m.cl_ret(v, self.k)
+  def pprint(self, indent):
+    return ' ' * indent + '(timeapplyk %s %s)' % (self.start, self.k.pprint(0))
+
+class __extend__(m.cl_timeapply):
+  def __init__(self, var0, literal1):
+    self.var0 = var0
+    assert isinstance(literal1, m.cl_quote)
+    self.literal1 = literal1
+    self.can_enter = False
+  def set_should_enter(self):
+    pass
+
+  def pprint(self, indent):
+    return ' ' * indent + '(p#timeapply %s %s)' % (self.var0.pprint(0), self.literal1.pprint(0))
+
+  def interpret(self, eee, k):
+    funenv = p.funenv(eee)
+    f = lookup(funenv, self.var0)
+    assert isinstance(f, m.cl_fun)
+    v = self.literal1.number0
+
+    return m.val_ignore_sing, eee, m.cl_fn(m.cl_vl(v, m.val_vsnil_sing),
+                                           m.val_esnil_sing,
+                                           f.vars0,
+                                           f.e1,
+                                           TimeApplyK(funenv, time.clock(), k))
 
 # XXX These have to be in here because I have hacks in the LC language
 # that rely on these functions being available at JSON->AST time
