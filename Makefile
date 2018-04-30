@@ -15,6 +15,7 @@ build/%.html: scribblings/%.scrbl
 
 
 build/interpreter-%/main.py : examples/%/spec.rkt $(RTDEPS) examples/%/interpreter/*.py $(METALANGDEPS)
+	raco make $(METALANGDEPS) $<
 	mkdir -p $(@D)
 	cp -R interpreter/* $(@D)
 	cp -R examples/$*/interpreter/* $(@D)
