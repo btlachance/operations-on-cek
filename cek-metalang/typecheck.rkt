@@ -97,6 +97,13 @@
            [_ (raise-user-error
                'compile-cek
                "could not typecheck template ~a" temp)])]
+        [(with* temp)
+         (match (tc-temp temp bindings)
+           [(tc-template-result #f)
+            bindings]
+           [_ (raise-user-error
+               'compile-cek
+               "expected template ~a to have #f (None) type" temp)])]
         [(temp* ast expected-ty)
          (tc-temps/expecteds (list ast) (list expected-ty) bindings)
          bindings]))

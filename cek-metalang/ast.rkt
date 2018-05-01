@@ -22,7 +22,9 @@
 ;; where a clause is one of
 ;; - (unless* ast ast)
 ;; - (where* ast ast)
+;; - (with* ast)
 (struct pat* (ast expected-ty) #:transparent)
 (struct unless* (temp-ast pat-ast) #:transparent)
 (struct where* (temp-ast pat-ast) #:transparent)
+(struct with* (temp-ast) #:transparent)
 (struct temp* (ast expected-ty) #:transparent)

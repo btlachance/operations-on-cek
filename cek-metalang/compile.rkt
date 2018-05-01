@@ -41,32 +41,40 @@
         asts
         subtemp-dests)]))
 
-  (define (compile-pat ast source rest)
-    (match ast
-      [(? symbol? s)
-       (check-instance source s rest)]
-      [(metavar nt suffix)
-       (check-instance
-        source nt
-        (ir:let (list (list (metavar->symbol ast) source))
-                rest))]
-      [(prim p data)
-       ((prim-data-compile-pat data) p source rest)]
-      [(compound asts sort)
-       (define projection-dests
-         (for/list ([field-name (hash-ref sort->field-names sort)])
-           (format-symbol "~a_~a" source field-name)))
-
-       (check-instance
-        source (hash-ref sort->name sort)
-        (ir:let (for/list ([dest projection-dests]
-                           [field-name (hash-ref sort->field-names sort)])
-                  (list dest (ir:project (hash-ref sort->name sort) field-name source)))
-                (foldr
-                 compile-pat
-                 rest
-                 asts
-                 projection-dests)))]))
+  (define compile-pat
+    (case-lambda
+      [(ast source known-type rest)
+       (match ast
+         [(? symbol? s)
+          (check-instance source s rest)]
+         [(metavar nt suffix)
+          (define check-fn
+            (if (and (nt? known-type) (equal? nt (nt-symbol known-type)))
+                values
+                (lambda (ir) (check-instance source nt ir))))
+          (check-fn
+           (ir:let (list (list (metavar->symbol ast) source))
+                   rest))]
+         [(prim p data)
+          ((prim-data-compile-pat data) p source rest)]
+         [(compound asts sort)
+          (define projection-dests
+            (for/list ([field-name (hash-ref sort->field-names sort)])
+              (format-symbol "~a_~a" source field-name)))
+          (define field-types (cdr sort))
+          (check-instance
+           source (hash-ref sort->name sort)
+           (ir:let (for/list ([dest projection-dests]
+                              [field-name (hash-ref sort->field-names sort)])
+                     (list dest (ir:project (hash-ref sort->name sort) field-name source)))
+                   (foldr
+                    compile-pat
+                    rest
+                    asts
+                    projection-dests
+                    field-types)))])]
+      [(ast source rest)
+       (compile-pat ast source #f rest)]))
 
   (define (compile-clauses clauses rest)
     (define (compile-clause c idx r)
@@ -85,7 +93,11 @@
            (compile-pat
             pat-ast tmp
             (ir:unless-failure))
-           r))]))
+           r))]
+        [(with* temp-ast)
+         (compile-temp
+          temp-ast tmp
+          r)]))
     (foldr
      compile-clause
      rest

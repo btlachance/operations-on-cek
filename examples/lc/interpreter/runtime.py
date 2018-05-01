@@ -556,6 +556,7 @@ def env_for_call(clo_env, envinfo, current_env):
   return clo_env
 
 callgraph = CallGraph()
+@jit.not_in_trace
 def register_call(lam, callingapp, cont):
   assert isinstance(callingapp, m.cl_callingapp)
   env_arg_unused = None
@@ -567,7 +568,6 @@ def register_call(lam, callingapp, cont):
 
 
   callgraph.register_call(lam, calling_app, cont, env_arg_unused)
-  return lam
 
 class EmptyEnv(Env):
   _immutable_fields_ = ['e', 'shape']

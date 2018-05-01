@@ -26,13 +26,16 @@
 (define-splicing-syntax-class clause
   #:attributes (body)
   (pattern :where-clause)
-  (pattern :unless-clause))
+  (pattern :unless-clause)
+  (pattern :with-clause))
 (define ((mk/parse-clause parse-temp parse-pat) w)
   (match w
     [(list 'where pattern template)
      (where* (parse-temp template) (parse-pat pattern))]
     [(list 'unless pattern template)
-     (unless* (parse-temp template) (parse-pat pattern))]))
+     (unless* (parse-temp template) (parse-pat pattern))]
+    [(list 'with template)
+     (with* (parse-temp template))]))
 (define-splicing-syntax-class where-clause
   #:attributes (body)
   (pattern (~seq #:where pattern template)
@@ -41,6 +44,10 @@
   #:attributes (body)
   (pattern (~seq #:unless pattern template)
            #:attr body (list 'unless #'pattern #'template)))
+(define-splicing-syntax-class with-clause
+  #:attributes (body)
+  (pattern (~seq #:with template)
+           #:attr body (list 'with #'template)))
 
 (struct step (lhs rhs clauses) #:prefab)
 (define-syntax-class -step
@@ -236,7 +243,7 @@
                    'extendcells 'env
                    'extendtoplevel 'env
                    'env_for_call 'env
-                   'register_call 'e
+                   'register_call #f
                    'zeropimpl 'e
                    'succimpl 'e
                    'predimpl 'e
