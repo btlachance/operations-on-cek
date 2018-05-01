@@ -1,4 +1,9 @@
 #lang racket
+(require syntax/location)
+(define OOC-DIR (make-parameter
+                 (let* ([components (explode-path (quote-module-path))])
+                   ;; drop examples/lc/benchmarks/ from the current directory
+                   (apply build-path (take components (- (length components) 4))))))
 (define PYCKET-BENCH-PATH (make-parameter #f))
 (define INTERPRETER-CMD+ARGS (make-parameter '(#f)))
 (define COMPILE-TERM-CMD+ARGS (make-parameter '(#f)))
@@ -119,9 +124,9 @@
               "Run benchmark <b>"
               (benchmarks (cons (string->symbol b) (benchmarks)))])
 
-  (parameterize ([PYCKET-BENCH-PATH (expand-user-path "~/projects/pycket-bench")]
-                 [INTERPRETER-CMD+ARGS (list (expand-user-path "~/projects/operations-on-cek/build/interpreter-lc/cek-c"))]
-                 [COMPILE-TERM-CMD+ARGS (list (find-executable-path "racket") (expand-user-path "~/projects/operations-on-cek/examples/lc/lc.rkt") "--compile-term")]
+  (parameterize ([PYCKET-BENCH-PATH (build-path (OOC-DIR) 'up "pycket-bench")]
+                 [INTERPRETER-CMD+ARGS (list (build-path (OOC-DIR) "build/interpreter-lc/cek-c"))]
+                 [COMPILE-TERM-CMD+ARGS (list (find-executable-path "racket") (build-path (OOC-DIR) (expand-user-path "examples/lc/lc.rkt")) "--compile-term")]
                  [error-print-width 4096])
     (for ([b (if (empty? (benchmarks))
                  default-benchmarks
