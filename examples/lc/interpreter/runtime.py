@@ -796,12 +796,19 @@ class Cell(m.cl_v):
   def pprint(self, indent):
     return ' ' * indent + '(cell %s)' % self.val.pprint(0)
 
+class PromotableCell(Cell):
+  _immutable_fields_ = ['val']
+  def get(self):
+    jit.promote(self)
+    return Cell.get(self)
+
 class __extend__(m.cl_v):
   def promote(self):
     pass
 class PromotableClosure(m.cl_clo):
   def promote(self):
     jit.promote(self)
+
 def trypromote(v):
   v.promote()
   return v
@@ -809,6 +816,8 @@ def trypromote(v):
 def promotees(es):
   return jit.promote(es)
 
+def mkpromotablecell(v):
+  return PromotableCell(v)
 def mkcell(v):
   return Cell(v)
 def setcell(var, env, v):
