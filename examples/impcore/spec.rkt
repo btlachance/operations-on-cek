@@ -214,7 +214,6 @@
 
 (module+ main
   (require (only-in (submod ".."impcore) corify)
-           syntax/location
            syntax/parse)
 
   (define (compile-term stx)
