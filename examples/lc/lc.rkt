@@ -19,7 +19,7 @@
   (e ::= var l a
      (quote c) (if e e e) (letvalues valuesbinds e es) (letrecvalues valuesbinds e es)
      (values var) ignore
-     (car e) (cdr e) (nullp e) (mkcons var var) (apply e e) (mkvoid) (cwv var var) (begin e es)
+     (car e) (cdr e) (nullp e) (mkcons var var) (apply e e) mkvoid (cwv var var) (begin e es)
      (callcc var))
   (valuesbind ::= (vb vars e))
   (binding ::= (bp))
@@ -113,7 +113,7 @@
                                                     esnil)
                                          esnil))
                (mf (define current-command-line-arguments (lam varsnil (app vector esnil) esnil))
-               (mf (define void (lamrest (varl args varsnil) (mkvoid) esnil))
+               (mf (define void (lamrest (varl args varsnil) mkvoid esnil))
                (mf (define symbol? (lam (varl s varsnil) (issymbolimpl s) esnil))
                (mf (define newline (lam varsnil
                                      (app fprintf (el (app current-output-port esnil) (el (quote "\n") esnil)))
@@ -228,7 +228,7 @@
   [((nullp e_0) env k) --> (e_0 env (nullk k))]
   [((mkcons var_1 var_2) env k) --> (ignore env (ret (cons (lookup env var_1) (lookup env var_2)) k))]
   [((apply e_1 e_2) env k) --> (e_1 env (getargs e_2 env k))]
-  [((mkvoid) env k) --> (ignore env (ret voidv k))]
+  [(mkvoid env k) --> (ignore env (ret voidv k))]
   [((values var) env expk) --> (ignore env (ret vs expk))
    #:where vs (vlisttovs (lookup env var))]
   [((cwv var_gen var_recv) env expk) --> ((app var_gen esnil) env (cwvk var_recv env expk))]
@@ -352,7 +352,10 @@
 
   (define empty-info #'infoempty)
   (define (make-info vars prev-info)
-    #`(info #,vars #,prev-info))
+    (if (and (identifier? vars)
+             (equal? (syntax-e vars) 'varsnil))
+        prev-info
+        #`(info #,vars #,prev-info)))
   (define (info-vars info)
     (syntax-parse info
       #:datum-literals (info infoempty)

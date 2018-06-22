@@ -372,7 +372,7 @@
          #`(while #,(corify-form #'condition)
              #,(if (null? (cdr (attribute body)))
                    (corify-form (car (attribute body)))
-                   #`(begin #,((expressions->es (map corify-form (attribute body)))))))]
+                   #`(begin #,(expressions->es (map corify-form (attribute body))))))]
 
         [(let-values ([(def) e])
            (set! x :id)
