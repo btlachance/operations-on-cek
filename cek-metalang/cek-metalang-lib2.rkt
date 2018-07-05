@@ -173,6 +173,7 @@
              ;; hard-coded metafunctions for now...
              (list (list 'lookup (nt 'env) (nt 'var))
                    (list 'lookup_backtrack (nt 'env) (nt 'var))
+                   (list 'extend1 (nt 'env) (nt 'var) (nt 'v))
                    (list 'extend (nt 'env) (nt 'vars) (nt 'result))
                    (list 'extendrest (nt 'env) (nt 'vars) (nt 'vs))
                    (list 'extendcells (nt 'env) (nt 'vars))
@@ -182,8 +183,10 @@
                    (list 'zeropimpl (nt 'var))
                    (list 'succimpl (nt 'var))
                    (list 'predimpl (nt 'var))
+                   (list 'primadd (nt 'v) (nt 'v))
                    (list 'addimpl (nt 'var) (nt 'var))
                    (list 'variadicaddimpl (nt 'var))
+                   (list 'primsub (nt 'v) (nt 'v))
                    (list 'subimpl (nt 'var) (nt 'var))
                    (list 'variadicsubimpl (nt 'var))
                    (list 'multimpl (nt 'var) (nt 'var))
@@ -239,6 +242,7 @@
              (hash 'lookup 'v
                    'lookup_backtrack 'v
                    'extend 'env
+                   'extend1 'env
                    'extendrest 'env
                    'extendcells 'env
                    'extendtoplevel 'env
@@ -247,8 +251,10 @@
                    'zeropimpl 'e
                    'succimpl 'e
                    'predimpl 'e
+                   'primadd 'v
                    'addimpl 'e
                    'variadicaddimpl 'e
+                   'primsub 'v
                    'subimpl 'e
                    'variadicsubimpl 'e
                    'multimpl 'e
