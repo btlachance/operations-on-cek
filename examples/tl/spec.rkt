@@ -6,7 +6,7 @@
   #:grammar
   (e ::=
      var
-     (quote integer)
+     (quote number)
      (app op e e)
      (let var e e)
      (ifz e e e)
@@ -14,7 +14,7 @@
   (op ::= plus minus)
   (var ::= variable)
 
-  (v ::= integer)
+  (v ::= number)
 
   (env ::= dummy)
 
@@ -33,12 +33,12 @@
 
 
   #:initial [e --> (e (emptyenv) mt)]
-  #:final [(ignore env (ret integer mt)) --> (quote integer)]
+  #:final [(ignore env (ret number mt)) --> (quote number)]
 
   #:step
   [(var env k) --> (ignore env (ret (lookup env var) k))]
 
-  [((quote integer) env k) --> (ignore env (ret integer k))]
+  [((quote number) env k) --> (ignore env (ret number k))]
 
   
   [((app op e_1 e_2) env k) --> (e_1 env (rand2 e_2 env op k))]
