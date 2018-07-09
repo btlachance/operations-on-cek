@@ -59,11 +59,12 @@
             clauses:clause ...]
            #:attr data (step #'lhs #'rhs (attribute clauses.body))))
 
-(struct final (state result) #:prefab)
+(struct final (state result clauses) #:prefab)
 (define-syntax-class -final
   #:datum-literals (-->)
-  (pattern [(~and state (e env k)) --> result]
-           #:attr data (final #'state #'result)))
+  (pattern [(~and state (e env k)) --> result
+            clauses:clause ...]
+           #:attr data (final #'state #'result (attribute clauses.body))))
 
 (struct initial (program state) #:prefab)
 (define-syntax-class -initial
@@ -202,6 +203,7 @@
                    (list 'setcells (nt 'vars) (nt 'env) (nt 'result))
                    (list 'vsreverse (nt 'vs))
                    (list 'printimpl (nt 'var))
+                   (list 'primprint (nt 'v))
                    (list 'printlnimpl (nt 'var))
                    (list 'ltimpl (nt 'var) (nt 'var))
                    (list 'gtimpl (nt 'var) (nt 'var))
@@ -270,6 +272,7 @@
                    'setcells 'v
                    'vsreverse 'vs
                    'printimpl 'e
+                   'primprint #f
                    'printlnimpl 'e
                    'ltimpl 'e
                    'gtimpl 'e
@@ -453,10 +456,12 @@
   (define (final->methods f)
     (match-define (list c0-ast e0-ast k0-ast)
       (stx-map parse-pat (final-state f)))
+    (define clauses (map (mk/parse-clause parse-temp parse-pat) (final-clauses f)))
     (define result-ast (parse-temp (final-result f)))
     (define cek/tys (map syntax-e (list c-id e-id k-id)))
     (tc-ast*s
      (append (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
+             clauses
              (list (temp* result-ast (syntax-e c-id)))))
     (if (or (metavar? k0-ast)
             (prim? k0-ast))
@@ -466,11 +471,13 @@
           (list 'self 'e 'k)
           (foldr
            compile-pat
-           (compile-temp
-            result-ast
-            'result
-            (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
-                    (ir:error "Failed to halt the program in a final state")))
+           (compile-clauses
+            clauses
+            (compile-temp
+             result-ast
+             'result
+             (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
+                     (ir:error "Failed to halt the program in a final state"))))
            (list c0-ast e0-ast k0-ast)
            (list 'self 'e 'k))))
         (list
@@ -487,11 +494,13 @@
           (list 'self 'c_arg 'e_arg)
           (foldr
            compile-pat
-           (compile-temp
-            result-ast
-            'result
-            (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
-                    (ir:error "Failed to halt the program in a final state")))
+           (compile-clauses
+            clauses
+            (compile-temp
+             result-ast
+             'result
+             (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
+                     (ir:error "Failed to halt the program in a final state"))))
            (list k0-ast c0-ast e0-ast)
            (list 'self 'c_arg 'e_arg))))))
 

@@ -62,3 +62,19 @@
 
   [(ignore env_0 (ret v (sel e_then e_else env k))) --> (e_else env k)
    #:unless 0 v])
+
+(module+ main
+  (command-line
+   #:program "tl"
+   #:once-any
+   ["--print-interp" "Print the Python definition of the interpreter"
+                     (print-tl-interp)]
+   ["--print-parser" ("Print the Python-based parser that consumes"
+                      "JSON representations of impcore terms and"
+                      "produces AST nodes")
+                     (print-tl-parser)]
+   ["--compile-term" ("Read a impcore term from stdin and print the"
+                      "JSON representation of that term to stdout.")
+                     (display (tl-term->json (read-syntax)))]
+   ["--pretty-print-term" "Like --compile-term, but print before JSON"
+                          (pretty-print (syntax->datum (read-syntax)))]))

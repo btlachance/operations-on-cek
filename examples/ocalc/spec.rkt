@@ -12,17 +12,18 @@
      (respond e var e)
      (send e var)
      ignore)
+
+  (v ::=
+     (clo l env)
+     c
+     (obj env))
+
   (var ::= variable)
   (l ::= (lam var e))
   (c ::=
      number
      add1
      sub1)
-
-  (v ::=
-     (clo l env)
-     c
-     (obj env))
 
   (env ::= dummy)
   (k ::=
@@ -31,7 +32,7 @@
      (op v k)
      (sel e e env k)
      (gethandler e var env k)
-     (extend v var k)
+     (extendobj v var k)
      (deliver var k)
      (ret v k))
 
@@ -41,13 +42,97 @@
 
   #:initial [e --> (e (emptyenv) mt)]
   #:final
-  ;; If the final result of a program can be either an number or a
-  ;; procedure and I want to be able to distinguish between those two
-  ;; cases, then I need some kind of disjunction for #:final. Right
-  ;; now the only disjunction in the metalanguage is through rule
-  ;; sequencing, so that suggests it would be nice to allow multiple
-  ;; rules for #:final.
-  [(ignore env (ret v mt)) --> (quote 0)]
+  ;; If the final result of a program can be either a number or a
+  ;; procedure and I want to have different final transitions that
+  ;; distinguish between those two cases, then I need some kind of
+  ;; disjunction for #:final. Right now the only disjunction in the
+  ;; metalanguage is through rule sequencing, so that suggests it
+  ;; would be nice to allow multiple rules for #:final. I'll work
+  ;; around by just calling something in Python land.
+  [(ignore env (ret v mt)) --> (quote 0)
+   #:with (primprint v)]
 
   #:step
-  [(var env k) --> (ignore env (ret (lookup env var) k))])
+  [(var env k) --> (ignore env (ret (lookup env var) k))]
+  [(l env k) --> (ignore env (ret (clo l env) k))]
+  [((quote c) env k) --> (ignore env (ret c k))]
+  [(emptyobj env k) --> (ignore env (ret (obj (emptyenv)) k))]
+  [((app e_op e_arg) env k) --> (e_op env (arg e_arg env k))]
+  [((ifz e_test e_then e_else) env k) --> (e_test env (sel e_then e_else env k))]
+  [((respond e_obj var e_handler) env k) --> (e_obj env (gethandler e_handler var env k))]
+  [((send e_obj var) env k) --> (e_obj env (deliver var k))]
+
+  [(ignore env_0 (ret v (arg e env k))) --> (e env (op v k))]
+  [(ignore env (ret v (op add1 k))) --> (ignore env (ret (primadd v 1) k))]
+  [(ignore env (ret v (op sub1 k))) --> (ignore env (ret (primsub v 1) k))]
+  [(ignore env_0 (ret v (op (clo (lam var e_body) env_1) k)))
+   -->
+   (e_body env k)
+   #:where env (extend1 env_1 var v)]
+  [(ignore env_0 (ret 0 (sel e_then e_else env k))) --> (e_then env k)]
+  [(ignore env_0 (ret v (sel e_then e_else env k))) --> (e_else env k)
+   #:unless 0 v]
+  [(ignore env_0 (ret v (gethandler e var env k))) --> (e env (extendobj v var k))]
+  [(ignore env_0 (ret v_handler (extendobj (obj env) var k)))
+   -->
+   (ignore env_0 (ret v_extended k))
+   #:where v_extended (obj (extend1 env var v_handler))])
+
+(module+ main
+  (command-line
+   #:program "ocalc"
+   #:once-any
+   ["--print-interp" "Print the Python definition of the interpreter"
+                     (print-ocalc-interp)]
+   ["--print-parser" ("Print the Python-based parser that consumes"
+                      "JSON representations of impcore terms and"
+                      "produces AST nodes")
+                     (print-ocalc-parser)]
+   ["--compile-term" ("Read a impcore term from stdin and print the"
+                      "JSON representation of that term to stdout.")
+                     (display (ocalc-term->json (read-syntax)))]
+   ["--pretty-print-term" "Like --compile-term, but print before JSON"
+                          (pretty-print (syntax->datum (read-syntax)))]))
+
+(module+ test
+  (require rackunit syntax/location)
+  (define racket/p (find-executable-path "racket"))
+  (define python/p (find-executable-path "python"))
+  (define ROOT (build-path (syntax-source-directory #'here) 'up 'up))
+  (define PY_MAIN (build-path ROOT "build" "interpreter-ocalc" "main.py"))
+
+  (parameterize ([current-directory ROOT])
+    (check-true (system* (find-executable-path "make")
+                         "--quiet"
+                         ;; make doesn't like the absolute path in PY_MAIN
+                         ;; so we need to give it a relative path
+                         (build-path "build" "interpreter-ocalc" "main.py"))))
+
+  (define (json-of test)
+    (define stx (datum->syntax #f test))
+    (ocalc-term->json stx))
+
+  (define (roundtrip-of test)
+    (with-output-to-string
+      (lambda ()
+        (parameterize ([current-input-port (open-input-string (~s test))])
+          (system* racket/p (quote-source-file) "--compile-term")))))
+
+  (define-syntax-rule (check-parse exp)
+    (begin
+      (define t 'exp)
+      (check-equal? (roundtrip-of t) (json-of t))))
+
+  (check-parse (quote 10))
+  (check-parse (send x x))
+  (check-parse (respond emptyobj x (lam x x)))
+  (check-parse (app (lam x x) (lam x x)))
+  (check-parse (ifz x y x))
+
+  ;; XXX Factor this better
+  (parameterize ([current-input-port (open-input-string (json-of '(quote 10)))])
+    (check-true (system* python/p PY_MAIN)))
+  (parameterize ([current-input-port (open-input-string (json-of '(app (quote add1) (quote 10))))])
+    (check-true (system* python/p PY_MAIN)))
+  (parameterize ([current-input-port (open-input-string (json-of '(lam x x)))])
+    (check-true (system* python/p PY_MAIN))))
