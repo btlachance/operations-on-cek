@@ -33,7 +33,9 @@
 
 
   #:initial [e --> (e (emptyenv) mt)]
-  #:final [(ignore env (ret number mt)) --> (quote number)]
+  #:final
+  [(ignore env (ret v mt)) --> (quote 0)
+   #:with (primprint v)]
 
   #:step
   [(var env k) --> (ignore env (ret (lookup env var) k))]
@@ -70,11 +72,64 @@
    ["--print-interp" "Print the Python definition of the interpreter"
                      (print-tl-interp)]
    ["--print-parser" ("Print the Python-based parser that consumes"
-                      "JSON representations of impcore terms and"
+                      "JSON representations of tl terms and"
                       "produces AST nodes")
                      (print-tl-parser)]
-   ["--compile-term" ("Read a impcore term from stdin and print the"
+   ["--compile-term" ("Read a tl term from stdin and print the"
                       "JSON representation of that term to stdout.")
                      (display (tl-term->json (read-syntax)))]
    ["--pretty-print-term" "Like --compile-term, but print before JSON"
                           (pretty-print (syntax->datum (read-syntax)))]))
+
+(module+ test
+  (require rackunit syntax/location)
+  (define-values (racket/p python/p make/p)
+    (apply values (map find-executable-path '("racket" "python" "make"))))
+  (define ROOT (build-path (syntax-source-directory #'here) 'up 'up))
+  (define main.py
+    ;; make doesn't like the absolute path in PY_MAIN so we need to
+    ;; give it a relative path
+    (build-path "build" "interpreter-tl" "main.py"))
+  (define PY_MAIN (build-path ROOT main.py))
+
+  (parameterize ([current-directory ROOT])
+    (check-true (system* (find-executable-path "make") "--quiet" main.py)))
+
+  (define (json-of test)
+    (define stx (datum->syntax #f test))
+    (tl-term->json stx))
+
+  (define (roundtrip-of test)
+    (with-output-to-string
+      (lambda ()
+        (parameterize ([current-input-port (open-input-string (~s test))])
+          (system* racket/p (quote-source-file) "--compile-term")))))
+
+  (define-syntax-rule (check-parse exp)
+    (begin
+      (define t 'exp)
+      (check-equal? (roundtrip-of t) (json-of t))))
+
+  (check-parse (quote 10))
+  (check-parse (app plus x x))
+  (check-parse (let x (quote 0) x))
+  (check-parse (ifz (quote 0) x y))
+
+  (define (eval exp)
+    (define err (open-output-string))
+    (parameterize ([current-input-port (open-input-string (json-of exp))]
+                   [current-error-port err])
+      (define out (with-output-to-string (lambda () (system* python/p PY_MAIN))))
+      (regexp-replace #rx"\n$" out "")))
+  (define-syntax-rule (check-evaluates-to exp s) (check-equal? (eval 'exp) s))
+
+  (check-evaluates-to (quote 42)
+                      "42")
+  (check-evaluates-to (let x (quote 0) (let x (quote 1) x))
+                      "1")
+  (check-evaluates-to (app plus (quote 21) (quote 21))
+                      "42")
+  (check-evaluates-to (app minus
+                           (quote 10)
+                           (ifz (quote 0) (quote -5) (quote 5)))
+                      "15"))

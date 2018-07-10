@@ -72,14 +72,7 @@ def primsub(v1, v2):
 
 stdout = sio.fdopen_as_stream(1, "w", buffering = 1)
 def primprint(v):
-  s = None
-  if isinstance(v, m.cl_clo):
-    s = "<procedure>"
-  elif isinstance(v, m.cl_obj):
-    s = "<object>"
-  else:
-    s = v.pprint(0)
-  stdout.write(s)
+  stdout.write(v.pprint(0))
   stdout.write("\n")
 
 # XXX These have to be in here because I have hacks in the LC language
