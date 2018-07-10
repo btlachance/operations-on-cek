@@ -36,7 +36,7 @@ class EmptyEnv(m.cl_env):
 class Env1(m.cl_env):
   _immutable_fields_ = ['x', 'v', 'e']
   def __init__(self, x, v, e):
-    assert isinstance(e, Env)
+    assert isinstance(e, m.cl_env)
     self.x = x
     self.v = v
     self.e = e

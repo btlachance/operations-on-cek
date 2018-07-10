@@ -56,7 +56,7 @@ def mkvariable(name):
   return envs.PrimVariable.make(name)
 def emptyenv():
   return envs.EmptyEnv()
-def extend(e, x, v):
+def extend1(e, x, v):
   return envs.Env1(x, v, e)
 def lookup(e, x):
   assert isinstance(x, envs.PrimVariable)
@@ -68,6 +68,8 @@ def mkint(n):
 
 def primadd(v1, v2):
   return nums.guardint(v1).add(nums.guardint(v2))
+def primsub(v1, v2):
+  return nums.guardint(v1).sub(nums.guardint(v2))
 
 stdout = sio.fdopen_as_stream(1, "w", buffering = 1)
 def primprint(v):

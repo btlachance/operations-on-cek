@@ -76,7 +76,10 @@
   [(ignore env_0 (ret v_handler (extendobj (obj env) var k)))
    -->
    (ignore env_0 (ret v_extended k))
-   #:where v_extended (obj (extend1 env var v_handler))])
+   #:where v_extended (obj (extend1 env var v_handler))]
+  [(ignore env_0 (ret v_obj (deliver var k))) --> (ignore env_0 (ret v_obj (op v k)))
+   #:where (obj env) v_obj
+   #:where v (lookup env var)])
 
 (module+ main
   (command-line
@@ -85,10 +88,10 @@
    ["--print-interp" "Print the Python definition of the interpreter"
                      (print-ocalc-interp)]
    ["--print-parser" ("Print the Python-based parser that consumes"
-                      "JSON representations of impcore terms and"
+                      "JSON representations of ocalc terms and"
                       "produces AST nodes")
                      (print-ocalc-parser)]
-   ["--compile-term" ("Read a impcore term from stdin and print the"
+   ["--compile-term" ("Read a ocalc term from stdin and print the"
                       "JSON representation of that term to stdout.")
                      (display (ocalc-term->json (read-syntax)))]
    ["--pretty-print-term" "Like --compile-term, but print before JSON"
@@ -96,17 +99,17 @@
 
 (module+ test
   (require rackunit syntax/location)
-  (define racket/p (find-executable-path "racket"))
-  (define python/p (find-executable-path "python"))
+  (define-values (racket/p python/p make/p)
+    (apply values (map find-executable-path '("racket" "python" "make"))))
   (define ROOT (build-path (syntax-source-directory #'here) 'up 'up))
-  (define PY_MAIN (build-path ROOT "build" "interpreter-ocalc" "main.py"))
+  (define main.py
+    ;; make doesn't like the absolute path in PY_MAIN so we need to
+    ;; give it a relative path
+    (build-path "build" "interpreter-ocalc" "main.py"))
+  (define PY_MAIN (build-path ROOT main.py))
 
   (parameterize ([current-directory ROOT])
-    (check-true (system* (find-executable-path "make")
-                         "--quiet"
-                         ;; make doesn't like the absolute path in PY_MAIN
-                         ;; so we need to give it a relative path
-                         (build-path "build" "interpreter-ocalc" "main.py"))))
+    (check-true (system* (find-executable-path "make") "--quiet" main.py)))
 
   (define (json-of test)
     (define stx (datum->syntax #f test))
@@ -135,4 +138,11 @@
   (parameterize ([current-input-port (open-input-string (json-of '(app (quote add1) (quote 10))))])
     (check-true (system* python/p PY_MAIN)))
   (parameterize ([current-input-port (open-input-string (json-of '(lam x x)))])
+    (check-true (system* python/p PY_MAIN)))
+  (parameterize ([current-input-port (open-input-string (json-of 'emptyobj))])
+    (check-true (system* python/p PY_MAIN)))
+  (parameterize ([current-input-port (open-input-string (json-of '(respond emptyobj x (lam self self))))])
+    (check-true (system* python/p PY_MAIN)))
+  (parameterize ([current-input-port (open-input-string (json-of '(send (respond emptyobj y (lam self (app (quote sub1) (quote 42))))
+                                                                        y)))])
     (check-true (system* python/p PY_MAIN))))
