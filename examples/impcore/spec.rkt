@@ -10,18 +10,22 @@
   (es ::= (el e es) esnil)
   (vs ::= (vl v vs) vsnil)
   (config ::= (conf term envs k))
+  (callingapp ::= nocallingapp (ca a))
+  (v ::= number l)
 
   (deff ::= (val var e) (define var vars e) e)
   (e ::= ignore literal var (set var e) (if e e e) (while e e)
-     (begin es) (app var es) (timeapply var literal))
+     (begin es) a (timeapply var literal))
+  (l ::= (lam vars e))
+  (a ::= (app var es))
   (var ::= variable)
   (literal ::= (quote number))
-  (v ::= number (fun vars e))
+
 
   (env ::= dummy)
   (envs ::= (eee env env env))
 
-  (k ::= mt (sel e e k) (looptest k) (repeat e e k) (seq e es k) (fn vs es var k)
+  (k ::= mt (sel e e k) (looptest k) (repeat e e k) (seq e es k) (fn vs es var callingapp k)
      (poplocalenv env k) (ret v k) (bindglobalk var k) (bindlocalk var k)
      (printk k) (progk program k) extensionk)
 
@@ -59,7 +63,7 @@
   [((defs (define var_fname vars_formals e_0) program) (eee env_g env_f0 env_l) k)
    -->
    (program (eee env_g env_f1 env_l) k)
-   #:where env_f1 (extend env_f0 (varl var_fname varsnil) (vl (fun vars_formals e_0) vsnil))]
+   #:where env_f1 (extend env_f0 (varl var_fname varsnil) (vl (lam vars_formals e_0) vsnil))]
 
   [((defs e_0 program) envs k)
    -->
@@ -111,9 +115,10 @@
    -->
    (ignore envs (seq e_0 es k))]
 
-  [((app var es) envs k)
+  [(a envs k)
    -->
-   (ignore envs (fn vsnil es var k))]
+   (ignore envs (fn vsnil es var (ca a) k))
+   #:where (app var es) a]
 
   [(ignore envs (ret v (looptest (repeat e_test e_body k))))
    -->
@@ -142,32 +147,36 @@
    (ignore envs k_seq)
    #:where (seq e_0 es k) k_seq]
 
-  [(ignore envs (ret v (fn vs es var k)))
+  [(ignore envs (ret v (fn vs es var callingapp k)))
    -->
-   (ignore envs (fn (vl v vs) es var k))]
+   (ignore envs (fn (vl v vs) es var callingapp k))]
 
-  [(ignore envs (fn vs (el e_next es_rest) var k))
+  [(ignore envs (fn vs (el e_next es_rest) var callingapp k))
    -->
-   (e_next envs (fn vs es_rest var k))]
+   (e_next envs (fn vs es_rest var callingapp k))]
 
-  [(ignore envs (fn vs esnil var k))
+  [(ignore envs (fn vs esnil var callingapp k))
    -->
    (e_0 (eee env_g env_f env_l1) (poplocalenv env_l0 k))
    #:unless (poplocalenv env_lignore k_ignore) k
    #:where (eee env_g env_f env_l0) envs
-   #:where (fun vars e_0) (trypromote (lookup env_f var))
-   #:where env_l1 (extend (emptyenv) vars (vsreverse vs))]
+   #:where l (lookup env_f var)
+   #:where (lam vars e_0) (trypromote l)
+   #:where env_l1 (extend (emptyenv) vars (vsreverse vs))
+   #:with (register_call l callingapp k)]
 
   ;; When the continuation of a function call is a poplocalenv, no
   ;; other expressions could see env_l0. So accumulating a poplocalenv
   ;; to restore it is wasteful, and we can easily avoid doing that.
-  [(ignore envs (fn vs esnil var k_0))
+  [(ignore envs (fn vs esnil var callingapp k_0))
    -->
    (e_0 (eee env_g env_f env_l1) k_0)
    #:where (poplocalenv env_lignore k) k_0
    #:where (eee env_g env_f env_l0) envs
-   #:where (fun vars e_0) (trypromote (lookup env_f var))
-   #:where env_l1 (extend (emptyenv) vars (vsreverse vs))]
+   #:where l (lookup env_f var)
+   #:where (lam vars e_0) (trypromote l)
+   #:where env_l1 (extend (emptyenv) vars (vsreverse vs))
+   #:with (register_call l callingapp k_0)]
 
   [(ignore envs (ret v (poplocalenv env_l1 k)))
    -->

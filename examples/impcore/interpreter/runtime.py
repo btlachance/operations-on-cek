@@ -1,11 +1,14 @@
 from rpython.rlib import jit
 from rpython.rlib import streamio as sio
+from pycket.callgraph import CallGraph
 import machine as m
 import numbers as nums
 import envs
 import prims as p
 import util as u
 import can_enter_hacks
+import surrounding_lambda_hacks
+import cont_next_ast_hacks
 import time
 
 class CEKError(Exception):
@@ -152,17 +155,32 @@ class __extend__(m.cl_timeapply):
     return m.val_ignore_sing, eee, m.cl_fn(m.cl_vl(v, m.val_vsnil_sing),
                                            m.val_esnil_sing,
                                            self.var0,
+                                           m.val_nocallingapp_sing,
                                            TimeApplyK(p.funenv(eee), time.clock(), k))
 
 class __extend__(m.cl_v):
   def promote(self):
     pass
-class __extend__(m.cl_fun):
+class __extend__(m.cl_lam):
   def promote(self):
     jit.promote(self)
 def trypromote(v):
   v.promote()
   return v
+
+callgraph = CallGraph()
+@jit.not_in_trace
+def register_call(lam, callingapp, cont):
+  assert isinstance(callingapp, m.cl_callingapp)
+  env_arg_unused = None
+  if isinstance(callingapp, m.cl_ca):
+    calling_app = callingapp.a0
+    assert isinstance(calling_app, m.cl_a)
+  else:
+    calling_app = None
+
+
+  callgraph.register_call(lam, calling_app, cont, env_arg_unused)
 
 # XXX These have to be in here because I have hacks in the LC language
 # that rely on these functions being available at JSON->AST time
