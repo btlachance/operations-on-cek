@@ -72,15 +72,32 @@ for Impcore based on its big-step semantics.
 
 @section{Performance?}
 
-To talk about performance improvements we need to keep in mind some
-notion of cost. Some costly operations RPython can automatically take
-care of for us, but others require specific annotations. We'll break
-the annotations down by components of the machine's state.
+The interpreter that Jam generates is almost as naive as it could
+get. Except in places where it's obviously not necessary, every
+compound pattern first tests that the object is of the right type and,
+if it is, deconstructs the object into its parts. If the test fails,
+then it backtracks to either the next possible transition or it halts
+the program. And it makes no attempts to factor out redundant
+patterns---when backtracking happens, the raw interpreter will do
+redundant work. But RPython and the style of JIT it generates pick up
+a lot of the slack.
 
-Our expressions are represented as objects with subexpressions stored
-as fields. Since reading out of a field on an object has a cost, with
-the help of the JIT we can eliminate that cost by marking the field as
-immutable.
+A crucial part of JITs and specializing in general is determining when
+and what to specialize. For today's purposes we'll assume that we know
+when to specialize, but we'll go over the what (i.e. what costly
+things we can eliminate).
+
+Some costly operations RPython can automatically take care of for
+us (for example, particular allocations) but others require specific
+annotations. Consider how an expression is represented as an object
+with its subexpressions stored in its fields. Any ifz expression,
+then, is an object with three fields, one for each of its
+subexpressions. Since reading out of a field on an object has a cost
+it would be nice if we could avoid that cost. If we mark each of the
+fields on the ifz class as immutable, and if the JIT specializes code
+with respect to a particular ifz expression, then the residual code
+will contain a guard on the ifz expression's object identity but
+reading out of any of the expression's fields will not be present.
 
 Environments are represented as objects with a lookup method, which
 takes an arbitrary variable and returns a value if the receiving
