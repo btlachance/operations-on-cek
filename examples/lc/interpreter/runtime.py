@@ -1055,8 +1055,6 @@ class TimeApplyK(ExtensionK):
     return m.val_ignore_sing, emptyenv(), m.cl_ret(timing_results, self.k)
   def pprint(self, indent):
     return ' ' * indent + '(timeapplyk %s %s)' % (self.start, self.k.pprint(0))
-  def get_next_executed_ast(self):
-    return self.k.get_next_executed_ast()
 
 def docontinuation(extensionk, result):
   assert isinstance(extensionk, ExtensionK)
@@ -1081,6 +1079,8 @@ def run(p):
     print err.__str__()
     return 1
   finally:
+    # import os, tempfile
+    # callgraph.write_dot_file(tempfile.NamedTemporaryFile(prefix = 'callgraph', dir = os.getcwd()))
     formatted = ', '.join(['%s=%s' % (var.pprint(0), n) for (var,n) in offtrace_vars_info.info.items()])
     print 'offtrace lookup info: %s' % formatted
     stdout.flush()
@@ -1113,5 +1113,6 @@ def inner(c, e, k):
     prev_c = c if isinstance(c, m.cl_a) else prev_c
     # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
     c, e, k = c.interpret(e, k)
+
     if c.can_enter():
       driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)

@@ -73,7 +73,7 @@ class CallGraph(object):
             if lam_in_subdct:
                 status = self.is_recursive(calling_lam, lam)
                 if status != NOT_LOOP:
-                    cont_ast.set_should_enter()
+                    cont.set_should_enter_return()
 
     def add_participants(self, path):
         for node in path:
@@ -120,7 +120,7 @@ class CallGraph(object):
         output.write("digraph callgraph {\n")
         names = Namer()
         for node in self.calls.iterkeys():
-            if node.body[0].should_enter:
+            if node.body0().should_enter:
                 name = names.nameof(node)
                 output.write(name)
                 output.write(" [fillcolor=red,style=filled];\n")
@@ -137,7 +137,7 @@ class CallGraph(object):
                 output.write(srcname)
                 output.write(" -> ")
                 output.write(dstname)
-                if dst.body[0].should_enter:
+                if dst.body0().should_enter:
                     output.write(" [color=blue]")
                 output.write(";\n")
         output.write("}\n")
