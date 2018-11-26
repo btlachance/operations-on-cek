@@ -1108,10 +1108,14 @@ def inner(c, e, k):
   # since the intial continuation is the result of a function call.
 
   prev_c = c
-  while True:
-    driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
-    prev_c = c if isinstance(c, m.cl_a) else prev_c
-    # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
-    c, e, k = c.interpret(e, k)
-    if c.can_enter():
-      driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)
+  try:
+    while True:
+      driver.jit_merge_point(c = c, prev_c = prev_c, e = e, k = k)
+      prev_c = c if isinstance(c, m.cl_a) else prev_c
+      # print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))
+      c, e, k = c.interpret(e, k)
+
+      if c.can_enter():
+        driver.can_enter_jit(c = c, prev_c = prev_c, e = e, k = k)
+  finally:
+    print "c: %s, e: %s, k: %s" % (c.pprint(0), e.pprint(0), k.pprint(0))

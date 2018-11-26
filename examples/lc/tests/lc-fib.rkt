@@ -3,4 +3,4 @@
   (if (< n 2)
       n
       (+ (fib (- n 1)) (fib (- n 2)))))
-(time-apply fib (cons 35 '()))
+(time-apply fib (cons 10 '()))

@@ -209,8 +209,17 @@
      (string-join (list header (ir->py error-ir #:indent (string-append prefix "  "))) "\n")]
     [(ir:method-def args cases)
      (define header (format "~adef interpret(~a):" prefix (apply ~a #:separator ", " args)))
+     (define store (format "~a  ~a = ~a"
+                            prefix
+                            (string-join (map (lambda (n) (~a n '_orig)) args) ", ")
+                            (apply ~a #:separator ", " args)))
      (define (case->py ir)
-       (ir->py/handle-match-failure ir #:indent (string-append prefix "  ")))
+       (ir->py/handle-match-failure ir
+                                    #:indent (string-append prefix "  ")
+                                    #:restore
+                                    (format "~a = ~a"
+                                            (apply ~a #:separator ", " args)
+                                            (string-join (map (lambda (n) (~a n '_orig)) args) ", "))))
      (define fallthrough-error
        (if (equal? super-name 'top)
            (format "~araise r.CEKError(~s)"
@@ -222,6 +231,7 @@
                    (apply ~a #:separator ", " args))))
      (~a
       header
+      store
       (string-join (map case->py cases) "\n")
       fallthrough-error
       #:separator "\n")]))
@@ -251,21 +261,26 @@
                 (string-join
                  (list
                   "def interpret(self, env, k):"
+                  "  self_orig, env_orig, k_orig = self, env, k"
                   "  try:"
                   "    return self, env, k"
-                  "  except CEKMatchFailure as matchf:"
-                  "    pass"
-                  "  raise CEKError(\"No cases matched for method in class infswimmer\")")
-                 "\n")))
+                  "  except r.CEKMatchFailure as matchf:"
+                  "    self, env, k = self_orig, env_orig, k_orig"
+                  "  raise r.CEKError(\"No cases matched for method in class infswimmer\")")
+                 "\n"))
+  )
 
-;; ir->py/handle-match-failure : ir -> string
-(define (ir->py/handle-match-failure ir #:indent [prefix ""])
+;; ir->py/handle-match-failure : ir (#:restore (U ir #f)) -> string
+;; where restore is a single, unindented, stringified statement
+(define (ir->py/handle-match-failure ir #:indent [prefix ""] #:restore [restore #f])
   (format
-   "~atry:\n~a\n~aexcept r.CEKMatchFailure as matchf:\n~a  pass"
+   "~atry:\n~a\n~aexcept r.CEKMatchFailure as matchf:\n~a  ~a"
    prefix
    (ir->py ir #:indent (string-append prefix "  "))
    prefix
-   prefix))
+   prefix
+   (or restore 'pass)))
+       
 
 (module+ test
   (check-equal? (ir->py/handle-match-failure (ir:return '(self env k)) #:indent "  ")
@@ -273,7 +288,7 @@
                  (list
                   "  try:"
                   "    return self, env, k"
-                  "  except CEKMatchFailure as matchf:"
+                  "  except r.CEKMatchFailure as matchf:"
                   "    pass")
                  "\n")))
 
@@ -327,18 +342,18 @@
                 (string-join
                  (list
                   "if isinstance(tofu, cl_food):"
-                  "  raise CEKError(\"then\")"
+                  "  raise r.CEKError(\"then\")"
                   "else:"
-                  "  raise CEKError(\"else\")")
+                  "  raise r.CEKError(\"else\")")
                  "\n"))
   (check-equal? (ir->py (ir:if-match-fails (ir:match-failure "failed!") (ir:error "bailed anyway")))
                 (string-join
                  (list
                   "try:"
-                  "  raise CEKMatchFailure(\"failed!\")"
-                  "except CEKMatchFailure as matchf:"
-                  "  raise CEKError(\"bailed anyway\")"
-                  "except CEKUnlessFailure:"
+                  "  raise r.CEKMatchFailure(\"failed!\")"
+                  "except r.CEKMatchFailure as matchf:"
+                  "  raise r.CEKError(\"bailed anyway\")"
+                  "except r.CEKUnlessFailure:"
                   "  pass")
                  "\n"))
   (check-equal? (ir->py (ir:return '()))
@@ -372,11 +387,11 @@
   (check-equal? (ir->py (ir:return '(c e k)))
                 "return c, e, k")
   (check-equal? (ir->py (ir:error "Expected c but got e"))
-                "raise CEKError(\"Expected c but got e\")")
+                "raise r.CEKError(\"Expected c but got e\")")
   (check-equal? (ir->py (ir:match-failure "Expected e but got mt"))
-                "raise CEKMatchFailure(\"Expected e but got mt\")")
+                "raise r.CEKMatchFailure(\"Expected e but got mt\")")
   (check-equal? (ir->py (ir:unless-failure))
-                "raise CEKUnlessFailure()"))
+                "raise r.CEKUnlessFailure()"))
 
 (define (test-ir->py test-ir)
   (match test-ir
@@ -422,9 +437,9 @@
                 "e.appfirst")
 
   (check-equal? (simple-ir->py (ir:call-builtin 'emptyenv '()))
-                "emptyenv()")
+                "r.emptyenv()")
   (check-equal? (simple-ir->py (ir:call-builtin 'extend '(e1 x v)))
-                "extend(e1, x, v)"))
+                "r.extend(e1, x, v)"))
 
 ;; a case is one of
 ;; - (normal-def symbol natural)

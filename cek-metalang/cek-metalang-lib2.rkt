@@ -392,6 +392,12 @@
   ;; IR) when it's the immediate result of step->methods. Once the
   ;; method is in method-by-class-name cases is a (listof IR)
   (struct method (class-name arg-names cases) #:transparent)
+
+  ;; smart constructor that produces a method on the control string
+  ;; class
+  (define (c-method arg-names cases)
+    (method (syntax-e c-id) arg-names cases))
+
   (define (step->methods step)
     (match-define (list c0-ast e0-ast k0-ast)
       (stx-map parse-pat (step-lhs step)))
@@ -405,53 +411,20 @@
       (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
       clauses
       (map temp* (list c*-ast e*-ast k*-ast) cek/tys)))
-    ;; TOTAL HACK: we only dispatch on the continuation if it's a
-    ;; named metavar or if it's a pattern that decomposes the
-    ;; continuation (i.e. not a prim). Remember: named metavar's have
-    ;; a truthy metavar-suffix
-    (define dispatch-on-k?
-      (cond
-        [(metavar? k0-ast) (metavar-suffix k0-ast)]
-        [else (not (prim? k0-ast))]))
-    (if (not dispatch-on-k?)
-        (list
-         (method
-          (ast->name c0-ast)
-          (list 'self 'e 'k)
-          (foldr
-           compile-pat
-           (compile-clauses
-            clauses
-            (foldr
-             compile-temp
-             (ir:return (list 'c_result 'e_result 'k_result))
-             (list c*-ast e*-ast k*-ast)
-             (list 'c_result 'e_result 'k_result)))
-           (list c0-ast e0-ast k0-ast)
-           (list 'self 'e 'k))))
-        (list
-         (method
-          (ast->name c0-ast)
-          (list 'self 'e 'k)
-          (foldr
-           compile-pat
-           (ir:send 'k (list 'self 'e))
-           (list c0-ast e0-ast (metavar 'k #f))
-           (list 'self 'e 'k)))
-         (method
-          (ast->name k0-ast)
-          (list 'self 'c_arg 'e_arg)
-          (foldr
-           compile-pat
-           (compile-clauses
-            clauses
-            (foldr
-             compile-temp
-             (ir:return (list 'c_result 'e_result 'k_result))
-             (list c*-ast e*-ast k*-ast)
-             (list 'c_result 'e_result 'k_result)))
-           (list k0-ast c0-ast e0-ast)
-           (list 'self 'c_arg 'e_arg))))))
+    (list
+     (c-method
+      (list 'self 'e 'k)
+      (foldr
+       compile-pat
+       (compile-clauses
+        clauses
+        (foldr
+         compile-temp
+         (ir:return (list 'c_result 'e_result 'k_result))
+         (list c*-ast e*-ast k*-ast)
+         (list 'c_result 'e_result 'k_result)))
+       (list c0-ast e0-ast k0-ast)
+       (list 'self 'e 'k)))))
 
   (define (final->methods f)
     (match-define (list c0-ast e0-ast k0-ast)
@@ -463,46 +436,20 @@
      (append (map pat* (list c0-ast e0-ast k0-ast) cek/tys)
              clauses
              (list (temp* result-ast (syntax-e c-id)))))
-    (if (or (metavar? k0-ast)
-            (prim? k0-ast))
-        (list
-         (method
-          (ast->name c0-ast)
-          (list 'self 'e 'k)
-          (foldr
-           compile-pat
-           (compile-clauses
-            clauses
-            (compile-temp
-             result-ast
-             'result
-             (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
-                     (ir:error "Failed to halt the program in a final state"))))
-           (list c0-ast e0-ast k0-ast)
-           (list 'self 'e 'k))))
-        (list
-         (method
-          (ast->name c0-ast)
-          (list 'self 'e 'k)
-          (foldr
-           compile-pat
-           (ir:send 'k (list 'self 'e))
-           (list c0-ast e0-ast (metavar 'k #f))
-           (list 'self 'e 'k)))
-         (method
-          (ast->name k0-ast)
-          (list 'self 'c_arg 'e_arg)
-          (foldr
-           compile-pat
-           (compile-clauses
-            clauses
-            (compile-temp
-             result-ast
-             'result
-             (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
-                     (ir:error "Failed to halt the program in a final state"))))
-           (list k0-ast c0-ast e0-ast)
-           (list 'self 'c_arg 'e_arg))))))
+    (list
+     (c-method
+      (list 'self 'e 'k)
+      (foldr
+       compile-pat
+       (compile-clauses
+        clauses
+        (compile-temp
+         result-ast
+         'result
+         (ir:let (list (list 'dummy (ir:call-builtin 'ret (list 'result))))
+                 (ir:error "Failed to halt the program in a final state"))))
+       (list c0-ast e0-ast k0-ast)
+       (list 'self 'e 'k)))))
 
   (define (initial->method-def i)
     (define c0-ast (parse-pat (initial-program i)))

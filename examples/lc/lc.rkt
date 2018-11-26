@@ -310,6 +310,7 @@
 
 (module+ main
   (require syntax/parse syntax/id-set)
+  (provide corify/lc-term->json)
   (define (ignored-modform? stx)
     (syntax-parse stx
       #:datum-literals (module define-syntaxes define-values
@@ -675,6 +676,7 @@
     (define basis-info (make-info (ids->vars (syntax->list names-in-basis)) empty-info))
     (define vars (assignable-vars stx))
     (kernel->core (mark-assignables stx vars) basis-info))
+
   (define corify/lc-term->json (compose lc-term->json corify))
 
   (command-line
@@ -691,3 +693,30 @@
                      (pretty-display (corify/lc-term->json (read-syntax)))]
    ["--pretty-print-term" "Like --compile-term, but print before JSON"
                           (pretty-display (syntax->datum (corify (read-syntax))))]))
+
+(module+ test
+  (require (submod ".." main) rackunit syntax/location)
+  (define-values (racket/p python/p make/p raco/p)
+    (apply values (map find-executable-path '("racket" "python" "make" "raco"))))
+  (define ROOT (build-path (syntax-source-directory #'here) 'up 'up))
+  (define main.py
+    ;; make doesn't like the absolute path in PY_MAIN so we need to
+    ;; give it a relative path
+    (build-path "build" "interpreter-lc" "main.py"))
+  (define PY_MAIN (build-path ROOT main.py))
+
+  (parameterize ([current-directory ROOT])
+    (check-true (system* make/p "--quiet" main.py)))
+
+  (define (json-of stx) (corify/lc-term->json (datum->syntax #f stx)))
+
+  (for ([f (in-directory (build-path ROOT "examples" "lc" "tests"))])
+    (define expanded-text (with-output-to-string (lambda () (system* raco/p "expand" f))))
+    (define json (with-input-from-string expanded-text (lambda () (json-of (read-syntax)))))
+    (define out (open-output-string))
+    (define err (open-output-string))
+    (parameterize ([current-input-port (open-input-string json)]
+                   [current-error-port err]
+                   [current-output-port out])
+      (system* python/p PY_MAIN))
+    (printf "running ~a produced\n\n~a\n\nand\n\n~a\n" f (get-output-string out) (get-output-string err))))
